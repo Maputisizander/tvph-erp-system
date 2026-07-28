@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useCallback, useEffect } from "react";
+import { useActionState, useState, useCallback, useEffect, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import {
   Save,
@@ -434,52 +434,52 @@ export function CreatePOForm({
               <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/10">
                 <th className={`${thClass} w-12`}>#</th>
                 <th className={`${thClass} w-24`}>Item Code</th>
-                <th className={thClass}>Description</th>
-                <th className={`${thClass} w-20`}>Qty</th>
+
+                <th className={`${thClass} min-w-[5rem]`}>Qty</th>
                 <th className={`${thClass} w-24`}>UoM</th>
                 <th className={`${thClass} w-32`}>Unit Price</th>
                 <th className={`${thClass} w-32`}>Amount</th>
                 <th className={`${thClass} w-10`}></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+            <tbody>
               {lineItems.map((li, idx) => {
                 const rowAmount = (Number(li.qty) || 0) * (Number(li.unit_price) || 0);
                 return (
-                  <tr key={idx} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
-                    <td className={`${tdClass} text-center text-slate-400 font-mono text-xs`}>
-                      {idx + 1}
-                    </td>
-                    <td className={tdClass}>
-                      <input
-                        type="text"
-                        value={li.item_code}
-                        onChange={(e) => updateLineItem(idx, "item_code", e.target.value)}
-                        className={inputClass}
-                        placeholder="—"
-                      />
-                    </td>
-                    <td className={tdClass}>
-                      <input
-                        type="text"
-                        value={li.description}
-                        onChange={(e) => updateLineItem(idx, "description", e.target.value)}
-                        className={inputClass}
-                        placeholder="Item description"
-                      />
-                    </td>
-                    <td className={tdClass}>
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={li.qty || ""}
-                        onChange={(e) => updateLineItem(idx, "qty", parseFloat(e.target.value) || 0)}
-                        className={`${inputClass} text-right`}
-                        placeholder="1"
-                      />
-                    </td>
-                    <td className={tdClass}>
+                  <Fragment key={idx}>
+                    <tr className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
+                      <td className={`${tdClass} text-center text-slate-400 font-mono text-xs`}>
+                        {idx + 1}
+                      </td>
+                      <td className={tdClass}>
+                        <input
+                          type="text"
+                          value={li.item_code}
+                          onChange={(e) => updateLineItem(idx, "item_code", e.target.value)}
+                          className={inputClass}
+                          placeholder="—"
+                        />
+                      </td>
+                      <td className={tdClass}>
+                        <div className="grid w-fit">
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={li.qty || ""}
+                            onChange={(e) => updateLineItem(idx, "qty", parseFloat(e.target.value) || 0)}
+                            className="row-start-1 col-start-1 w-full min-w-[5rem] text-right px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                            placeholder="1"
+                          />
+                          <span
+                            className="invisible whitespace-nowrap row-start-1 col-start-1 text-right px-3 py-2 text-sm border border-transparent"
+                            aria-hidden="true"
+                          >
+                            {li.qty || "1"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className={tdClass}>
                       <select
                         value={li.uom}
                         onChange={(e) => updateLineItem(idx, "uom", e.target.value)}
@@ -521,12 +521,26 @@ export function CreatePOForm({
                       </button>
                     </td>
                   </tr>
-                );
+                  <tr className="group">
+                    <td colSpan={7} className="px-3 pb-2 pt-0 border-b border-slate-100 dark:border-slate-800/50">
+                      <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                        Description
+                      </label>
+                      <textarea
+                        value={li.description}
+                        onChange={(e) => updateLineItem(idx, "description", e.target.value)}
+                        className={`${inputClass} resize-none min-h-[2.5rem]`}
+                        placeholder="Item description"
+                        rows={2}
+                      />
+                    </td>
+                  </tr>
+                </Fragment>);
               })}
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20">
-                <td colSpan={6} className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <td colSpan={5} className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Total ({currencyLabel})
                 </td>
                 <td className="px-3 py-3 text-right font-bold text-lg text-slate-900 dark:text-white pr-4">
