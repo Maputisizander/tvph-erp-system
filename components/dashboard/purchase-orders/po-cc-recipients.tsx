@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useCallback, useRef, useEffect } from "react";
-import { Mail, X, Loader2, Search, UserPlus } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { updatePOCcEmails } from "@/app/dashboard/purchase-orders/actions";
 import { createClient } from "@/utils/supabase/client";
 
@@ -23,10 +23,8 @@ export function PoCcRecipients({
   const [query, setQuery] = useState("");
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [externalInput, setExternalInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const fetchProfiles = useCallback(async (q: string) => {
     const supabase = createClient();
@@ -35,7 +33,7 @@ export function PoCcRecipients({
       .select("id, full_name, email")
       .ilike("full_name", `%${q}%`)
       .order("full_name")
-      .limit(8);
+      .limit(6);
     setProfiles(data || []);
   }, []);
 
@@ -66,7 +64,6 @@ export function PoCcRecipients({
     const next = [...emails, normalized];
     setEmails(next);
     setQuery("");
-    setExternalInput("");
     setShowDropdown(false);
     persist(next);
   }
@@ -85,10 +82,10 @@ export function PoCcRecipients({
     });
   }
 
-  function handleExternalKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter") {
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter" && query.trim()) {
       e.preventDefault();
-      addEmail(externalInput);
+      addEmail(query);
     }
   }
 
@@ -97,66 +94,31 @@ export function PoCcRecipients({
   );
 
   return (
-    <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-      <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
-        <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-          <Mail className="h-5 w-5 text-primary" /> CC Recipients
-        </h2>
-        {isPending && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
-      </div>
-      <div className="p-6 space-y-4">
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          These recipients will receive a copy of the PO email sent to the vendor.
-        </p>
-
-        {/* Selected chips */}
-        {emails.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {emails.map((email) => (
-              <span
-                key={email}
-                className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-full text-xs font-medium"
-              >
-                <Mail className="h-3 w-3" />
-                {email}
-                <button
-                  type="button"
-                  onClick={() => removeEmail(email)}
-                  className="ml-0.5 p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Search internal users */}
-        <div className="relative" ref={dropdownRef}>
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onFocus={() => query.length >= 2 && setShowDropdown(true)}
-                placeholder="Search internal users..."
-                className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-              />
-            </div>
-          </div>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-3">
+        <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1.5">
+          CC
+          {isPending && <Loader2 className="h-3 w-3 animate-spin" />}
+        </label>
+        <div className="relative flex-1" ref={dropdownRef}>
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onFocus={() => query.length >= 2 && setShowDropdown(true)}
+            placeholder="Add email recipients..."
+            className="w-full px-3 py-1.5 text-sm bg-transparent border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary transition-all"
+          />
           {showDropdown && filteredProfiles.length > 0 && (
-            <div className="absolute z-50 mt-1 w-full bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+            <div className="absolute z-50 mt-1 w-full bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg max-h-48 overflow-y-auto">
               {filteredProfiles.map((p) => (
                 <button
                   key={p.id}
                   type="button"
                   onClick={() => addEmail(p.email)}
-                  className="flex items-center gap-3 w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                  className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                 >
-                  <UserPlus className="h-4 w-4 text-slate-400 shrink-0" />
                   <span className="min-w-0">
                     <span className="block text-sm font-medium text-slate-900 dark:text-white truncate">
                       {p.full_name}
@@ -170,35 +132,31 @@ export function PoCcRecipients({
             </div>
           )}
         </div>
-
-        {/* External email input */}
-        <div className="flex items-center gap-2">
-          <input
-            type="email"
-            value={externalInput}
-            onChange={(e) => setExternalInput(e.target.value)}
-            onKeyDown={handleExternalKeyDown}
-            placeholder="Or type an external email address..."
-            className="flex-1 px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-          />
-          <button
-            type="button"
-            onClick={() => addEmail(externalInput)}
-            disabled={!externalInput.includes("@")}
-            className="px-3 py-2 text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Add
-          </button>
-        </div>
-
-        {error && (
-          <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
-        )}
-
-        {emails.length === 0 && (
-          <p className="text-xs text-slate-400 italic">No CC recipients added yet.</p>
-        )}
       </div>
+
+      {emails.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 ml-9">
+          {emails.map((email) => (
+            <span
+              key={email}
+              className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-md text-xs"
+            >
+              {email}
+              <button
+                type="button"
+                onClick={() => removeEmail(email)}
+                className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {error && (
+        <p className="text-xs text-red-600 dark:text-red-400 ml-9">{error}</p>
+      )}
     </div>
   );
 }

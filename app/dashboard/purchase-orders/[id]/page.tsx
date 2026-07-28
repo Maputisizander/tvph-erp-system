@@ -486,14 +486,6 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
         </div>
       )}
 
-      {/* CC Recipients — editable while draft or pending approval */}
-      {(po.status === "draft" || po.status === "pending_approval") && (
-        <PoCcRecipients
-          poId={po.id}
-          initialEmails={(po.cc_emails as string[] | null) || []}
-        />
-      )}
-
       {/* Completion Certificates */}
       {(signedCerts.length > 0 || canSubmitCert) && (
         <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
@@ -939,6 +931,14 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                   </p>
                 </div>
               </div>
+              {(po.status === "draft" || po.status === "pending_approval") && (
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800/50">
+                  <PoCcRecipients
+                    poId={po.id}
+                    initialEmails={(po.cc_emails as string[] | null) || []}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
