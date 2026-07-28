@@ -932,12 +932,10 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                 </div>
               </div>
               {(po.status === "draft" || po.status === "pending_approval") && (
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800/50">
-                  <PoCcRecipients
-                    poId={po.id}
-                    initialEmails={(po.cc_emails as string[] | null) || []}
-                  />
-                </div>
+                <PoCcRecipients
+                  poId={po.id}
+                  initialEmails={(po.cc_emails as string[] | null) || []}
+                />
               )}
             </div>
           </div>
