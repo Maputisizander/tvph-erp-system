@@ -35,7 +35,14 @@ export function PurchaseOrdersTableBody({ pos, error }: { pos: any[] | null; err
             className="cursor-pointer group hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors"
           >
             <td className="px-6 py-4">
-              <div className="font-bold text-slate-900 dark:text-white">{po.po_number}</div>
+              <div className="font-bold text-slate-900 dark:text-white">
+                {po.po_number}
+                {Number(po.dp_amount) > 0 && (
+                  <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
+                    DP
+                  </span>
+                )}
+              </div>
               <div className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">{new Date(po.issued_date).toLocaleDateString()}</div>
             </td>
             <td className="px-6 py-4">

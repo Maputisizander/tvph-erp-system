@@ -259,7 +259,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
   // Fetch latest payment request for this PO
   const { data: paymentRequest } = await supabase
     .from('payment_requests')
-    .select('id, request_number, amount, due_in_days, notes, status, completion_cert_id, percent_complete, created_at, rejection_reason')
+    .select('id, request_number, amount, due_in_days, notes, status, completion_cert_id, percent_complete, created_at, rejection_reason, is_downpayment')
     .eq('po_id', po.id)
     .in('status', ['pending', 'approved', 'rejected', 'fully_invoiced'])
     .order('created_at', { ascending: false })
@@ -325,6 +325,11 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               >
                 {po.status.replace(/_/g, " ").toUpperCase()}
               </span>
+              {dpAmount > 0 && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/50 text-sm font-bold">
+                  DP — ₱{dpAmount.toLocaleString()}
+                </span>
+              )}
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
               <Building2 className="h-4 w-4" /> Vendor:{" "}
@@ -814,6 +819,11 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-3">
                   Payment Request: {paymentRequest.request_number}
+                  {paymentRequest.is_downpayment && (
+                    <span className="ml-1.5 inline-flex items-center px-1 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
+                      DP
+                    </span>
+                  )}
                 </label>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-xs">

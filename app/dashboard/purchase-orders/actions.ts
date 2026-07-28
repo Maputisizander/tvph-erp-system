@@ -1083,6 +1083,7 @@ export async function createPaymentRequest(
   dueInDays?: number,
   notes?: string,
   completionCertId?: string,
+  isDownpayment: boolean = false,
 ) {
   const supabase = await createClient();
   const { user, error: authError } = await requireCapability('payment_request.create', supabase);
@@ -1139,6 +1140,7 @@ export async function createPaymentRequest(
     completion_cert_id: completionCertId || null,
     percent_complete: percentComplete,
     created_by: user.id,
+    is_downpayment: isDownpayment,
   });
   if (insertError) return { error: insertError.message };
 

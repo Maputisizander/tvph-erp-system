@@ -19,6 +19,21 @@ function formatNumber(value: number): string {
   }).format(value);
 }
 
+/** Inject a DP label run beside the PO number in the document header */
+function injectDpLabel(xml: string, poNumber: string, dpAmount: number): string {
+  if (dpAmount <= 0) return xml;
+
+  const escaped = poNumber.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const dpRun = `<w:r><w:rPr><w:b/><w:color w:val="D97706"/><w:sz w:val="18"/></w:rPr><w:t xml:space="preserve">  [DP]</w:t></w:r>`;
+
+  return xml.replace(/(<w:p[ >][\s\S]*?<\/w:p>)/g, (para) => {
+    if (new RegExp(`<w:t[^>]*>${escaped}</w:t>`).test(para)) {
+      return para.replace(/(<\/w:p>)/, dpRun + '$1');
+    }
+    return para;
+  });
+}
+
 /** Escape text for safe embedding in XML text nodes */
 function escapeXml(str: string): string {
   return String(str ?? "")
@@ -193,6 +208,8 @@ export async function generatePurchaseOrderDocx(poId: string): Promise<Buffer> {
     "{project_name}": poData.project_name,
   };
   xml = replaceInPlace(xml, vars);
+
+  xml = injectDpLabel(xml, poData.po_number, poData.downpayment_amount);
 
   xml = expandLoop(xml, "line_items", poData.line_items, (item) => ({
     "{line_no}": String(item.line_no),

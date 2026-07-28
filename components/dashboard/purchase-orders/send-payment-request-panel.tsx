@@ -54,6 +54,7 @@ interface Props {
   poId: string;
   poNumber: string;
   poAmount: number;
+  poDpAmount: number;
   vendorId: string;
   vendorName: string;
   vendorDocuments: VendorDoc[];
@@ -65,6 +66,7 @@ export function SendPaymentRequestPanel({
   poId,
   poNumber,
   poAmount,
+  poDpAmount,
   vendorId,
   vendorName,
   vendorDocuments,
@@ -80,6 +82,7 @@ export function SendPaymentRequestPanel({
   const [selectedCertId, setSelectedCertId] = useState(
     approvedCerts[0]?.id ?? "",
   );
+  const [isDownpayment, setIsDownpayment] = useState(false);
 
   const docStatusMap: Record<string, VendorDoc> = {};
   for (const doc of vendorDocuments) {
@@ -115,6 +118,7 @@ export function SendPaymentRequestPanel({
         parseInt(dueInDays) || 30,
         notes || undefined,
         selectedCertId || undefined,
+        isDownpayment,
       );
       if (res.error) {
         setError(res.error);
@@ -233,6 +237,24 @@ export function SendPaymentRequestPanel({
                   className="w-full text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-3 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="is-downpayment"
+                checked={isDownpayment}
+                onChange={(e) => {
+                  setIsDownpayment(e.target.checked);
+                  if (e.target.checked && poDpAmount > 0) {
+                    setAmount(String(poDpAmount));
+                  }
+                }}
+                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+              />
+              <label htmlFor="is-downpayment" className="text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                This is a Downpayment Request
+              </label>
             </div>
 
             {approvedCerts.length > 0 && (
