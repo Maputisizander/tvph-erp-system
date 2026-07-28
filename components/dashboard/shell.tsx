@@ -52,7 +52,7 @@ export function DashboardShell({
           />
           <main className="flex-1 overflow-auto bg-white dark:bg-[#0a0a0a]">
             <div className="min-h-full flex flex-col">
-              <div className="flex-1 pb-24">
+              <div className="flex-1">
                 {children}
               </div>
             </div>
