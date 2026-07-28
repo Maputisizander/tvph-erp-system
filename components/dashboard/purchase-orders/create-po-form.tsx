@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState, useCallback } from "react";
+import { useActionState, useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Save,
   Building2,
@@ -14,9 +15,13 @@ import {
   Plus,
   Trash2,
   MapPin,
+  CheckCircle2,
+  XCircle,
+  X,
 } from "lucide-react";
 import { createPurchaseOrder } from "@/app/dashboard/purchase-orders/actions";
 import { hasCapability } from "@/lib/auth/roles";
+import { Combobox } from "@/components/ui/combobox";
 
 interface VendorWithNda {
   id: string;
@@ -39,9 +44,11 @@ interface SiteDetail {
   area_city: string;
   no_of_nodes: number;
   cable_length_km: number;
+  node_id: string;
+  phase: string;
 }
 
-const UOM_OPTIONS = ["LOT", "PCS", "SET", "HRS", "DAYS", "MOS", "SQM", "LM", "KG"];
+const UOM_OPTIONS = ["LOT", "PCS", "SET", "HRS", "DAYS", "MOS", "SQM", "LM", "KG", "KM"];
 
 const EMPTY_LINE_ITEM: LineItem = {
   item_code: "",
@@ -56,22 +63,49 @@ const EMPTY_SITE: SiteDetail = {
   area_city: "",
   no_of_nodes: 0,
   cable_length_km: 0,
+  node_id: "",
+  phase: "",
 };
 
 export function CreatePOForm({
   vendors,
   projects,
   userRole,
+  regions,
+  areaByRegion,
 }: {
   vendors: VendorWithNda[];
   projects: { id: string; name: string }[];
   userRole: string;
+  regions: string[];
+  areaByRegion: Record<string, string[]>;
 }) {
   const [state, formAction, isPending] = useActionState(createPurchaseOrder, null);
+  const router = useRouter();
   const [selectedVendor, setSelectedVendor] = useState("");
   const [lineItems, setLineItems] = useState<LineItem[]>([{ ...EMPTY_LINE_ITEM }]);
   const [siteDetails, setSiteDetails] = useState<SiteDetail[]>([{ ...EMPTY_SITE }]);
   const [waiveRequirements, setWaiveRequirements] = useState(false);
+  const [resultModal, setResultModal] = useState<{
+    type: "success" | "error";
+    title: string;
+    message: string;
+    poUrl?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!state) return;
+    if ("error" in state) {
+      setResultModal({ type: "error", title: "Failed to Create PO", message: state.error as string });
+    } else if ("id" in state) {
+      setResultModal({
+        type: "success",
+        title: "PO Created Successfully",
+        message: (state as any).message || `Draft PO ${(state as any).po_number} created successfully.`,
+        poUrl: (state as any).url,
+      });
+    }
+  }, [state]);
 
   const vendor = vendors.find((v) => v.id === selectedVendor);
   const ndaBlocked = vendor && !vendor.nda_approved;
@@ -150,7 +184,7 @@ export function CreatePOForm({
       <input type="hidden" name="site_details" value={JSON.stringify(siteDetails)} />
       <input type="hidden" name="amount" value={totalAmount.toString()} />
 
-      {state?.error && (
+      {state && "error" in state && (
         <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-sm font-medium">
           {state.error}
         </div>
@@ -538,6 +572,8 @@ export function CreatePOForm({
                 <th className={`${thClass} w-12`}>S/N</th>
                 <th className={thClass}>Region</th>
                 <th className={thClass}>Area / City</th>
+                <th className={`${thClass} w-28`}>Node ID</th>
+                <th className={`${thClass} w-24`}>Phase</th>
                 <th className={`${thClass} w-28`}>No. of Nodes</th>
                 <th className={`${thClass} w-36`}>Cable Length (KM)</th>
                 <th className={`${thClass} w-10`}></th>
@@ -550,21 +586,43 @@ export function CreatePOForm({
                     {idx + 1}
                   </td>
                   <td className={tdClass}>
-                    <input
-                      type="text"
+                    <Combobox
+                      options={regions}
                       value={site.region}
-                      onChange={(e) => updateSite(idx, "region", e.target.value)}
-                      className={inputClass}
+                      onChange={(val) => {
+                        updateSite(idx, "region", val);
+                        const allowedAreas = areaByRegion[val] || [];
+                        if (!allowedAreas.includes(site.area_city)) {
+                          updateSite(idx, "area_city", "");
+                        }
+                      }}
                       placeholder="Region"
+                    />
+                  </td>
+                  <td className={tdClass}>
+                    <Combobox
+                      options={areaByRegion[site.region] || []}
+                      value={site.area_city}
+                      onChange={(val) => updateSite(idx, "area_city", val)}
+                      placeholder="Area / City"
                     />
                   </td>
                   <td className={tdClass}>
                     <input
                       type="text"
-                      value={site.area_city}
-                      onChange={(e) => updateSite(idx, "area_city", e.target.value)}
+                      value={site.node_id}
+                      onChange={(e) => updateSite(idx, "node_id", e.target.value)}
                       className={inputClass}
-                      placeholder="Area / City"
+                      placeholder="e.g. MN113"
+                    />
+                  </td>
+                  <td className={tdClass}>
+                    <input
+                      type="text"
+                      value={site.phase}
+                      onChange={(e) => updateSite(idx, "phase", e.target.value)}
+                      className={inputClass}
+                      placeholder="Phase"
                     />
                   </td>
                   <td className={tdClass}>
@@ -603,7 +661,7 @@ export function CreatePOForm({
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20">
-                <td colSpan={3} className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <td colSpan={5} className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Total
                 </td>
                 <td className="px-3 py-3 text-right font-bold text-slate-900 dark:text-white">
@@ -644,6 +702,53 @@ export function CreatePOForm({
           Create PO
         </button>
       </div>
+
+      {/* ── Result Modal ── */}
+      {resultModal && (
+        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-[#0a0a0a]/50">
+              <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                {resultModal.type === "success" ? (
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-red-500" />
+                )}
+                {resultModal.title}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setResultModal(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-slate-600 dark:text-slate-400">{resultModal.message}</p>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setResultModal(null)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  {resultModal.type === "error" ? "Close" : "Stay"}
+                </button>
+                {resultModal.type === "success" && resultModal.poUrl && (
+                  <button
+                    type="button"
+                    onClick={() => router.push(resultModal.poUrl!)}
+                    className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-95"
+                  >
+                    <FileText className="h-4 w-4" />
+                    View PO
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

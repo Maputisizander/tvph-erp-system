@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server';
 import { ArrowLeft } from 'lucide-react';
 import { CreatePOForm } from '@/components/dashboard/purchase-orders/create-po-form';
 import { getCurrentProfile } from '@/lib/auth/permissions';
+import { REGION_NAMES, REGIONS } from '@/lib/constants/philippine-regions';
 
 export default async function NewPurchaseOrderPage() {
   const supabase = await createClient();
@@ -35,6 +36,9 @@ export default async function NewPurchaseOrderPage() {
     .is('deleted_at', null)
     .order('name');
 
+  const regions = REGION_NAMES;
+  const areaByRegion = REGIONS;
+
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
@@ -55,7 +59,13 @@ export default async function NewPurchaseOrderPage() {
         </div>
       </div>
 
-      <CreatePOForm vendors={vendorsWithNda} projects={projects || []} userRole={role || ''} />
+      <CreatePOForm
+        vendors={vendorsWithNda}
+        projects={projects || []}
+        userRole={role || ''}
+        regions={regions}
+        areaByRegion={areaByRegion}
+      />
     </div>
   );
 }

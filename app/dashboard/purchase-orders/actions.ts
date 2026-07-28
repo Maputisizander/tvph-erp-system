@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
-import { redirect } from 'next/navigation';
 import { createNotification } from '@/utils/notifications';
 import { recordAuditLog } from '@/utils/audit';
 import { getCurrentProfile, requireCapability, hasCapability } from '@/lib/auth/permissions';
@@ -10,7 +9,7 @@ import { sendPoIssuedEmail } from '@/lib/email/po';
 import { sendPoPendingApprovalEmail } from '@/lib/email/po-pending-approval';
 
 type POLineItem = { item_code?: string; description: string; qty: number; uom?: string; unit_price: number };
-type POSiteDetail = { region: string; area_city: string; no_of_nodes: number; cable_length_km: number };
+type POSiteDetail = { region: string; area_city: string; no_of_nodes: number; cable_length_km: number; node_id?: string; phase?: string };
 
 interface CreatePOInput {
   vendor_id: string;
@@ -98,6 +97,34 @@ export async function createPurchaseOrderCore(input: CreatePOInput) {
     if (statusFailed) waivedRequirements.push('vendor_status');
   }
 
+  // ── Duplicate check: prevent overlapping POs for the same node_id in the same region/area/phase ──
+  for (const site of site_details) {
+    if (!site.node_id?.trim()) continue;
+    const { data: existingRows } = await supabase
+      .from('po_site_details')
+      .select('po_id')
+      .ilike('region', site.region || '')
+      .ilike('area_city', site.area_city || '')
+      .ilike('node_id', site.node_id)
+      .ilike('phase', site.phase || '');
+
+    if (existingRows && existingRows.length > 0) {
+      const poIds = [...new Set(existingRows.map(r => r.po_id))];
+      const { data: activePOs } = await supabase
+        .from('purchase_orders')
+        .select('po_number')
+        .in('id', poIds)
+        .neq('status', 'cancelled')
+        .is('deleted_at', null);
+
+      if (activePOs && activePOs.length > 0) {
+        return {
+          error: `Duplicate site detected: Node ID "${site.node_id}" in ${site.region}, ${site.area_city} (Phase: "${site.phase || 'N/A'}") already exists in ${activePOs.map(p => p.po_number).join(', ')}. Please check and avoid duplicate entries.`,
+        };
+      }
+    }
+  }
+
   const { data: newPO, error } = await supabase.from('purchase_orders').insert({
     vendor_id,
     project_id: project_id || null,
@@ -147,7 +174,7 @@ export async function createPurchaseOrderCore(input: CreatePOInput) {
   }
 
   const validSites = site_details.filter(
-    (s) => s.region || s.area_city || s.no_of_nodes > 0 || s.cable_length_km > 0
+    (s) => s.region || s.area_city || s.node_id || s.phase || s.no_of_nodes > 0 || s.cable_length_km > 0
   );
   if (validSites.length > 0) {
     const { error: siteError } = await supabase.from('po_site_details').insert(
@@ -156,6 +183,8 @@ export async function createPurchaseOrderCore(input: CreatePOInput) {
         sn: i + 1,
         region: s.region || '',
         area_city: s.area_city || '',
+        node_id: s.node_id || '',
+        phase: s.phase || '',
         no_of_nodes: Number(s.no_of_nodes) || 0,
         cable_length_km: Number(s.cable_length_km) || 0,
       }))
@@ -232,8 +261,7 @@ export async function createPurchaseOrder(prevState: any, formData: FormData) {
     waive_requirements: formData.get('waive_requirements') === 'on',
   });
 
-  if ('error' in result) return { error: result.error };
-  redirect(result.url);
+  return result;
 }
 
 function parseTerms(formData: FormData) {
