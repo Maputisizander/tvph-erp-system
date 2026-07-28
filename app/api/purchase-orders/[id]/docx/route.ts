@@ -13,7 +13,8 @@ export async function GET(
     }
 
     const { id } = await params
-    const { buffer, filename } = await resolvePoDocx(id)
+    const regenerate = _request.nextUrl.searchParams.get("regenerate") === "true"
+    const { buffer, filename } = await resolvePoDocx(id, { forceRegenerate: regenerate })
 
     return new Response(buffer as unknown as BodyInit, {
       status: 200,
