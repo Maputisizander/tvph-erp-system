@@ -836,6 +836,8 @@ export const erpTools = {
         area_city: z.string(),
         no_of_nodes: z.number(),
         cable_length_km: z.number(),
+        node_id: z.string().optional().describe("Node identifier, e.g. MN113"),
+        phase: z.string().optional().describe("Phase number, e.g. '1', 'Phase 1'"),
       })).optional().describe("Optional telecom site details"),
       description: z.string().optional().describe("Overall PO description or scope of work"),
       issued_date: z.string().optional().describe("Issued date in YYYY-MM-DD format. Defaults to today if omitted."),

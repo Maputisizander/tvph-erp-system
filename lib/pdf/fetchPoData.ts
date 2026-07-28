@@ -55,6 +55,8 @@ export async function fetchPoData(id: string): Promise<PoData | null> {
     area_city: s.area_city ?? '',
     no_of_nodes: Number(s.no_of_nodes),
     estimated_strand_km: Number(s.cable_length_km ?? 0),
+    node_id: s.node_id ?? '',
+    phase: s.phase ?? '',
   }))
 
   return {
