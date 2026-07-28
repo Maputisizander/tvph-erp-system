@@ -576,6 +576,42 @@ export async function resendPurchaseOrderEmail(poId: string) {
   return { success: true };
 }
 
+export async function updatePOCcEmails(poId: string, ccEmails: string[]) {
+  const supabase = await createClient();
+  const { user, error: authError } = await requireCapability('po.write', supabase);
+  if (authError || !user) return { error: authError || 'Unauthorized' };
+
+  const { data: po } = await supabase
+    .from('purchase_orders')
+    .select('status')
+    .eq('id', poId)
+    .single();
+
+  if (po?.status !== 'draft' && po?.status !== 'pending_approval') {
+    return { error: 'CC recipients can only be edited before the PO is issued.' };
+  }
+
+  const uniqueEmails = [...new Set(ccEmails)].filter((e) => e && e.includes('@'));
+
+  const { error } = await supabase
+    .from('purchase_orders')
+    .update({ cc_emails: uniqueEmails, updated_at: new Date().toISOString() })
+    .eq('id', poId);
+
+  if (error) return { error: error.message };
+
+  await recordAuditLog({
+    entity_type: 'purchase_order',
+    entity_id: poId,
+    action: 'UPDATE',
+    changes: { after: { cc_emails: uniqueEmails } },
+    performed_by: user.id,
+  });
+
+  revalidatePath(`/dashboard/purchase-orders/${poId}`);
+  return { success: true };
+}
+
 export async function assignProjectToPO(poId: string, projectId: string | null) {
   const supabase = await createClient();
   const { user, error: authError } = await requireCapability('po.write', supabase);

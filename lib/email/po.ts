@@ -40,7 +40,7 @@ export async function sendPoIssuedEmail(
   const { data: po, error } = await supabase
     .from("purchase_orders")
     .select(
-      `po_number, amount, currency, issued_date, created_by, vendor_id,
+      `po_number, amount, currency, issued_date, created_by, vendor_id, cc_emails,
        vendors ( name, contact_person, contact_email ),
        creator:profiles!created_by ( full_name, email, phone )`,
     )
@@ -73,7 +73,7 @@ export async function sendPoIssuedEmail(
     kind: "po_issued",
     refId: poId,
     to: [vendor.contact_email || ""],
-    cc: internalCc(creator.email),
+    cc: [...internalCc(creator.email), ...((po.cc_emails as string[] | null) || [])],
     subject: `Purchase Order ${po.po_number} from TVPH`,
     react: PoIssuedEmail({
       vendorName: vendor.name || "Vendor",

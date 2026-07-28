@@ -37,6 +37,7 @@ import { PoCertUpload } from "@/components/dashboard/purchase-orders/po-cert-upl
 import { NotifyFinanceButton } from "@/components/dashboard/purchase-orders/notify-finance-button";
 import { PaymentRequestButton } from "@/components/dashboard/purchase-orders/payment-request-button";
 import { PoTermsCard } from "@/components/dashboard/purchase-orders/po-terms-card";
+import { PoCcRecipients } from "@/components/dashboard/purchase-orders/po-cc-recipients";
 import { getCurrentProfile, hasCapability } from "@/lib/auth/permissions";
 import { signDocUrls } from "@/utils/storage";
 
@@ -483,6 +484,14 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
             </p>
           </div>
         </div>
+      )}
+
+      {/* CC Recipients — editable while draft or pending approval */}
+      {(po.status === "draft" || po.status === "pending_approval") && (
+        <PoCcRecipients
+          poId={po.id}
+          initialEmails={(po.cc_emails as string[] | null) || []}
+        />
       )}
 
       {/* Completion Certificates */}
