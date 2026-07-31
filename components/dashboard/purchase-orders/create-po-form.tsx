@@ -54,6 +54,7 @@ interface PRPrefill {
   description: string | null;
   project_id: string | null;
   line_items: LineItem[];
+  site_details?: SiteDetail[];
 }
 
 const UOM_OPTIONS = ["LOT", "PCS", "SET", "HRS", "DAYS", "MOS", "SQM", "LM", "KG", "KM"];
@@ -96,7 +97,11 @@ export function CreatePOForm({
   const [lineItems, setLineItems] = useState<LineItem[]>(
     purchaseRequest?.line_items?.length ? purchaseRequest.line_items : [{ ...EMPTY_LINE_ITEM }]
   );
-  const [siteDetails, setSiteDetails] = useState<SiteDetail[]>([{ ...EMPTY_SITE }]);
+  const [siteDetails, setSiteDetails] = useState<SiteDetail[]>(
+    purchaseRequest?.site_details?.length
+      ? purchaseRequest.site_details
+      : [{ ...EMPTY_SITE }]
+  );
   const [waiveRequirements, setWaiveRequirements] = useState(false);
   const [resultModal, setResultModal] = useState<{
     type: "success" | "error";

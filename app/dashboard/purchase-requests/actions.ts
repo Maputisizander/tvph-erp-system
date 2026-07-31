@@ -10,11 +10,43 @@ import { sendPrPendingApprovalEmail } from '@/lib/email/pr-pending-approval';
 import { sendPrApprovedEmail } from '@/lib/email/pr-approved';
 
 type PRLineItem = { item_code?: string; description: string; qty: number; uom?: string; unit_price: number };
+type PRSiteDetail = {
+  region?: string;
+  area_city?: string;
+  node_id?: string;
+  phase?: string;
+  no_of_nodes?: number;
+  cable_length_km?: number;
+};
 
 interface CreatePRInput {
   project_id?: string;
   line_items: PRLineItem[];
+  site_details?: PRSiteDetail[];
   description?: string;
+}
+
+function siteDetailRows(prId: string, siteDetails: PRSiteDetail[]) {
+  return siteDetails.map((s, i) => ({
+    pr_id: prId,
+    sn: i + 1,
+    region: s.region || '',
+    area_city: s.area_city || '',
+    node_id: s.node_id || '',
+    phase: s.phase || '',
+    no_of_nodes: Number(s.no_of_nodes) || 0,
+    cable_length_km: Number(s.cable_length_km) || 0,
+  }));
+}
+
+function parseJsonField(formData: FormData, name: string): any[] | null {
+  const raw = formData.get(name) as string;
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 export async function createPurchaseRequestCore(input: CreatePRInput) {
@@ -22,7 +54,7 @@ export async function createPurchaseRequestCore(input: CreatePRInput) {
   const { user, error: authError } = await requireCapability('pr.create', supabase);
   if (authError || !user) return { error: authError || 'Unauthorized' };
 
-  const { project_id, line_items, description } = input;
+  const { project_id, line_items, site_details = [], description } = input;
 
   const totalAmount = line_items.reduce((sum, li) => sum + (Number(li.qty) || 0) * (Number(li.unit_price) || 0), 0);
   if (totalAmount <= 0) return { error: 'Total amount must be greater than zero. Add at least one line item with a price.' };
@@ -59,11 +91,23 @@ export async function createPurchaseRequestCore(input: CreatePRInput) {
     if (liError) console.error('Error inserting PR line items:', liError);
   }
 
+  if (site_details.length > 0) {
+    const { error: sdError } = await supabase.from('pr_site_details').insert(siteDetailRows(newPR.id, site_details));
+    if (sdError) console.error('Error inserting PR site details:', sdError);
+  }
+
   await recordAuditLog({
     entity_type: 'purchase_request',
     entity_id: newPR.id,
     action: 'CREATE',
-    changes: { after: { amount: totalAmount, status: 'draft', line_items_count: line_items.length } },
+    changes: {
+      after: {
+        amount: totalAmount,
+        status: 'draft',
+        line_items_count: line_items.length,
+        site_details_count: site_details.length,
+      },
+    },
     performed_by: user.id,
   });
 
@@ -78,18 +122,15 @@ export async function createPurchaseRequestCore(input: CreatePRInput) {
 }
 
 export async function createPurchaseRequest(prevState: any, formData: FormData) {
-  let lineItems: PRLineItem[] = [];
-
-  try {
-    const raw = formData.get('line_items') as string;
-    if (raw) lineItems = JSON.parse(raw);
-  } catch {
-    return { error: 'Invalid line items data.' };
-  }
+  const lineItems = parseJsonField(formData, 'line_items');
+  if (!lineItems) return { error: 'Invalid line items data.' };
+  const siteDetails = parseJsonField(formData, 'site_details');
+  if (!siteDetails) return { error: 'Invalid site details data.' };
 
   const result = await createPurchaseRequestCore({
     project_id: formData.get('project_id') as string || undefined,
     line_items: lineItems,
+    site_details: siteDetails,
     description: formData.get('description') as string || undefined,
   });
 
@@ -115,12 +156,13 @@ export async function updatePurchaseRequest(prId: string, formData: FormData) {
   if (pr?.status !== 'draft') return { error: 'Only draft PRs can be edited.' };
 
   let lineItems: PRLineItem[] = [];
-  try {
-    const raw = formData.get('line_items') as string;
-    if (raw) lineItems = JSON.parse(raw);
-  } catch {
-    return { error: 'Invalid line items data.' };
-  }
+  let siteDetails: PRSiteDetail[] = [];
+  const parsedLineItems = parseJsonField(formData, 'line_items');
+  const parsedSiteDetails = parseJsonField(formData, 'site_details');
+  if (!parsedLineItems) return { error: 'Invalid line items data.' };
+  if (!parsedSiteDetails) return { error: 'Invalid site details data.' };
+  lineItems = parsedLineItems;
+  siteDetails = parsedSiteDetails;
 
   const totalAmount = lineItems.reduce((sum, li) => sum + (Number(li.qty) || 0) * (Number(li.unit_price) || 0), 0);
   if (totalAmount <= 0) return { error: 'Total amount must be greater than zero. Add at least one line item with a price.' };
@@ -155,11 +197,20 @@ export async function updatePurchaseRequest(prId: string, formData: FormData) {
   );
   if (liError) return { error: liError.message };
 
+  // Replace site details (draft-only, so a wholesale swap is safe)
+  await supabase.from('pr_site_details').delete().eq('pr_id', prId);
+  if (siteDetails.length > 0) {
+    const { error: sdError } = await supabase.from('pr_site_details').insert(siteDetailRows(prId, siteDetails));
+    if (sdError) return { error: sdError.message };
+  }
+
   await recordAuditLog({
     entity_type: 'purchase_request',
     entity_id: prId,
     action: 'UPDATE',
-    changes: { after: { amount: totalAmount, line_items_count: lineItems.length } },
+    changes: {
+      after: { amount: totalAmount, line_items_count: lineItems.length, site_details_count: siteDetails.length },
+    },
     performed_by: user.id,
   });
 

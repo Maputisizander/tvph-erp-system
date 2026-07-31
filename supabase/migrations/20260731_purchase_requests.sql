@@ -77,6 +77,28 @@ drop policy if exists "Allow authenticated full access" on public.pr_line_items;
 create policy "Allow authenticated full access" on public.pr_line_items
   for all to authenticated using (true) with check (true);
 
+-- Site details captured at the request stage so approvers see the scope and the
+-- PO inherits it at conversion. Mirrors po_site_details 1:1.
+create table if not exists public.pr_site_details (
+  id          uuid primary key default gen_random_uuid(),
+  pr_id       uuid not null references public.purchase_requests(id) on delete cascade,
+  sn          integer not null,
+  region      text not null default '',
+  area_city   text not null default '',
+  node_id     text not null default '',
+  phase       text not null default '',
+  no_of_nodes integer not null default 0,
+  cable_length_km numeric not null default 0,
+  created_at  timestamptz default now()
+);
+alter table public.pr_site_details enable row level security;
+
+drop policy if exists "Allow authenticated full access" on public.pr_site_details;
+create policy "Allow authenticated full access" on public.pr_site_details
+  for all to authenticated using (true) with check (true);
+
+create index if not exists idx_pr_site_details_pr_id on public.pr_site_details(pr_id);
+
 -- email_log kinds for the PR flow. payment_request_notification is also added —
 -- app code (lib/email/payment-request.ts) already uses it but no migration ever
 -- added it to this constraint.

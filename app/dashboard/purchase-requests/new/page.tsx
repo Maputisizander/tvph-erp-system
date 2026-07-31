@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { createClient } from '@/utils/supabase/server';
 import { ArrowLeft } from 'lucide-react';
 import { CreatePRForm } from '@/components/dashboard/purchase-requests/create-pr-form';
+import { REGION_NAMES, REGIONS } from '@/lib/constants/philippine-regions';
 
 export default async function NewPurchaseRequestPage() {
   const supabase = await createClient();
@@ -32,7 +33,7 @@ export default async function NewPurchaseRequestPage() {
         </div>
       </div>
 
-      <CreatePRForm projects={projects || []} />
+      <CreatePRForm projects={projects || []} regions={REGION_NAMES} areaByRegion={REGIONS} />
     </div>
   );
 }
