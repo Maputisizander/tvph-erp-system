@@ -70,6 +70,12 @@ async function NewPurchaseOrderContent({
     .eq('pr_id', pr.id)
     .order('line_no');
 
+  const { data: prSiteDetails } = await supabase
+    .from('pr_site_details')
+    .select('region, area_city, node_id, phase, no_of_nodes, cable_length_km')
+    .eq('pr_id', pr.id)
+    .order('sn');
+
   // Fetch vendors with their NDA status and currency
   const { data: vendors } = await supabase
     .from('vendors')
@@ -134,6 +140,14 @@ async function NewPurchaseOrderContent({
             qty: Number(li.qty) || 1,
             uom: li.uom || 'LOT',
             unit_price: Number(li.unit_price) || 0,
+          })),
+          site_details: (prSiteDetails || []).map((s: any) => ({
+            region: s.region || '',
+            area_city: s.area_city || '',
+            node_id: s.node_id || '',
+            phase: s.phase || '',
+            no_of_nodes: Number(s.no_of_nodes) || 0,
+            cable_length_km: Number(s.cable_length_km) || 0,
           })),
         }}
         regions={regions}

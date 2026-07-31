@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Suspense } from 'react';
 import { redirect, notFound } from 'next/navigation';
 import { CreatePRForm } from '@/components/dashboard/purchase-requests/create-pr-form';
+import { REGION_NAMES, REGIONS } from '@/lib/constants/philippine-regions';
 
 export const unstable_instant = {
   prefetch: 'static',
@@ -57,6 +58,12 @@ async function EditPurchaseRequestContent({
     .eq('pr_id', id)
     .order('line_no');
 
+  const { data: siteDetails } = await supabase
+    .from('pr_site_details')
+    .select('region, area_city, node_id, phase, no_of_nodes, cable_length_km')
+    .eq('pr_id', id)
+    .order('sn');
+
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center gap-4">
@@ -78,6 +85,8 @@ async function EditPurchaseRequestContent({
 
       <CreatePRForm
         projects={projects || []}
+        regions={REGION_NAMES}
+        areaByRegion={REGIONS}
         initialData={{
           id: pr.id,
           pr_number: pr.pr_number,
@@ -89,6 +98,14 @@ async function EditPurchaseRequestContent({
             qty: Number(li.qty) || 1,
             uom: li.uom || 'LOT',
             unit_price: Number(li.unit_price) || 0,
+          })),
+          site_details: (siteDetails || []).map((s: any) => ({
+            region: s.region || '',
+            area_city: s.area_city || '',
+            node_id: s.node_id || '',
+            phase: s.phase || '',
+            no_of_nodes: Number(s.no_of_nodes) || 0,
+            cable_length_km: Number(s.cable_length_km) || 0,
           })),
         }}
       />
