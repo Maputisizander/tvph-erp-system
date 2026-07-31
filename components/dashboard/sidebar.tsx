@@ -50,6 +50,7 @@ const MODULE_CONFIG: ModuleItem[] = [
     roles: ["superadmin", "admin", "operations"],
     subModules: [
       { id: "vendor-list", label: "All Vendors", href: "/dashboard/vendors", roles: ["superadmin", "admin", "operations"] },
+      { id: "purchase-requests", label: "Purchase Requests", href: "/dashboard/purchase-requests", roles: ["superadmin", "admin", "operations"] },
       { id: "purchase-orders", label: "Purchase Orders", href: "/dashboard/purchase-orders", roles: ["superadmin", "admin", "operations"] },
       { id: "vendor-contracts", label: "Contracts", href: "/dashboard/vendors/contracts", roles: ["superadmin", "admin", "operations"] },
       { id: "vendor-performance", label: "Performance", href: "/dashboard/vendors/performance", roles: ["superadmin", "admin", "operations"] },

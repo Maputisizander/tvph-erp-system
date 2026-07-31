@@ -1,0 +1,409 @@
+import Link from "next/link";
+import { createClient } from "@/utils/supabase/server";
+import {
+  ArrowLeft,
+  Calendar,
+  FileText,
+  CircleDollarSign,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  User,
+  FolderGit2,
+  ArrowRight,
+  Pencil,
+  MapPin,
+} from "lucide-react";
+import { notFound } from "next/navigation";
+import { Suspense } from "react";
+import { PrSubmitButton } from "@/components/dashboard/purchase-requests/pr-submit-button";
+import { PrApprovalActions } from "@/components/dashboard/purchase-requests/pr-approval-actions";
+import { PrCancelButton, PrDeleteButton } from "@/components/dashboard/purchase-requests/pr-cancel-button";
+import { getCurrentProfile, hasCapability } from "@/lib/auth/permissions";
+
+export const unstable_instant = {
+  prefetch: 'static',
+  samples: [{ params: { id: 'sample-id' } }]
+};
+
+export default function PurchaseRequestDetailPage(props: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <Suspense fallback={<PRDetailSkeleton />}>
+      <PRDetailContent paramsPromise={props.params} />
+    </Suspense>
+  );
+}
+
+const STATUS_BADGE: Record<string, string> = {
+  draft: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400",
+  pending_approval: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400",
+  approved: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400",
+  converted: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400",
+  cancelled: "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-500",
+};
+
+async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id: string }> }) {
+  const params = await paramsPromise;
+  const supabase = await createClient();
+
+  const [{ data: pr, error }, { user: currentUser, role: currentRole }] = await Promise.all([
+    supabase
+      .from("purchase_requests")
+      .select("*, projects(name)")
+      .eq("id", params.id)
+      .is("deleted_at", null)
+      .single(),
+    getCurrentProfile(supabase),
+  ]);
+
+  if (error || !pr) {
+    notFound();
+  }
+
+  const { data: lineItems } = await supabase
+    .from("pr_line_items")
+    .select("*")
+    .eq("pr_id", pr.id)
+    .order("line_no");
+
+  const { data: siteDetails } = await supabase
+    .from("pr_site_details")
+    .select("*")
+    .eq("pr_id", pr.id)
+    .order("sn");
+
+  // The PO this PR was converted into (1:1 — enforced by unique index).
+  const { data: linkedPO } = await supabase
+    .from("purchase_orders")
+    .select("id, po_number, status")
+    .eq("purchase_request_id", pr.id)
+    .maybeSingle();
+
+  // Resolve creator/submitter/approver names
+  const profileIds = [pr.created_by, pr.submitted_for_approval_by, pr.approved_by_user_id].filter(Boolean) as string[];
+  const profiles: Record<string, string> = {};
+  if (profileIds.length > 0) {
+    const { data: rows } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", profileIds);
+    for (const p of rows || []) profiles[p.id] = p.full_name;
+  }
+
+  // Eligible approvers for the submit picker (4-eyes: exclude current user).
+  let eligibleApprovers: { id: string; full_name: string; email: string }[] = [];
+  if (pr.status === "draft" && currentUser) {
+    const { data: admins } = await supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .in("role", ["superadmin", "admin"])
+      .neq("id", currentUser.id)
+      .order("full_name");
+    eligibleApprovers = admins || [];
+  }
+
+  const canSubmit = hasCapability(currentRole, "pr.status");
+  const canApprove = hasCapability(currentRole, "pr.approve");
+  const canCancel = hasCapability(currentRole, "pr.create") && pr.created_by === currentUser?.id;
+  const canDelete = hasCapability(currentRole, "pr.delete");
+  const canConvert = hasCapability(currentRole, "po.create");
+
+  const currencySymbol = pr.currency === "USD" ? "$" : "₱";
+
+  return (
+    <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <Link
+            href="/dashboard/purchase-requests"
+            className="p-2 -ml-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors mt-1"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white font-plus-jakarta tracking-tight">
+                {pr.pr_number}
+              </h1>
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${STATUS_BADGE[pr.status] || STATUS_BADGE.draft}`}>
+                {pr.status.replace(/_/g, " ").toUpperCase()}
+              </span>
+            </div>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+              {pr.description || "No description provided"}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 md:ml-auto">
+          {pr.status === "draft" && canSubmit && (
+            <PrSubmitButton prId={pr.id} eligibleApprovers={eligibleApprovers} />
+          )}
+          {pr.status === "draft" && canCancel && (
+            <Link
+              href={`/dashboard/purchase-requests/${pr.id}/edit`}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 hover:border-primary hover:text-primary transition-all"
+            >
+              <Pencil className="h-4 w-4" />
+              Edit
+            </Link>
+          )}
+          {pr.status === "approved" && canConvert && (
+            <Link
+              href={`/dashboard/purchase-orders/new?from_pr=${pr.id}`}
+              className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95"
+            >
+              <ArrowRight className="h-4 w-4" />
+              Convert to PO
+            </Link>
+          )}
+          {["draft", "pending_approval", "approved"].includes(pr.status) && canCancel && (
+            <PrCancelButton prId={pr.id} />
+          )}
+          {pr.status === "draft" && canDelete && (
+            <PrDeleteButton prId={pr.id} />
+          )}
+        </div>
+      </div>
+
+      {/* Pending approval banner */}
+      {pr.status === "pending_approval" && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50">
+          <div className="flex items-start gap-3 flex-1">
+            <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                Awaiting Approval
+              </p>
+              <p className="text-xs text-amber-600/80 dark:text-amber-400/60 mt-1">
+                This request has been submitted and <span className="font-semibold">cannot be converted</span> until an admin approves it.
+              </p>
+            </div>
+          </div>
+          {canApprove && pr.submitted_for_approval_by !== currentUser?.id ? (
+            <PrApprovalActions prId={pr.id} />
+          ) : canApprove ? (
+            <p className="text-xs text-amber-600/80 dark:text-amber-400/60">
+              You submitted this PR for approval. Another admin or superadmin must approve it.
+            </p>
+          ) : null}
+        </div>
+      )}
+
+      {/* Rejected banner (back in draft) */}
+      {pr.status === "draft" && pr.rejection_reason && (
+        <div className="flex items-start gap-3 p-4 rounded-2xl bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50">
+          <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-red-700 dark:text-red-400">
+              Approval Rejected — Returned to Draft
+            </p>
+            <p className="text-xs text-red-600/80 dark:text-red-400/60 mt-1">
+              Reason: <span className="font-medium">{pr.rejection_reason}</span>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Converted banner */}
+      {pr.status === "converted" && linkedPO && (
+        <div className="flex items-start gap-3 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/50">
+          <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+              Converted to Purchase Order
+            </p>
+            <p className="text-xs text-emerald-600/80 dark:text-emerald-400/60 mt-1">
+              This request was converted into{" "}
+              <Link href={`/dashboard/purchase-orders/${linkedPO.id}`} className="font-semibold underline">
+                {linkedPO.po_number}
+              </Link>
+              . The request is now frozen as an audit record.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Details */}
+      <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center gap-2">
+          <FileText className="h-5 w-5 text-primary" />
+          <h2 className="font-semibold text-slate-900 dark:text-white">Request Details</h2>
+        </div>
+        <div className="p-6 grid grid-cols-2 gap-8">
+          <div>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <FolderGit2 className="h-3.5 w-3.5" /> Project
+            </label>
+            <p className="mt-1 text-slate-900 dark:text-slate-300 font-medium">
+              {(pr.projects as any)?.name || "No project linked"}
+            </p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <CircleDollarSign className="h-3.5 w-3.5" /> Estimated Total
+            </label>
+            <p className="mt-1 text-slate-900 dark:text-slate-300 font-medium">
+              {currencySymbol}{Number(pr.amount).toLocaleString()}
+            </p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5" /> Requested by
+            </label>
+            <p className="mt-1 text-slate-900 dark:text-slate-300 font-medium">
+              {profiles[pr.created_by] || "Unknown"}
+              {pr.created_at && (
+                <span className="text-slate-400 font-normal">
+                  {" "}on {new Date(pr.created_at).toLocaleDateString(undefined, { dateStyle: "long" })}
+                </span>
+              )}
+            </p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Approved by
+            </label>
+            <p className="mt-1 text-slate-900 dark:text-slate-300 font-medium">
+              {pr.approved_by_user_id
+                ? `${profiles[pr.approved_by_user_id] || "Unknown"} on ${new Date(pr.approved_at).toLocaleDateString(undefined, { dateStyle: "long" })}`
+                : "Not yet approved"}
+            </p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5" /> Submitted for approval
+            </label>
+            <p className="mt-1 text-slate-900 dark:text-slate-300 font-medium">
+              {pr.submitted_for_approval_at
+                ? `${profiles[pr.submitted_for_approval_by] || "Unknown"} on ${new Date(pr.submitted_for_approval_at).toLocaleDateString(undefined, { dateStyle: "long" })}`
+                : "Not yet submitted"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Line Items */}
+      {lineItems && lineItems.length > 0 && (
+        <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
+            <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <CircleDollarSign className="h-5 w-5 text-primary" /> Estimated Line Items
+            </h2>
+            <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs px-2 py-0.5 rounded-full font-bold">
+              {lineItems.length}
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-[10px] text-slate-500 uppercase bg-slate-50/50 dark:bg-slate-800/20 border-b border-slate-200 dark:border-slate-800">
+                <tr>
+                  <th className="px-4 py-3 font-semibold w-12">#</th>
+                  <th className="px-4 py-3 font-semibold w-24">Item Code</th>
+                  <th className="px-4 py-3 font-semibold">Description</th>
+                  <th className="px-4 py-3 font-semibold w-16 text-right">Qty</th>
+                  <th className="px-4 py-3 font-semibold w-16">UoM</th>
+                  <th className="px-4 py-3 font-semibold w-28 text-right">Est. Unit Price</th>
+                  <th className="px-4 py-3 font-semibold w-28 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {lineItems.map((li: any) => (
+                  <tr key={li.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
+                    <td className="px-4 py-3 text-slate-400 font-mono text-xs">{li.line_no}</td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{li.item_code || "—"}</td>
+                    <td className="px-4 py-3 text-slate-900 dark:text-white font-medium">{li.description}</td>
+                    <td className="px-4 py-3 text-right text-slate-900 dark:text-white">{Number(li.qty).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{li.uom}</td>
+                    <td className="px-4 py-3 text-right text-slate-900 dark:text-white">{currencySymbol}{Number(li.unit_price).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-slate-900 dark:text-white">{currencySymbol}{Number(li.amount).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20">
+                  <td colSpan={6} className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Estimated Total
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-white">
+                    {currencySymbol}{lineItems.reduce((sum: number, li: any) => sum + Number(li.amount), 0).toLocaleString()}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Site Details */}
+      {siteDetails && siteDetails.length > 0 && (
+        <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
+            <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-primary" /> Sites &amp; Details
+            </h2>
+            <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs px-2 py-0.5 rounded-full font-bold">
+              {siteDetails.length}
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-[10px] text-slate-500 uppercase bg-slate-50/50 dark:bg-slate-800/20 border-b border-slate-200 dark:border-slate-800">
+                <tr>
+                  <th className="px-4 py-3 font-semibold w-12">S/N</th>
+                  <th className="px-4 py-3 font-semibold">Region</th>
+                  <th className="px-4 py-3 font-semibold">Area / City</th>
+                  <th className="px-4 py-3 font-semibold">Node ID</th>
+                  <th className="px-4 py-3 font-semibold">Phase</th>
+                  <th className="px-4 py-3 font-semibold w-24 text-right">No. of Nodes</th>
+                  <th className="px-4 py-3 font-semibold w-32 text-right">Cable (KM)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {siteDetails.map((s: any) => (
+                  <tr key={s.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
+                    <td className="px-4 py-3 text-slate-400 font-mono text-xs">{s.sn}</td>
+                    <td className="px-4 py-3 text-slate-900 dark:text-white font-medium">{s.region || "—"}</td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{s.area_city || "—"}</td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{s.node_id || "—"}</td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{s.phase || "—"}</td>
+                    <td className="px-4 py-3 text-right text-slate-900 dark:text-white">{Number(s.no_of_nodes).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right text-slate-900 dark:text-white">
+                      {Number(s.cable_length_km).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20">
+                  <td colSpan={5} className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Total
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-white">
+                    {siteDetails.reduce((sum: number, s: any) => sum + Number(s.no_of_nodes), 0).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-white">
+                    {siteDetails.reduce((sum: number, s: any) => sum + Number(s.cable_length_km), 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PRDetailSkeleton() {
+  return (
+    <div className="p-6 lg:p-8 space-y-8 animate-pulse">
+      <div className="h-10 w-96 bg-slate-100 dark:bg-slate-800/50 rounded-lg" />
+      <div className="h-48 rounded-2xl bg-slate-100 dark:bg-slate-800/50" />
+      <div className="h-64 rounded-2xl bg-slate-100 dark:bg-slate-800/50" />
+    </div>
+  );
+}

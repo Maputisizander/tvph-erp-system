@@ -354,6 +354,18 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               <span className="font-medium text-slate-700 dark:text-slate-300">
                 {po.vendors?.name}
               </span>
+              {po.purchase_request_id && (
+                <>
+                  <span className="text-slate-300 dark:text-slate-600">·</span>
+                  <FileText className="h-4 w-4" /> From:{" "}
+                  <Link
+                    href={`/dashboard/purchase-requests/${po.purchase_request_id}`}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {po.pr_number || "Purchase Request"}
+                  </Link>
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -894,15 +906,82 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
             canEdit={canEditTerms}
             canOverride={canOverridePenalty}
           />
-          <PODetailsEditor
-            poId={po.id}
-            description={po.description}
-            issuedDate={po.issued_date}
-            dueDate={po.due_date}
-            draftedBy={draftedByLabel}
-            approvedBy={approvedByLabel}
-            canEdit={canEditDraft}
-          />
+          <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
+              <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" /> PO Details
+              </h2>
+            </div>
+            <div className="p-6 space-y-6">
+              <div>
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  Description
+                </label>
+                <p className="mt-1 text-slate-900 dark:text-slate-300 text-lg">
+                  {po.description || "No description provided"}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8 pt-4 border-t border-slate-100 dark:border-slate-800/50">
+                <div>
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" /> Issued Date
+                  </label>
+                  <p className="mt-1 text-slate-900 dark:text-slate-300 font-medium">
+                    {new Date(po.issued_date).toLocaleDateString(undefined, {
+                      dateStyle: "long",
+                    })}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5" /> Due Date
+                  </label>
+                  <p className="mt-1 text-slate-900 dark:text-slate-300 font-medium">
+                    {po.due_date
+                      ? new Date(po.due_date).toLocaleDateString(undefined, {
+                          dateStyle: "long",
+                        })
+                      : "No due date set"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8 pt-4 border-t border-slate-100 dark:border-slate-800/50">
+                <div>
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5" /> Drafted by
+                  </label>
+                  <p className="mt-1 text-slate-900 dark:text-slate-300 font-medium">
+                    {poProfiles[po.created_by]
+                      ? `${poProfiles[po.created_by].full_name} (${poProfiles[po.created_by].role})`
+                      : "Unknown"}
+                    {po.created_at && (
+                      <span className="text-slate-400 font-normal">
+                        {" "}on {new Date(po.created_at).toLocaleDateString(undefined, { dateStyle: "long" })}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Approved by
+                  </label>
+                  <p className="mt-1 text-slate-900 dark:text-slate-300 font-medium">
+                    {po.approved_by_user_id
+                      ? `${poProfiles[po.approved_by_user_id] ? `${poProfiles[po.approved_by_user_id].full_name} (${poProfiles[po.approved_by_user_id].role})` : "Unknown"} on ${new Date(po.approved_at).toLocaleDateString(undefined, { dateStyle: "long" })}`
+                      : "Not yet approved"}
+                  </p>
+                </div>
+              </div>
+              {(po.status === "draft" || po.status === "pending_approval") && (
+                <PoCcRecipients
+                  poId={po.id}
+                  initialEmails={(po.cc_emails as string[] | null) || []}
+                />
+              )}
+            </div>
+          </div>
 
           {/* Line Items Table */}
           {(canEditDraft || (lineItems && lineItems.length > 0)) && (

@@ -55,6 +55,7 @@ const typeIcons = {
     color: "text-sky-500",
     bg: "bg-sky-500/10",
   },
+  pr: { icon: FileText, color: "text-violet-500", bg: "bg-violet-500/10" },
 };
 
 export function NotificationBell() {

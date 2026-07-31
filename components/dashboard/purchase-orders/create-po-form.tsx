@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useCallback, useEffect, useLayoutEffect, useRef, startTransition, Fragment } from "react";
+import { useActionState, useState, useCallback, useMemo, useEffect, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import {
   Save,
@@ -49,6 +49,15 @@ interface SiteDetail {
   phase: string;
 }
 
+interface PRPrefill {
+  id: string;
+  pr_number: string;
+  description: string | null;
+  project_id: string | null;
+  line_items: LineItem[];
+  site_details?: SiteDetail[];
+}
+
 const UOM_OPTIONS = ["LOT", "PCS", "SET", "HRS", "DAYS", "MOS", "SQM", "LM", "KG", "KM"];
 
 const EMPTY_LINE_ITEM: LineItem = {
@@ -72,12 +81,14 @@ export function CreatePOForm({
   vendors,
   projects,
   userRole,
+  purchaseRequest,
   regions,
   areaByRegion,
 }: {
   vendors: VendorWithNda[];
   projects: { id: string; name: string }[];
   userRole: string;
+  purchaseRequest?: PRPrefill | null;
   regions: string[];
   areaByRegion: Record<string, string[]>;
 }) {
@@ -90,8 +101,14 @@ export function CreatePOForm({
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
   const [selectedVendor, setSelectedVendor] = useState("");
-  const [lineItems, setLineItems] = useState<LineItem[]>([{ ...EMPTY_LINE_ITEM }]);
-  const [siteDetails, setSiteDetails] = useState<SiteDetail[]>([{ ...EMPTY_SITE }]);
+  const [lineItems, setLineItems] = useState<LineItem[]>(
+    purchaseRequest?.line_items?.length ? purchaseRequest.line_items : [{ ...EMPTY_LINE_ITEM }]
+  );
+  const [siteDetails, setSiteDetails] = useState<SiteDetail[]>(
+    purchaseRequest?.site_details?.length
+      ? purchaseRequest.site_details
+      : [{ ...EMPTY_SITE }]
+  );
   const [waiveRequirements, setWaiveRequirements] = useState(false);
   const [resultModal, setResultModal] = useState<{
     type: "success" | "error";
@@ -207,10 +224,23 @@ export function CreatePOForm({
       <input type="hidden" name="line_items" value={JSON.stringify(lineItems)} />
       <input type="hidden" name="site_details" value={JSON.stringify(siteDetails)} />
       <input type="hidden" name="amount" value={totalAmount.toString()} />
+      {purchaseRequest && (
+        <input type="hidden" name="purchase_request_id" value={purchaseRequest.id} />
+      )}
 
       {state && "error" in state && (
         <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-sm font-medium">
           {state.error}
+        </div>
+      )}
+
+      {/* PR conversion banner */}
+      {purchaseRequest && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/50">
+          <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
+            Converting purchase request {purchaseRequest.pr_number} — line items are prefilled from the request. Choose a vendor and confirm actual prices.
+          </span>
         </div>
       )}
 
@@ -326,6 +356,7 @@ export function CreatePOForm({
               <select
                 id="project_id"
                 name="project_id"
+                defaultValue={purchaseRequest?.project_id || ""}
                 className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all appearance-none"
               >
                 <option value="">
@@ -347,8 +378,9 @@ export function CreatePOForm({
             <textarea
               id="description"
               name="description"
-              rows={3}
-              className="w-full px-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all resize-y"
+              type="text"
+              defaultValue={purchaseRequest?.description || ""}
+              className="w-full px-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
               placeholder="e.g. Server Maintenance for Q3"
             />
           </div>
@@ -380,6 +412,7 @@ export function CreatePOForm({
                 id="due_date"
                 name="due_date"
                 type="date"
+                defaultValue={defaultDates.due}
                 className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
               />
             </div>
