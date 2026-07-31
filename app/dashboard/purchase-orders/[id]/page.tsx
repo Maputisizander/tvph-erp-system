@@ -331,6 +331,18 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               <span className="font-medium text-slate-700 dark:text-slate-300">
                 {po.vendors?.name}
               </span>
+              {po.purchase_request_id && (
+                <>
+                  <span className="text-slate-300 dark:text-slate-600">·</span>
+                  <FileText className="h-4 w-4" /> From:{" "}
+                  <Link
+                    href={`/dashboard/purchase-requests/${po.purchase_request_id}`}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {po.pr_number || "Purchase Request"}
+                  </Link>
+                </>
+              )}
             </p>
           </div>
         </div>
