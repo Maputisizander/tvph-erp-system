@@ -37,6 +37,7 @@ import { PoCertUpload } from "@/components/dashboard/purchase-orders/po-cert-upl
 import { NotifyFinanceButton } from "@/components/dashboard/purchase-orders/notify-finance-button";
 import { PaymentRequestButton } from "@/components/dashboard/purchase-orders/payment-request-button";
 import { PoTermsCard } from "@/components/dashboard/purchase-orders/po-terms-card";
+import { PoCcRecipients } from "@/components/dashboard/purchase-orders/po-cc-recipients";
 import { getCurrentProfile, hasCapability } from "@/lib/auth/permissions";
 import { signDocUrls } from "@/utils/storage";
 
@@ -942,6 +943,12 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                   </p>
                 </div>
               </div>
+              {(po.status === "draft" || po.status === "pending_approval") && (
+                <PoCcRecipients
+                  poId={po.id}
+                  initialEmails={(po.cc_emails as string[] | null) || []}
+                />
+              )}
             </div>
           </div>
 
@@ -1011,6 +1018,8 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                       <th className="px-4 py-3 font-semibold w-12">S/N</th>
                       <th className="px-4 py-3 font-semibold">Region</th>
                       <th className="px-4 py-3 font-semibold">Area / City</th>
+                      <th className="px-4 py-3 font-semibold w-24">Node ID</th>
+                      <th className="px-4 py-3 font-semibold w-20">Phase</th>
                       <th className="px-4 py-3 font-semibold w-28 text-right">No. of Nodes</th>
                       <th className="px-4 py-3 font-semibold w-36 text-right">Cable Length (KM)</th>
                     </tr>
@@ -1021,6 +1030,8 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                         <td className="px-4 py-3 text-slate-400 font-mono text-xs">{site.sn}</td>
                         <td className="px-4 py-3 text-slate-900 dark:text-white">{site.region}</td>
                         <td className="px-4 py-3 text-slate-900 dark:text-white">{site.area_city}</td>
+                        <td className="px-4 py-3 text-slate-900 dark:text-white font-mono">{site.node_id || '—'}</td>
+                        <td className="px-4 py-3 text-slate-900 dark:text-white">{site.phase || '—'}</td>
                         <td className="px-4 py-3 text-right text-slate-900 dark:text-white">{Number(site.no_of_nodes).toLocaleString()}</td>
                         <td className="px-4 py-3 text-right text-slate-900 dark:text-white">{Number(site.cable_length_km).toLocaleString()}</td>
                       </tr>
@@ -1028,7 +1039,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20">
-                      <td colSpan={3} className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Total</td>
+                      <td colSpan={5} className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Total</td>
                       <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-white">
                         {siteDetails.reduce((sum: number, s: any) => sum + Number(s.no_of_nodes), 0).toLocaleString()}
                       </td>

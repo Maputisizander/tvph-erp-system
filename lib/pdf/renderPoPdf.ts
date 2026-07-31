@@ -8,8 +8,8 @@ export interface RenderedPoPdf {
   filename: string;
 }
 
-export async function renderPoPdf(poId: string): Promise<RenderedPoPdf> {
-  const docx = await resolvePoDocx(poId);
+export async function renderPoPdf(poId: string, opts?: { forceRegenerate?: boolean }): Promise<RenderedPoPdf> {
+  const docx = await resolvePoDocx(poId, opts);
   const buffer = await convertDocxToPdf(docx.buffer, docx.filename);
   return { buffer, filename: docx.filename.replace(/\.docx$/i, ".pdf") };
 }

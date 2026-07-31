@@ -210,6 +210,8 @@ export async function generatePurchaseOrderDocx(poId: string): Promise<Buffer> {
     "{area}": site.area_city,
     "{nodes}": String(site.no_of_nodes),
     "{est_km}": formatNumber(site.estimated_strand_km),
+    "{node_id}": site.node_id,
+    "{phase}": site.phase,
   }));
 
   const totalNodes = poData.site_details.reduce((s, r) => s + r.no_of_nodes, 0);

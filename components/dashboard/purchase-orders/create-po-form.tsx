@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState, useCallback, useMemo } from "react";
+import { useActionState, useState, useCallback, useMemo, useEffect, Fragment } from "react";
+import { useRouter } from "next/navigation";
 import {
   Save,
   Building2,
@@ -14,9 +15,13 @@ import {
   Plus,
   Trash2,
   MapPin,
+  CheckCircle2,
+  XCircle,
+  X,
 } from "lucide-react";
 import { createPurchaseOrder } from "@/app/dashboard/purchase-orders/actions";
 import { hasCapability } from "@/lib/auth/roles";
+import { Combobox } from "@/components/ui/combobox";
 
 interface VendorWithNda {
   id: string;
@@ -39,6 +44,8 @@ interface SiteDetail {
   area_city: string;
   no_of_nodes: number;
   cable_length_km: number;
+  node_id: string;
+  phase: string;
 }
 
 interface PRPrefill {
@@ -49,7 +56,7 @@ interface PRPrefill {
   line_items: LineItem[];
 }
 
-const UOM_OPTIONS = ["LOT", "PCS", "SET", "HRS", "DAYS", "MOS", "SQM", "LM", "KG"];
+const UOM_OPTIONS = ["LOT", "PCS", "SET", "HRS", "DAYS", "MOS", "SQM", "LM", "KG", "KM"];
 
 const EMPTY_LINE_ITEM: LineItem = {
   item_code: "",
@@ -64,6 +71,8 @@ const EMPTY_SITE: SiteDetail = {
   area_city: "",
   no_of_nodes: 0,
   cable_length_km: 0,
+  node_id: "",
+  phase: "",
 };
 
 export function CreatePOForm({
@@ -71,19 +80,44 @@ export function CreatePOForm({
   projects,
   userRole,
   purchaseRequest,
+  regions,
+  areaByRegion,
 }: {
   vendors: VendorWithNda[];
   projects: { id: string; name: string }[];
   userRole: string;
   purchaseRequest?: PRPrefill | null;
+  regions: string[];
+  areaByRegion: Record<string, string[]>;
 }) {
   const [state, formAction, isPending] = useActionState(createPurchaseOrder, null);
+  const router = useRouter();
   const [selectedVendor, setSelectedVendor] = useState("");
   const [lineItems, setLineItems] = useState<LineItem[]>(
     purchaseRequest?.line_items?.length ? purchaseRequest.line_items : [{ ...EMPTY_LINE_ITEM }]
   );
   const [siteDetails, setSiteDetails] = useState<SiteDetail[]>([{ ...EMPTY_SITE }]);
   const [waiveRequirements, setWaiveRequirements] = useState(false);
+  const [resultModal, setResultModal] = useState<{
+    type: "success" | "error";
+    title: string;
+    message: string;
+    poUrl?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!state) return;
+    if ("error" in state) {
+      setResultModal({ type: "error", title: "Failed to Create PO", message: state.error as string });
+    } else if ("id" in state) {
+      setResultModal({
+        type: "success",
+        title: "PO Created Successfully",
+        message: (state as any).message || `Draft PO ${(state as any).po_number} created successfully.`,
+        poUrl: (state as any).url,
+      });
+    }
+  }, [state]);
 
   const defaultDates = useMemo(() => {
     const now = new Date();
@@ -171,7 +205,7 @@ export function CreatePOForm({
         <input type="hidden" name="purchase_request_id" value={purchaseRequest.id} />
       )}
 
-      {state?.error && (
+      {state && "error" in state && (
         <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-sm font-medium">
           {state.error}
         </div>
@@ -433,52 +467,52 @@ export function CreatePOForm({
               <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/10">
                 <th className={`${thClass} w-12`}>#</th>
                 <th className={`${thClass} w-24`}>Item Code</th>
-                <th className={thClass}>Description</th>
-                <th className={`${thClass} w-20`}>Qty</th>
+
+                <th className={`${thClass} min-w-[5rem]`}>Qty</th>
                 <th className={`${thClass} w-24`}>UoM</th>
                 <th className={`${thClass} w-32`}>Unit Price</th>
                 <th className={`${thClass} w-32`}>Amount</th>
                 <th className={`${thClass} w-10`}></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+            <tbody>
               {lineItems.map((li, idx) => {
                 const rowAmount = (Number(li.qty) || 0) * (Number(li.unit_price) || 0);
                 return (
-                  <tr key={idx} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
-                    <td className={`${tdClass} text-center text-slate-400 font-mono text-xs`}>
-                      {idx + 1}
-                    </td>
-                    <td className={tdClass}>
-                      <input
-                        type="text"
-                        value={li.item_code}
-                        onChange={(e) => updateLineItem(idx, "item_code", e.target.value)}
-                        className={inputClass}
-                        placeholder="—"
-                      />
-                    </td>
-                    <td className={tdClass}>
-                      <input
-                        type="text"
-                        value={li.description}
-                        onChange={(e) => updateLineItem(idx, "description", e.target.value)}
-                        className={inputClass}
-                        placeholder="Item description"
-                      />
-                    </td>
-                    <td className={tdClass}>
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={li.qty || ""}
-                        onChange={(e) => updateLineItem(idx, "qty", parseFloat(e.target.value) || 0)}
-                        className={`${inputClass} text-right`}
-                        placeholder="1"
-                      />
-                    </td>
-                    <td className={tdClass}>
+                  <Fragment key={idx}>
+                    <tr className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
+                      <td className={`${tdClass} text-center text-slate-400 font-mono text-xs`}>
+                        {idx + 1}
+                      </td>
+                      <td className={tdClass}>
+                        <input
+                          type="text"
+                          value={li.item_code}
+                          onChange={(e) => updateLineItem(idx, "item_code", e.target.value)}
+                          className={inputClass}
+                          placeholder="—"
+                        />
+                      </td>
+                      <td className={tdClass}>
+                        <div className="grid w-fit">
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={li.qty || ""}
+                            onChange={(e) => updateLineItem(idx, "qty", parseFloat(e.target.value) || 0)}
+                            className="row-start-1 col-start-1 w-full min-w-[5rem] text-right px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                            placeholder="1"
+                          />
+                          <span
+                            className="invisible whitespace-nowrap row-start-1 col-start-1 text-right px-3 py-2 text-sm border border-transparent"
+                            aria-hidden="true"
+                          >
+                            {li.qty || "1"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className={tdClass}>
                       <select
                         value={li.uom}
                         onChange={(e) => updateLineItem(idx, "uom", e.target.value)}
@@ -520,12 +554,26 @@ export function CreatePOForm({
                       </button>
                     </td>
                   </tr>
-                );
+                  <tr className="group">
+                    <td colSpan={7} className="px-3 pb-2 pt-0 border-b border-slate-100 dark:border-slate-800/50">
+                      <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                        Description
+                      </label>
+                      <textarea
+                        value={li.description}
+                        onChange={(e) => updateLineItem(idx, "description", e.target.value)}
+                        className={`${inputClass} resize-none min-h-[2.5rem]`}
+                        placeholder="Item description"
+                        rows={2}
+                      />
+                    </td>
+                  </tr>
+                </Fragment>);
               })}
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20">
-                <td colSpan={6} className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <td colSpan={5} className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Total ({currencyLabel})
                 </td>
                 <td className="px-3 py-3 text-right font-bold text-lg text-slate-900 dark:text-white pr-4">
@@ -571,6 +619,8 @@ export function CreatePOForm({
                 <th className={`${thClass} w-12`}>S/N</th>
                 <th className={thClass}>Region</th>
                 <th className={thClass}>Area / City</th>
+                <th className={`${thClass} w-28`}>Node ID</th>
+                <th className={`${thClass} w-24`}>Phase</th>
                 <th className={`${thClass} w-28`}>No. of Nodes</th>
                 <th className={`${thClass} w-36`}>Cable Length (KM)</th>
                 <th className={`${thClass} w-10`}></th>
@@ -583,21 +633,43 @@ export function CreatePOForm({
                     {idx + 1}
                   </td>
                   <td className={tdClass}>
-                    <input
-                      type="text"
+                    <Combobox
+                      options={regions}
                       value={site.region}
-                      onChange={(e) => updateSite(idx, "region", e.target.value)}
-                      className={inputClass}
+                      onChange={(val) => {
+                        updateSite(idx, "region", val);
+                        const allowedAreas = areaByRegion[val] || [];
+                        if (!allowedAreas.includes(site.area_city)) {
+                          updateSite(idx, "area_city", "");
+                        }
+                      }}
                       placeholder="Region"
+                    />
+                  </td>
+                  <td className={tdClass}>
+                    <Combobox
+                      options={areaByRegion[site.region] || []}
+                      value={site.area_city}
+                      onChange={(val) => updateSite(idx, "area_city", val)}
+                      placeholder="Area / City"
                     />
                   </td>
                   <td className={tdClass}>
                     <input
                       type="text"
-                      value={site.area_city}
-                      onChange={(e) => updateSite(idx, "area_city", e.target.value)}
+                      value={site.node_id}
+                      onChange={(e) => updateSite(idx, "node_id", e.target.value)}
                       className={inputClass}
-                      placeholder="Area / City"
+                      placeholder="e.g. MN113"
+                    />
+                  </td>
+                  <td className={tdClass}>
+                    <input
+                      type="text"
+                      value={site.phase}
+                      onChange={(e) => updateSite(idx, "phase", e.target.value)}
+                      className={inputClass}
+                      placeholder="Phase"
                     />
                   </td>
                   <td className={tdClass}>
@@ -636,7 +708,7 @@ export function CreatePOForm({
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20">
-                <td colSpan={3} className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <td colSpan={5} className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Total
                 </td>
                 <td className="px-3 py-3 text-right font-bold text-slate-900 dark:text-white">
@@ -677,6 +749,53 @@ export function CreatePOForm({
           Create PO
         </button>
       </div>
+
+      {/* ── Result Modal ── */}
+      {resultModal && (
+        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-[#0a0a0a]/50">
+              <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                {resultModal.type === "success" ? (
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-red-500" />
+                )}
+                {resultModal.title}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setResultModal(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-slate-600 dark:text-slate-400">{resultModal.message}</p>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setResultModal(null)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  {resultModal.type === "error" ? "Close" : "Stay"}
+                </button>
+                {resultModal.type === "success" && resultModal.poUrl && (
+                  <button
+                    type="button"
+                    onClick={() => router.push(resultModal.poUrl!)}
+                    className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-95"
+                  >
+                    <FileText className="h-4 w-4" />
+                    View PO
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

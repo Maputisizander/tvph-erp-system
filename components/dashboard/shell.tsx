@@ -50,12 +50,8 @@ export function DashboardShell({
             onCollapseToggle={() => setIsCollapsed(!isCollapsed)}
             onAuditOpen={() => setAuditOpen(true)}
           />
-          <main className="flex-1 overflow-auto bg-white dark:bg-[#0a0a0a]">
-            <div className="min-h-full flex flex-col">
-              <div className="flex-1 pb-24">
-                {children}
-              </div>
-            </div>
+          <main className="flex-1 overflow-auto overscroll-y-contain bg-white dark:bg-[#0a0a0a]">
+            {children}
           </main>
         </div>
 

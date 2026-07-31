@@ -14,6 +14,8 @@ export interface PoSiteDetail {
   area_city: string
   no_of_nodes: number
   estimated_strand_km: number
+  node_id: string
+  phase: string
 }
 
 export interface PoData {
