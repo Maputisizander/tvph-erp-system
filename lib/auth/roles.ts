@@ -36,6 +36,10 @@ export type Capability =
   | "po.delete"
   | "po.status"
   | "po.write"
+  | "pr.create"
+  | "pr.delete"
+  | "pr.status"
+  | "pr.approve"
   | "project.write"
   | "settings.manage"
   | "user.manage"
@@ -80,6 +84,10 @@ export const CAPABILITY_ROLES = {
   "po.delete": ["superadmin"],
   "po.status": ["superadmin", "admin", "operations", "finance"],
   "po.write": ["superadmin", "admin", "operations"],
+  "pr.create": ["superadmin", "admin", "operations"],
+  "pr.delete": ["superadmin"],
+  "pr.status": ["superadmin", "admin", "operations", "finance"],
+  "pr.approve": ["superadmin", "admin"],
   "project.write": ["superadmin", "admin", "operations"],
   "settings.manage": ["superadmin", "admin"],
   "user.manage": ["superadmin", "admin"],

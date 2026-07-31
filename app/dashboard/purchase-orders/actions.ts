@@ -25,6 +25,7 @@ interface CreatePOInput {
   penalty_rate?: number;
   penalty_type?: 'monthly' | 'fixed';
   waive_requirements?: boolean;
+  purchase_request_id?: string;
 }
 
 function getTomorrowDateInTimeZone(timeZone: string, now = new Date()): string {
@@ -97,6 +98,23 @@ export async function createPurchaseOrderCore(input: CreatePOInput) {
     if (statusFailed) waivedRequirements.push('vendor_status');
   }
 
+  // PR conversion path: the PO originates from an approved purchase request and
+  // inherits its pr_number. The unique index on purchase_request_id is the race
+  // guard — the status check below is only the friendly error.
+  let prToConvert: { id: string; pr_number: string } | null = null;
+  if (input.purchase_request_id) {
+    const { data: pr } = await supabase
+      .from('purchase_requests')
+      .select('id, pr_number, status')
+      .eq('id', input.purchase_request_id)
+      .is('deleted_at', null)
+      .single();
+    if (!pr) return { error: 'Purchase request not found.' };
+    if (pr.status === 'converted') return { error: 'This purchase request has already been converted to a PO.' };
+    if (pr.status !== 'approved') return { error: 'Only approved purchase requests can be converted to a PO.' };
+    prToConvert = pr;
+  }
+
   // ── Duplicate check: prevent overlapping POs for the same node_id in the same region/area/phase ──
   for (const site of site_details) {
     if (!site.node_id?.trim()) continue;
@@ -143,6 +161,7 @@ export async function createPurchaseOrderCore(input: CreatePOInput) {
     currency,
     internal_entity_id: entity?.id || null,
     created_by: user.id,
+    ...(prToConvert ? { purchase_request_id: prToConvert.id, pr_number: prToConvert.pr_number } : {}),
     ...(waive && hasBlockers ? {
       requirements_waived: true,
       waived_by: user.id,
@@ -154,6 +173,10 @@ export async function createPurchaseOrderCore(input: CreatePOInput) {
 
   if (error) {
     console.error('Error creating PO:', error);
+    // Unique index on purchase_request_id — someone converted this PR first.
+    if (prToConvert && (error as { code?: string }).code === '23505') {
+      return { error: 'This purchase request has already been converted to a PO.' };
+    }
     return { error: error.message };
   }
 
@@ -196,9 +219,31 @@ export async function createPurchaseOrderCore(input: CreatePOInput) {
     entity_type: 'purchase_order',
     entity_id: newPO.id,
     action: 'CREATE',
-    changes: { after: { vendor_id, amount: totalAmount, status: 'draft', currency, line_items_count: line_items.length, sites_count: validSites.length, ...(waive && hasBlockers ? { requirements_waived: true, waived_requirements: waivedRequirements } : {}) } },
+    changes: { after: { vendor_id, amount: totalAmount, status: 'draft', currency, line_items_count: line_items.length, sites_count: validSites.length, ...(prToConvert ? { purchase_request_id: prToConvert.id, pr_number: prToConvert.pr_number } : {}), ...(waive && hasBlockers ? { requirements_waived: true, waived_requirements: waivedRequirements } : {}) } },
     performed_by: user.id,
   });
+
+  // Conversion complete: freeze the PR. Guarded on status='approved' so a stale
+  // retry can never resurrect it.
+  if (prToConvert) {
+    const { error: flipError } = await supabase
+      .from('purchase_requests')
+      .update({ status: 'converted', updated_at: new Date().toISOString() })
+      .eq('id', prToConvert.id)
+      .eq('status', 'approved');
+    if (flipError) {
+      console.error('Error marking PR as converted:', flipError);
+      await createNotification({
+        type: 'pr',
+        title: '⚠️ PR conversion incomplete',
+        message: `PO ${newPO.po_number} was created, but the purchase request could not be marked converted. Open the PR and verify its status.`,
+        link: `/dashboard/purchase-requests/${prToConvert.id}`,
+        created_by: user.id,
+      });
+    }
+    revalidatePath(`/dashboard/purchase-requests/${prToConvert.id}`);
+    revalidatePath('/dashboard/purchase-requests');
+  }
 
   await createNotification({
     type: 'po',
@@ -236,10 +281,12 @@ export async function createPurchaseOrder(prevState: any, formData: FormData) {
     return { error: 'Invalid site details data.' };
   }
 
-  // Fallback: if no line items, try the legacy amount field so existing forms still work
-  const rawAmount = parseFloat(formData.get('amount') as string) || 0;
-  if (lineItems.length === 0 && rawAmount > 0) {
-    lineItems = [{ description: formData.get('description') as string || 'Service', qty: 1, unit_price: rawAmount }];
+  // UI flow is PR-mandatory: the form only renders via an approved PR's
+  // "Convert to PO" link, which carries this hidden field. The core action keeps
+  // it optional for the AI chat tool.
+  const purchaseRequestId = formData.get('purchase_request_id') as string;
+  if (!purchaseRequestId) {
+    return { error: 'Purchase orders must originate from an approved purchase request. Open an approved PR and use "Convert to PO".' };
   }
 
   const dpDueDays = formData.get('dp_due_days');
@@ -259,6 +306,7 @@ export async function createPurchaseOrder(prevState: any, formData: FormData) {
     penalty_rate: penaltyRate == null || penaltyRate === '' ? undefined : Number(penaltyRate),
     penalty_type: penaltyType == null || penaltyType === '' ? undefined : penaltyType as 'monthly' | 'fixed',
     waive_requirements: formData.get('waive_requirements') === 'on',
+    purchase_request_id: purchaseRequestId,
   });
 
   return result;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useCallback, useEffect, Fragment } from "react";
+import { useActionState, useState, useCallback, useMemo, useEffect, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import {
   Save,
@@ -48,6 +48,14 @@ interface SiteDetail {
   phase: string;
 }
 
+interface PRPrefill {
+  id: string;
+  pr_number: string;
+  description: string | null;
+  project_id: string | null;
+  line_items: LineItem[];
+}
+
 const UOM_OPTIONS = ["LOT", "PCS", "SET", "HRS", "DAYS", "MOS", "SQM", "LM", "KG", "KM"];
 
 const EMPTY_LINE_ITEM: LineItem = {
@@ -71,19 +79,23 @@ export function CreatePOForm({
   vendors,
   projects,
   userRole,
+  purchaseRequest,
   regions,
   areaByRegion,
 }: {
   vendors: VendorWithNda[];
   projects: { id: string; name: string }[];
   userRole: string;
+  purchaseRequest?: PRPrefill | null;
   regions: string[];
   areaByRegion: Record<string, string[]>;
 }) {
   const [state, formAction, isPending] = useActionState(createPurchaseOrder, null);
   const router = useRouter();
   const [selectedVendor, setSelectedVendor] = useState("");
-  const [lineItems, setLineItems] = useState<LineItem[]>([{ ...EMPTY_LINE_ITEM }]);
+  const [lineItems, setLineItems] = useState<LineItem[]>(
+    purchaseRequest?.line_items?.length ? purchaseRequest.line_items : [{ ...EMPTY_LINE_ITEM }]
+  );
   const [siteDetails, setSiteDetails] = useState<SiteDetail[]>([{ ...EMPTY_SITE }]);
   const [waiveRequirements, setWaiveRequirements] = useState(false);
   const [resultModal, setResultModal] = useState<{
@@ -106,6 +118,12 @@ export function CreatePOForm({
       });
     }
   }, [state]);
+
+  const defaultDates = useMemo(() => {
+    const now = new Date();
+    const iso = (d: Date) => d.toISOString().split("T")[0];
+    return { issued: iso(now), due: iso(new Date(now.getTime() + 30 * 864e5)) };
+  }, []);
 
   const vendor = vendors.find((v) => v.id === selectedVendor);
   const ndaBlocked = vendor && !vendor.nda_approved;
@@ -183,10 +201,23 @@ export function CreatePOForm({
       <input type="hidden" name="line_items" value={JSON.stringify(lineItems)} />
       <input type="hidden" name="site_details" value={JSON.stringify(siteDetails)} />
       <input type="hidden" name="amount" value={totalAmount.toString()} />
+      {purchaseRequest && (
+        <input type="hidden" name="purchase_request_id" value={purchaseRequest.id} />
+      )}
 
       {state && "error" in state && (
         <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-sm font-medium">
           {state.error}
+        </div>
+      )}
+
+      {/* PR conversion banner */}
+      {purchaseRequest && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/50">
+          <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
+            Converting purchase request {purchaseRequest.pr_number} — line items are prefilled from the request. Choose a vendor and confirm actual prices.
+          </span>
         </div>
       )}
 
@@ -302,6 +333,7 @@ export function CreatePOForm({
               <select
                 id="project_id"
                 name="project_id"
+                defaultValue={purchaseRequest?.project_id || ""}
                 className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all appearance-none"
               >
                 <option value="">
@@ -324,6 +356,7 @@ export function CreatePOForm({
               id="description"
               name="description"
               type="text"
+              defaultValue={purchaseRequest?.description || ""}
               className="w-full px-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
               placeholder="e.g. Server Maintenance for Q3"
             />
@@ -340,7 +373,7 @@ export function CreatePOForm({
                 name="issued_date"
                 type="date"
                 required
-                defaultValue={new Date().toISOString().split("T")[0]}
+                defaultValue={defaultDates.issued}
                 className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
               />
             </div>
@@ -356,7 +389,7 @@ export function CreatePOForm({
                 id="due_date"
                 name="due_date"
                 type="date"
-                defaultValue={new Date(Date.now() + 30 * 864e5).toISOString().split("T")[0]}
+                defaultValue={defaultDates.due}
                 className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
               />
             </div>
