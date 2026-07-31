@@ -322,6 +322,7 @@ export function CreateInvoiceForm({ vendors, pos }: { vendors: Vendor[], pos: PO
                     <option value="government_fees">Government Fees</option>
                     <option value="office_admin">Office / Admin</option>
                     <option value="other">Other</option>
+                    <option value="downpayment">Downpayment</option>
                   </select>
                 </div>
               </div>
@@ -403,7 +404,7 @@ export function CreateInvoiceForm({ vendors, pos }: { vendors: Vendor[], pos: PO
                         const isApproved = pr.status === 'approved';
                         return (
                           <option key={pr.id} value={pr.id} disabled={!isApproved}>
-                            {pr.request_number} — {pr.status.toUpperCase()}
+                            {pr.is_downpayment ? '[DP] ' : ''}{pr.request_number} — {pr.status.toUpperCase()}
                             {isApproved ? ` — ₱${pr.remaining.toLocaleString()} available` : ''}
                           </option>
                         );
@@ -415,7 +416,14 @@ export function CreateInvoiceForm({ vendors, pos }: { vendors: Vendor[], pos: PO
                       <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 space-y-2">
                         <div className="flex justify-between text-xs">
                           <span className="text-slate-500">Request</span>
-                          <span className="font-semibold text-slate-900 dark:text-white">{currentPR.request_number}</span>
+                          <span className="font-semibold text-slate-900 dark:text-white">
+                            {currentPR.request_number}
+                            {currentPR.is_downpayment && (
+                              <span className="ml-1.5 inline-flex items-center px-1 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
+                                DP
+                              </span>
+                            )}
+                          </span>
                         </div>
                         <div className="flex justify-between text-xs">
                           <span className="text-slate-500">Status</span>

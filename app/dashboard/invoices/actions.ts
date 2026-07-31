@@ -162,6 +162,7 @@ export interface EligiblePR {
   consumed: number;
   remaining: number;
   status: string;
+  is_downpayment: boolean;
 }
 
 export async function getEligiblePaymentRequests(poId: string): Promise<{ data?: EligiblePR[]; error?: string }> {
@@ -172,7 +173,7 @@ export async function getEligiblePaymentRequests(poId: string): Promise<{ data?:
   // Fetch all PRs for this PO (not just approved ones)
   const { data: prs, error } = await supabase
     .from('payment_requests')
-    .select('id, request_number, amount, status')
+    .select('id, request_number, amount, status, is_downpayment')
     .eq('po_id', poId)
     .order('created_at', { ascending: false });
 
@@ -197,6 +198,7 @@ export async function getEligiblePaymentRequests(poId: string): Promise<{ data?:
         consumed,
         remaining: Number(pr.amount) - consumed,
         status: pr.status,
+        is_downpayment: pr.is_downpayment,
       };
     })
   );

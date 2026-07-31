@@ -50,8 +50,20 @@ export function PurchaseOrdersTableBody({ pos, error }: { pos: any[] | null; err
                 <span className="text-xs text-slate-400 italic">No Project</span>
               )}
             </td>
-            <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">
-              ₱{Number(po.amount).toLocaleString()}
+            <td className="px-6 py-4">
+              <div className="font-semibold text-slate-900 dark:text-white">
+                ₱{Number(po.amount).toLocaleString()}
+              </div>
+              {Number(po.dp_amount) > 0 && (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
+                    DP
+                  </span>
+                  <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                    ₱{Number(po.dp_amount).toLocaleString()}
+                  </span>
+                </div>
+              )}
             </td>
             <td className="px-6 py-4">
               <div className="flex flex-wrap items-center gap-1.5">

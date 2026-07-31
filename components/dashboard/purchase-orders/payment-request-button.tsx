@@ -26,6 +26,7 @@ interface PaymentRequest {
   percent_complete: number | null;
   created_at: string;
   rejection_reason: string | null;
+  is_downpayment: boolean;
 }
 
 interface Props {
@@ -73,6 +74,11 @@ export function PaymentRequestButton({
       <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center gap-2">
         <FileText className="h-5 w-5 text-primary" />
         <h2 className="font-semibold text-slate-900 dark:text-white">Payment Request</h2>
+        {paymentRequest?.is_downpayment && (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
+            Down Payment
+          </span>
+        )}
         {paymentRequest?.status && (
           <span className={`ml-auto inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${
             paymentRequest.status === "approved"

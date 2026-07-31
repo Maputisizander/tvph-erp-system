@@ -4,9 +4,7 @@ import { invoiceStatusLabel, invoiceStatusBadgeClasses } from "@/lib/invoices/st
 import {
   ArrowLeft,
   Building2,
-  Calendar,
   FileText,
-  CircleDollarSign,
   CheckCircle2,
   XCircle,
   Send,
@@ -17,7 +15,6 @@ import {
   Mail,
   FolderGit2,
   FileDown,
-  MapPin,
   Pencil,
   ShieldAlert,
   ShieldCheck,
@@ -28,7 +25,6 @@ import {
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { POProjectAssigner } from "@/components/dashboard/purchase-orders/po-project-assigner";
-import { RecentActivity } from "@/components/dashboard/shared/recent-activity";
 import { PODownloadDropdown } from "@/components/dashboard/purchase-orders/po-download-dropdown";
 import { PoResendButton } from "@/components/dashboard/purchase-orders/po-resend-button";
 import { PoIssueButton } from "@/components/dashboard/purchase-orders/po-issue-button";
@@ -37,7 +33,11 @@ import { PoCertUpload } from "@/components/dashboard/purchase-orders/po-cert-upl
 import { NotifyFinanceButton } from "@/components/dashboard/purchase-orders/notify-finance-button";
 import { PaymentRequestButton } from "@/components/dashboard/purchase-orders/payment-request-button";
 import { PoTermsCard } from "@/components/dashboard/purchase-orders/po-terms-card";
-import { PoCcRecipients } from "@/components/dashboard/purchase-orders/po-cc-recipients";
+import { PODetailsEditor } from "@/components/dashboard/purchase-orders/po-details-editor";
+import { POLineItemsEditor } from "@/components/dashboard/purchase-orders/po-line-items-editor";
+import { POSiteDetailsEditor } from "@/components/dashboard/purchase-orders/po-site-details-editor";
+import { AddDownpayment } from "@/components/dashboard/purchase-orders/po-add-downpayment";
+import { POEditHistory } from "@/components/dashboard/purchase-orders/po-edit-history";
 import { getCurrentProfile, hasCapability } from "@/lib/auth/permissions";
 import { signDocUrls } from "@/utils/storage";
 
@@ -130,6 +130,12 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
   const canEditTerms = hasCapability(currentRole, "po.write");
   const canOverridePenalty = ["finance", "admin", "superadmin"].includes(currentRole || "");
 
+  // Originator-only draft editing: only the user who drafted the PO can fix it
+  // while it is still a draft or pending approval.
+  const isOriginator = !!currentUser && currentUser.id === po.created_by;
+  const canEditDraft = isOriginator && ["draft", "pending_approval"].includes(po.status);
+  const currencySymbol = po.currency === "USD" ? "$" : "₱";
+
   const invoiceIds = invoices?.map((i) => i.id) || [];
 
   // Fetch all payments for those invoices
@@ -167,6 +173,17 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
       poProfiles[p.id] = { full_name: p.full_name, role: p.role };
     }
   }
+
+  const draftedByLabel = poProfiles[po.created_by]
+    ? `${poProfiles[po.created_by].full_name} (${poProfiles[po.created_by].role})${
+        po.created_at
+          ? ` on ${new Date(po.created_at).toLocaleDateString(undefined, { dateStyle: "long" })}`
+          : ""
+      }`
+    : "Unknown";
+  const approvedByLabel = po.approved_by_user_id
+    ? `${poProfiles[po.approved_by_user_id] ? `${poProfiles[po.approved_by_user_id].full_name} (${poProfiles[po.approved_by_user_id].role})` : "Unknown"} on ${new Date(po.approved_at).toLocaleDateString(undefined, { dateStyle: "long" })}`
+    : "Not yet approved";
 
   // Eligible approvers for the submit-for-approval picker: admins/superadmins
   // other than the current user (the 4-eyes rule blocks self-approval). Only
@@ -260,7 +277,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
   // Fetch latest payment request for this PO
   const { data: paymentRequest } = await supabase
     .from('payment_requests')
-    .select('id, request_number, amount, due_in_days, notes, status, completion_cert_id, percent_complete, created_at, rejection_reason')
+    .select('id, request_number, amount, due_in_days, notes, status, completion_cert_id, percent_complete, created_at, rejection_reason, is_downpayment')
     .eq('po_id', po.id)
     .in('status', ['pending', 'approved', 'rejected', 'fully_invoiced'])
     .order('created_at', { ascending: false })
@@ -326,6 +343,11 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               >
                 {po.status.replace(/_/g, " ").toUpperCase()}
               </span>
+              {dpAmount > 0 && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/50 text-sm font-bold">
+                  DP — ₱{dpAmount.toLocaleString()}
+                </span>
+              )}
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
               <Building2 className="h-4 w-4" /> Vendor:{" "}
@@ -687,6 +709,10 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               </div>
             )}
 
+            {canEditDraft && dpTarget === 0 && (
+              <AddDownpayment poId={po.id} poAmount={poAmount} currencySymbol={currencySymbol} />
+            )}
+
             <div className="pt-6 border-t border-slate-100 dark:border-slate-800/50">
               {isOverpaid ? (
                 <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-2xl">
@@ -827,6 +853,11 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-3">
                   Payment Request: {paymentRequest.request_number}
+                  {paymentRequest.is_downpayment && (
+                    <span className="ml-1.5 inline-flex items-center px-1 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
+                      DP
+                    </span>
+                  )}
                 </label>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-xs">
@@ -953,104 +984,22 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
           </div>
 
           {/* Line Items Table */}
-          {lineItems && lineItems.length > 0 && (
-            <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-              <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
-                <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                  <CircleDollarSign className="h-5 w-5 text-primary" /> Line Items
-                </h2>
-                <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs px-2 py-0.5 rounded-full font-bold">
-                  {lineItems.length}
-                </span>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="text-[10px] text-slate-500 uppercase bg-slate-50/50 dark:bg-slate-800/20 border-b border-slate-200 dark:border-slate-800">
-                    <tr>
-                      <th className="px-4 py-3 font-semibold w-12">#</th>
-                      <th className="px-4 py-3 font-semibold w-24">Item Code</th>
-                      <th className="px-4 py-3 font-semibold">Description</th>
-                      <th className="px-4 py-3 font-semibold w-16 text-right">Qty</th>
-                      <th className="px-4 py-3 font-semibold w-16">UoM</th>
-                      <th className="px-4 py-3 font-semibold w-28 text-right">Unit Price</th>
-                      <th className="px-4 py-3 font-semibold w-28 text-right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {lineItems.map((li: any) => (
-                      <tr key={li.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
-                        <td className="px-4 py-3 text-slate-400 font-mono text-xs">{li.line_no}</td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{li.item_code || '—'}</td>
-                        <td className="px-4 py-3 text-slate-900 dark:text-white font-medium">{li.description}</td>
-                        <td className="px-4 py-3 text-right text-slate-900 dark:text-white">{Number(li.qty).toLocaleString()}</td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{li.uom}</td>
-                        <td className="px-4 py-3 text-right text-slate-900 dark:text-white">₱{Number(li.unit_price).toLocaleString()}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-slate-900 dark:text-white">₱{Number(li.amount).toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20">
-                      <td colSpan={6} className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
-                        Total
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-white">
-                        ₱{lineItems.reduce((sum: number, li: any) => sum + Number(li.amount), 0).toLocaleString()}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
+          {(canEditDraft || (lineItems && lineItems.length > 0)) && (
+            <POLineItemsEditor
+              poId={po.id}
+              items={lineItems || []}
+              currencySymbol={currencySymbol}
+              canEdit={canEditDraft}
+            />
           )}
 
           {/* Site Details Table */}
-          {siteDetails && siteDetails.length > 0 && (
-            <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-              <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-primary" />
-                <h2 className="font-semibold text-slate-900 dark:text-white">Sites &amp; Details</h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="text-[10px] text-slate-500 uppercase bg-slate-50/50 dark:bg-slate-800/20 border-b border-slate-200 dark:border-slate-800">
-                    <tr>
-                      <th className="px-4 py-3 font-semibold w-12">S/N</th>
-                      <th className="px-4 py-3 font-semibold">Region</th>
-                      <th className="px-4 py-3 font-semibold">Area / City</th>
-                      <th className="px-4 py-3 font-semibold w-24">Node ID</th>
-                      <th className="px-4 py-3 font-semibold w-20">Phase</th>
-                      <th className="px-4 py-3 font-semibold w-28 text-right">No. of Nodes</th>
-                      <th className="px-4 py-3 font-semibold w-36 text-right">Cable Length (KM)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {siteDetails.map((site: any) => (
-                      <tr key={site.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
-                        <td className="px-4 py-3 text-slate-400 font-mono text-xs">{site.sn}</td>
-                        <td className="px-4 py-3 text-slate-900 dark:text-white">{site.region}</td>
-                        <td className="px-4 py-3 text-slate-900 dark:text-white">{site.area_city}</td>
-                        <td className="px-4 py-3 text-slate-900 dark:text-white font-mono">{site.node_id || '—'}</td>
-                        <td className="px-4 py-3 text-slate-900 dark:text-white">{site.phase || '—'}</td>
-                        <td className="px-4 py-3 text-right text-slate-900 dark:text-white">{Number(site.no_of_nodes).toLocaleString()}</td>
-                        <td className="px-4 py-3 text-right text-slate-900 dark:text-white">{Number(site.cable_length_km).toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20">
-                      <td colSpan={5} className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Total</td>
-                      <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-white">
-                        {siteDetails.reduce((sum: number, s: any) => sum + Number(s.no_of_nodes), 0).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-white">
-                        {siteDetails.reduce((sum: number, s: any) => sum + Number(s.cable_length_km), 0).toLocaleString()}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
+          {(canEditDraft || (siteDetails && siteDetails.length > 0)) && (
+            <POSiteDetailsEditor
+              poId={po.id}
+              sites={siteDetails || []}
+              canEdit={canEditDraft}
+            />
           )}
 
           {/* Linked Invoices Section */}
@@ -1143,6 +1092,9 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               </table>
             </div>
           </div>
+
+          {/* Edit History */}
+          <POEditHistory poId={po.id} />
         </div>
 
         {/* Right Column: Vendor Info */}
