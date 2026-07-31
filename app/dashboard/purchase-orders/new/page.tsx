@@ -1,15 +1,43 @@
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { CreatePOForm } from '@/components/dashboard/purchase-orders/create-po-form';
 import { getCurrentProfile } from '@/lib/auth/permissions';
 import { REGION_NAMES, REGIONS } from '@/lib/constants/philippine-regions';
 
-export default async function NewPurchaseOrderPage(props: {
+export const unstable_instant = {
+  prefetch: 'static',
+  samples: [{ searchParams: { from_pr: null } }],
+};
+
+function NewPODraftSkeleton() {
+  return (
+    <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8 animate-pulse">
+      <div className="h-8 w-64 bg-muted rounded" />
+      <div className="h-4 w-96 bg-muted rounded" />
+      <div className="h-96 bg-muted rounded" />
+    </div>
+  );
+}
+
+export default function NewPurchaseOrderPage(props: {
   searchParams?: Promise<{ from_pr?: string }>;
 }) {
-  const searchParams = await props.searchParams;
+  return (
+    <Suspense fallback={<NewPODraftSkeleton />}>
+      <NewPurchaseOrderContent searchParamsPromise={props.searchParams} />
+    </Suspense>
+  );
+}
+
+async function NewPurchaseOrderContent({
+  searchParamsPromise,
+}: {
+  searchParamsPromise?: Promise<{ from_pr?: string }>;
+}) {
+  const searchParams = await searchParamsPromise;
   const fromPr = searchParams?.from_pr;
 
   // POs originate from an approved purchase request. No PR → pick one first.
