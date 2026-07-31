@@ -147,7 +147,7 @@ export function POLineItemsEditor({
                   <th className={`${thClass} w-10`}></th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {draft.map((li, idx) => {
                   const rowAmount = (Number(li.qty) || 0) * (Number(li.unit_price) || 0);
                   return (
@@ -214,8 +214,8 @@ export function POLineItemsEditor({
                         </td>
                       </tr>
                       <tr className="group">
-                        <td colSpan={7} className="px-3 pb-2 pt-0 border-b border-slate-100 dark:border-slate-800/50">
-                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                        <td colSpan={7} className="px-3 pb-2 pt-0">
+                          <label className="block -mx-3 px-3 py-2 bg-slate-50/30 dark:bg-slate-800/10 border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
                             Description
                           </label>
                           <textarea
