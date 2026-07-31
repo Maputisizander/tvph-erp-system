@@ -1,13 +1,41 @@
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/server';
 import { ArrowLeft } from 'lucide-react';
+import { Suspense } from 'react';
 import { redirect, notFound } from 'next/navigation';
 import { CreatePRForm } from '@/components/dashboard/purchase-requests/create-pr-form';
 
-export default async function EditPurchaseRequestPage(props: {
+export const unstable_instant = {
+  prefetch: 'static',
+  samples: [{ params: { id: 'sample-pr-id' } }],
+};
+
+function EditPRSkeleton() {
+  return (
+    <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8 animate-pulse">
+      <div className="h-8 w-64 bg-muted rounded" />
+      <div className="h-4 w-96 bg-muted rounded" />
+      <div className="h-96 bg-muted rounded" />
+    </div>
+  );
+}
+
+export default function EditPurchaseRequestPage(props: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await props.params;
+  return (
+    <Suspense fallback={<EditPRSkeleton />}>
+      <EditPurchaseRequestContent paramsPromise={props.params} />
+    </Suspense>
+  );
+}
+
+async function EditPurchaseRequestContent({
+  paramsPromise,
+}: {
+  paramsPromise: Promise<{ id: string }>;
+}) {
+  const { id } = await paramsPromise;
   const supabase = await createClient();
 
   const [{ data: pr, error }, { data: projects }] = await Promise.all([
