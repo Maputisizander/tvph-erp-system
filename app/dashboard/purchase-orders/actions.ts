@@ -301,6 +301,202 @@ export async function updatePurchaseOrderTerms(poId: string, formData: FormData)
   return { success: true };
 }
 
+// ── Originator-only draft editing ────────────────────────────────────────
+// The user who drafted the PO (created_by) may fix human errors while the PO
+// is still a draft or pending approval. No other role can edit these fields.
+async function assertOriginatorCanEdit(poId: string) {
+  const supabase = await createClient();
+  const { user, error: authError } = await getCurrentProfile(supabase);
+  if (authError || !user) return { error: authError || 'Unauthorized' };
+
+  const { data: po } = await supabase
+    .from('purchase_orders')
+    .select('id, created_by, status, amount, dp_amount, description, due_date')
+    .eq('id', poId)
+    .single();
+
+  if (!po) return { error: 'Purchase order not found.' };
+  if (po.created_by !== user.id) return { error: 'Only the originator who drafted this PO can edit it.' };
+  if (po.status !== 'draft' && po.status !== 'pending_approval') {
+    return { error: 'This PO can only be edited while it is a draft or pending approval.' };
+  }
+  return { user, po, supabase };
+}
+
+export async function updatePODetails(poId: string, formData: FormData) {
+  const context = await assertOriginatorCanEdit(poId);
+  if ('error' in context) return context;
+  const { user, po, supabase } = context;
+
+  const description = String(formData.get('description') || '').trim() || null;
+  const dueDateRaw = String(formData.get('due_date') || '').trim();
+  const due_date = dueDateRaw || null;
+  if (due_date && Number.isNaN(Date.parse(due_date))) return { error: 'Invalid due date.' };
+
+  const before = { description: po.description ?? null, due_date: po.due_date ?? null };
+  const { error } = await supabase
+    .from('purchase_orders')
+    .update({ description, due_date, updated_at: new Date().toISOString() })
+    .eq('id', poId);
+  if (error) return { error: error.message };
+
+  await recordAuditLog({
+    entity_type: 'purchase_order',
+    entity_id: poId,
+    action: 'UPDATE',
+    changes: { before, after: { description, due_date } },
+    performed_by: user.id,
+  });
+  revalidatePath(`/dashboard/purchase-orders/${poId}`);
+  return { success: true };
+}
+
+export async function updatePOLineItems(poId: string, lineItems: POLineItem[]) {
+  const context = await assertOriginatorCanEdit(poId);
+  if ('error' in context) return context;
+  const { user, po, supabase } = context;
+
+  if (!Array.isArray(lineItems) || lineItems.length === 0) return { error: 'Add at least one line item.' };
+
+  const clean = lineItems.map((li) => ({
+    item_code: String(li.item_code || '').trim(),
+    description: String(li.description || '').trim(),
+    qty: Number(li.qty) || 0,
+    uom: String(li.uom || 'LOT').trim() || 'LOT',
+    unit_price: Number(li.unit_price) || 0,
+  }));
+
+  if (clean.some((li) => li.qty < 0 || li.unit_price < 0)) return { error: 'Qty and unit price must be nonnegative numbers.' };
+  if (clean.some((li) => !li.description)) return { error: 'Every line item needs a description.' };
+
+  const totalAmount = clean.reduce((sum, li) => sum + li.qty * li.unit_price, 0);
+  if (totalAmount <= 0) return { error: 'Total amount must be greater than zero.' };
+  if (Number(po.dp_amount || 0) > totalAmount) {
+    return { error: `Cannot lower the PO total below the downpayment (₱${Number(po.dp_amount).toLocaleString()}). Adjust the downpayment first.` };
+  }
+
+  const { data: existing } = await supabase.from('po_line_items').select('id').eq('po_id', poId);
+  const beforeCount = existing?.length ?? 0;
+
+  const { error: deleteError } = await supabase.from('po_line_items').delete().eq('po_id', poId);
+  if (deleteError) return { error: deleteError.message };
+
+  const { error: insertError } = await supabase.from('po_line_items').insert(
+    clean.map((li, i) => ({
+      po_id: poId,
+      line_no: i + 1,
+      item_code: li.item_code,
+      description: li.description,
+      qty: li.qty,
+      uom: li.uom,
+      unit_price: li.unit_price,
+      amount: li.qty * li.unit_price,
+    })),
+  );
+  if (insertError) return { error: insertError.message };
+
+  const { error: updateError } = await supabase
+    .from('purchase_orders')
+    .update({ amount: totalAmount, updated_at: new Date().toISOString() })
+    .eq('id', poId);
+  if (updateError) return { error: updateError.message };
+
+  await recordAuditLog({
+    entity_type: 'purchase_order',
+    entity_id: poId,
+    action: 'UPDATE',
+    changes: {
+      before: { amount: po.amount, line_items: beforeCount },
+      after: { amount: totalAmount, line_items: clean.length },
+    },
+    performed_by: user.id,
+  });
+  revalidatePath(`/dashboard/purchase-orders/${poId}`);
+  return { success: true };
+}
+
+export async function updatePOSiteDetails(poId: string, siteDetails: POSiteDetail[]) {
+  const context = await assertOriginatorCanEdit(poId);
+  if ('error' in context) return context;
+  const { user, supabase } = context;
+
+  if (!Array.isArray(siteDetails)) return { error: 'Invalid site details data.' };
+
+  const clean = siteDetails
+    .filter(
+      (s) =>
+        s.region || s.area_city || s.node_id || s.phase || Number(s.no_of_nodes) > 0 || Number(s.cable_length_km) > 0,
+    )
+    .map((s) => ({
+      region: String(s.region || '').trim(),
+      area_city: String(s.area_city || '').trim(),
+      node_id: String(s.node_id || '').trim(),
+      phase: String(s.phase || '').trim(),
+      no_of_nodes: Number(s.no_of_nodes) || 0,
+      cable_length_km: Number(s.cable_length_km) || 0,
+    }));
+
+  if (clean.some((s) => s.no_of_nodes < 0 || s.cable_length_km < 0)) return { error: 'Node count and cable length must be nonnegative numbers.' };
+
+  const { data: existing } = await supabase.from('po_site_details').select('id').eq('po_id', poId);
+  const beforeCount = existing?.length ?? 0;
+
+  const { error: deleteError } = await supabase.from('po_site_details').delete().eq('po_id', poId);
+  if (deleteError) return { error: deleteError.message };
+
+  if (clean.length > 0) {
+    const { error: insertError } = await supabase.from('po_site_details').insert(
+      clean.map((s, i) => ({
+        po_id: poId,
+        sn: i + 1,
+        region: s.region,
+        area_city: s.area_city,
+        node_id: s.node_id,
+        phase: s.phase,
+        no_of_nodes: s.no_of_nodes,
+        cable_length_km: s.cable_length_km,
+      })),
+    );
+    if (insertError) return { error: insertError.message };
+  }
+
+  await recordAuditLog({
+    entity_type: 'purchase_order',
+    entity_id: poId,
+    action: 'UPDATE',
+    changes: { before: { site_details: beforeCount }, after: { site_details: clean.length } },
+    performed_by: user.id,
+  });
+  revalidatePath(`/dashboard/purchase-orders/${poId}`);
+  return { success: true };
+}
+
+export async function addDownPayment(poId: string, amount: number) {
+  const context = await assertOriginatorCanEdit(poId);
+  if ('error' in context) return context;
+  const { user, po, supabase } = context;
+
+  if (Number(po.dp_amount || 0) !== 0) return { error: 'This PO already has a downpayment set.' };
+  if (!Number.isFinite(amount) || amount <= 0) return { error: 'Downpayment must be greater than zero.' };
+  if (amount > Number(po.amount)) return { error: 'Downpayment cannot exceed the PO total.' };
+
+  const { error } = await supabase
+    .from('purchase_orders')
+    .update({ dp_amount: amount, updated_at: new Date().toISOString() })
+    .eq('id', poId);
+  if (error) return { error: error.message };
+
+  await recordAuditLog({
+    entity_type: 'purchase_order',
+    entity_id: poId,
+    action: 'UPDATE',
+    changes: { before: { dp_amount: 0 }, after: { dp_amount: amount } },
+    performed_by: user.id,
+  });
+  revalidatePath(`/dashboard/purchase-orders/${poId}`);
+  return { success: true };
+}
+
 export async function overridePurchaseOrderPenalty(poId: string, formData: FormData) {
   const supabase = await createClient();
   const { user, role, error: authError } = await getCurrentProfile(supabase);

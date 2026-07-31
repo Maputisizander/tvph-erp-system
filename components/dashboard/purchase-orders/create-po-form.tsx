@@ -22,6 +22,7 @@ import {
 import { createPurchaseOrder } from "@/app/dashboard/purchase-orders/actions";
 import { hasCapability } from "@/lib/auth/roles";
 import { Combobox } from "@/components/ui/combobox";
+import { manilaDateString } from "@/lib/payment-terms";
 
 interface VendorWithNda {
   id: string;
@@ -320,11 +321,11 @@ export function CreatePOForm({
             <label htmlFor="description" className="text-sm font-medium text-slate-700 dark:text-slate-300">
               Description / Subject
             </label>
-            <input
+            <textarea
               id="description"
               name="description"
-              type="text"
-              className="w-full px-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+              rows={3}
+              className="w-full px-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all resize-y"
               placeholder="e.g. Server Maintenance for Q3"
             />
           </div>
@@ -340,7 +341,7 @@ export function CreatePOForm({
                 name="issued_date"
                 type="date"
                 required
-                defaultValue={new Date().toISOString().split("T")[0]}
+                defaultValue={manilaDateString()}
                 className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
               />
             </div>
@@ -356,7 +357,6 @@ export function CreatePOForm({
                 id="due_date"
                 name="due_date"
                 type="date"
-                defaultValue={new Date(Date.now() + 30 * 864e5).toISOString().split("T")[0]}
                 className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
               />
             </div>
