@@ -4,7 +4,8 @@ import { createClient } from '@/utils/supabase/server'
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return ''
   const d = new Date(iso)
-  return d.toLocaleDateString('en-PH', { day: 'numeric', month: 'long', year: 'numeric' })
+  // golden: "22 June 2026" (day-first, long month)
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 function fmtSlashDate(iso: string | null | undefined): string {
