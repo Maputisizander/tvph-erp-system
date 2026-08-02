@@ -5,6 +5,7 @@ import { Suspense } from 'react';
 import { SearchInput } from '@/components/ui/search-input';
 import { StatusSelect } from '@/components/ui/status-select';
 import { PurchaseOrdersTableBody } from '@/components/dashboard/purchase-orders/purchase-orders-table-body';
+import { LiveListRefresh } from '@/components/dashboard/shared/live-list-refresh';
 import { ExportDropdown } from '@/components/dashboard/export-dropdown';
 import { Pagination } from '@/components/ui/pagination';
 import { LIST_PAGE_SIZE, parsePage, pageRange } from '@/components/ui/pagination-utils';
@@ -186,6 +187,7 @@ async function PurchaseOrdersContent({ searchParams: searchParamsPromise }: { se
 
         <Pagination page={page} totalCount={count ?? 0} pageSize={LIST_PAGE_SIZE} />
       </div>
+      <LiveListRefresh />
     </div>
   );
 }
