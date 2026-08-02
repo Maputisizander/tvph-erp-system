@@ -12,30 +12,70 @@ import {
   AlertTriangle,
   ShieldCheck,
   ShieldAlert,
-  CheckCircle2,
-  XCircle,
-  Loader2,
   Plus,
   Trash2,
   MapPin,
-  ArrowLeft,
-  UploadCloud,
-  FileSpreadsheet,
+  CheckCircle2,
+  XCircle,
+  X,
 } from "lucide-react";
-import { createPurchaseOrder, fetchStagedPoFile } from "@/app/dashboard/purchase-orders/actions";
+import { createPurchaseOrder } from "@/app/dashboard/purchase-orders/actions";
 import { hasCapability } from "@/lib/auth/roles";
 import { Combobox } from "@/components/ui/combobox";
-import { FileUpload } from "@/components/ui/file-upload";
-import { toast } from "sonner";
-import {
-  type PurchaseRequest,
-  type Vendor,
-  type LineItem,
-  type SiteDetail,
-  EMPTY_LINE_ITEM,
-  EMPTY_SITE,
-  type PRPrefill,
-} from "@/types/purchase-orders";
+import { manilaDateString } from "@/lib/payment-terms";
+
+interface VendorWithNda {
+  id: string;
+  name: string;
+  currency: string;
+  status: string;
+  nda_approved: boolean;
+}
+
+interface LineItem {
+  item_code: string;
+  description: string;
+  qty: number;
+  uom: string;
+  unit_price: number;
+}
+
+interface SiteDetail {
+  region: string;
+  area_city: string;
+  no_of_nodes: number;
+  cable_length_km: number;
+  node_id: string;
+  phase: string;
+}
+
+interface PRPrefill {
+  id: string;
+  pr_number: string;
+  description: string | null;
+  project_id: string | null;
+  line_items: LineItem[];
+  site_details?: SiteDetail[];
+}
+
+const UOM_OPTIONS = ["LOT", "PCS", "SET", "HRS", "DAYS", "MOS", "SQM", "LM", "KG", "KM"];
+
+const EMPTY_LINE_ITEM: LineItem = {
+  item_code: "",
+  description: "",
+  qty: 1,
+  uom: "LOT",
+  unit_price: 0,
+};
+
+const EMPTY_SITE: SiteDetail = {
+  region: "",
+  area_city: "",
+  no_of_nodes: 0,
+  cable_length_km: 0,
+  node_id: "",
+  phase: "",
+};
 
 export function CreatePOForm({
   vendors,
@@ -45,14 +85,20 @@ export function CreatePOForm({
   regions,
   areaByRegion,
 }: {
-  vendors: Vendor[];
+  vendors: VendorWithNda[];
   projects: { id: string; name: string }[];
   userRole: string;
   purchaseRequest?: PRPrefill | null;
   regions: string[];
   areaByRegion: Record<string, string[]>;
 }) {
-  const [state, formAction, isPending] = useActionState(createPurchaseOrder, null);
+  const clientAction = useCallback((prev: any, action: any) => {
+    if (action && action.type === "RESET") return null;
+    return createPurchaseOrder(prev, action);
+  }, []);
+  const [state, dispatch, isPending] = useActionState(clientAction, null);
+  const shouldReset = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
   const [selectedVendor, setSelectedVendor] = useState("");
   const [lineItems, setLineItems] = useState<LineItem[]>(
@@ -73,455 +119,708 @@ export function CreatePOForm({
 
   useEffect(() => {
     if (!state) return;
-    if (state.success) {
+    shouldReset.current = true;
+    if ("error" in state) {
+      setResultModal({ type: "error", title: "Failed to Create PO", message: state.error as string });
+    } else if ("id" in state) {
       setResultModal({
         type: "success",
-        title: "Purchase Order Created",
-        message: state.message ?? "The purchase order was created successfully.",
-        poUrl: state.poUrl,
-      });
-    } else {
-      setResultModal({
-        type: "error",
-        title: "Failed to Create Purchase Order",
-        message: state.message ?? "An unexpected error occurred while creating the purchase order.",
+        title: "PO Created Successfully",
+        message: (state as any).message || `Draft PO ${(state as any).po_number} created successfully.`,
+        poUrl: (state as any).url,
       });
     }
   }, [state]);
 
-  useEffect(() => {
-    if (state?.success) {
-      if (state.poUrl) {
-        router.push(state.poUrl);
-      } else {
-        router.push("/dashboard/purchase-orders");
+  useLayoutEffect(() => {
+    const form = formRef.current;
+    return () => {
+      setResultModal(null);
+      if (shouldReset.current) {
+        shouldReset.current = false;
+        form?.reset();
+        setSelectedVendor("");
+        setLineItems([{ ...EMPTY_LINE_ITEM }]);
+        setSiteDetails([{ ...EMPTY_SITE }]);
+        setWaiveRequirements(false);
+        startTransition(() => dispatch({ type: "RESET" }));
       }
-    }
-  }, [state?.success, state?.poUrl, router]);
+    };
+  }, [dispatch]);
 
-  const isProjectOwner = hasCapability(userRole, "po:create");
+  const vendor = vendors.find((v) => v.id === selectedVendor);
+  const ndaBlocked = vendor && !vendor.nda_approved;
+  const statusBlocked = vendor && vendor.status !== "active";
+  const hasBlockers = !!ndaBlocked || !!statusBlocked;
+  const isAdmin = hasCapability(userRole, "po.waive_requirements");
+  const currencySymbol = vendor?.currency === "USD" ? "$" : "₱";
+  const currencyLabel = vendor?.currency || "PHP";
 
-  const handleLineItemChange = (index: number, field: keyof LineItem, value: string) => {
-    setLineItems((prev) => {
-      const next = prev.map((item, i) => (i === index ? { ...item, [field]: value } : item));
-      if (field === "category") {
-        next[index] = { ...next[index], description: "" };
-      }
-      return next;
-    });
-  };
-
-  const handleSiteChange = (index: number, field: keyof SiteDetail, value: string) => {
-    setSiteDetails((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
-  };
-
-  const handleAddLineItem = () => setLineItems((prev) => [...prev, { ...EMPTY_LINE_ITEM }]);
-  const handleRemoveLineItem = (index: number) =>
-    setLineItems((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
-
-  const handleAddSite = () => setSiteDetails((prev) => [...prev, { ...EMPTY_SITE }]);
-  const handleRemoveSite = (index: number) =>
-    setSiteDetails((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
-
-  const handleSubmit = (event: React.FormEvent) => {
-    const form = event.currentTarget;
-    const vendorId = (form.elements.namedItem("vendor_id") as HTMLSelectElement)?.value;
-    if (!vendorId) {
-      event.preventDefault();
-      toast.error("Please select a vendor.");
-      return;
-    }
-    const fileInput = form.elements.namedItem("attachment") as HTMLInputElement;
-    if (fileInput?.files?.length && !(fileInput.files[0].type === "application/pdf" || fileInput.files[0].type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) {
-      event.preventDefault();
-      toast.error("Attachment must be a PDF or Excel file.");
-      return;
-    }
-    const required: { name: string; label: string }[] = [
-      { name: "vendor_id", label: "Vendor" },
-      { name: "project_id", label: "Project" },
-      { name: "po_number", label: "PO Number" },
-      { name: "po_date", label: "PO Date" },
-      { name: "payment_terms", label: "Payment Terms" },
-    ];
-    for (const field of required) {
-      const value = (form.elements.namedItem(field.name) as HTMLInputElement)?.value;
-      if (!value) {
-        event.preventDefault();
-        toast.error(`Please fill out the ${field.label} field.`);
-        return;
-      }
-    }
-    const deliveryDate = (form.elements.namedItem("delivery_date") as HTMLInputElement)?.value;
-    if (deliveryDate && new Date(deliveryDate) < new Date()) {
-      event.preventDefault();
-      toast.error("Delivery date cannot be in the past.");
-      return;
-    }
-  };
-
-  const handleFileChange = (file: File) => {
-    if (!file) return;
-    const allowedTypes = [
-      "application/pdf",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/vnd.ms-excel",
-    ];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error("Please upload a PDF or Excel file.");
-      return;
-    }
-    const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-      toast.error("File must be 10MB or smaller.");
-      return;
-    }
-    toast.success("Attachment staged");
-  };
-
-  const handleUpload = async (file: File) => {
-    if (!file) return;
-    const allowedTypes = [
-      "application/pdf",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/vnd.ms-excel",
-    ];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error("Please upload a PDF or Excel file.");
-      return;
-    }
-    const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-      toast.error("File must be 10MB or smaller.");
-      return;
-    }
-    const formData = new FormData();
-    formData.append("file", file);
-    try {
-      const res = await fetch("/api/purchase-orders/stage-file", {
-        method: "POST",
-        body: formData,
+  // ── Line item helpers ──
+  const updateLineItem = useCallback(
+    (index: number, field: keyof LineItem, value: string | number) => {
+      setLineItems((prev) => {
+        const next = [...prev];
+        next[index] = { ...next[index], [field]: value };
+        return next;
       });
-      if (!res.ok) throw new Error("Upload failed");
-      toast.success("File staged");
-    } catch {
-      toast.error("Upload failed. Please try again.");
-    }
-  };
+    },
+    []
+  );
+
+  const addLineItem = useCallback(() => {
+    setLineItems((prev) => [...prev, { ...EMPTY_LINE_ITEM }]);
+  }, []);
+
+  const removeLineItem = useCallback(
+    (index: number) => {
+      if (lineItems.length <= 1) return;
+      setLineItems((prev) => prev.filter((_, i) => i !== index));
+    },
+    [lineItems.length]
+  );
+
+  // ── Site detail helpers ──
+  const updateSite = useCallback(
+    (index: number, field: keyof SiteDetail, value: string | number) => {
+      setSiteDetails((prev) => {
+        const next = [...prev];
+        next[index] = { ...next[index], [field]: value };
+        return next;
+      });
+    },
+    []
+  );
+
+  const addSite = useCallback(() => {
+    setSiteDetails((prev) => [...prev, { ...EMPTY_SITE }]);
+  }, []);
+
+  const removeSite = useCallback(
+    (index: number) => {
+      if (siteDetails.length <= 1) return;
+      setSiteDetails((prev) => prev.filter((_, i) => i !== index));
+    },
+    [siteDetails.length]
+  );
+
+  // ── Computed totals ──
+  const totalAmount = lineItems.reduce(
+    (sum, li) => sum + (Number(li.qty) || 0) * (Number(li.unit_price) || 0),
+    0
+  );
+  const totalNodes = siteDetails.reduce((sum, s) => sum + (Number(s.no_of_nodes) || 0), 0);
+  const totalCable = siteDetails.reduce((sum, s) => sum + (Number(s.cable_length_km) || 0), 0);
+
+  const inputClass =
+    "w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all";
+  const thClass =
+    "px-3 py-2.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-left";
+  const tdClass = "px-3 py-2";
 
   return (
-    <form
-      action={formAction}
-      onSubmit={handleSubmit}
-      className="space-y-8"
-    >
-      {/* Vendor Selection */}
-      <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold text-gray-900">Vendor</h2>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <form ref={formRef} action={dispatch} className="space-y-6">
+      {/* Hidden fields for serialized data */}
+      <input type="hidden" name="line_items" value={JSON.stringify(lineItems)} />
+      <input type="hidden" name="site_details" value={JSON.stringify(siteDetails)} />
+      <input type="hidden" name="amount" value={totalAmount.toString()} />
+      {purchaseRequest && (
+        <input type="hidden" name="purchase_request_id" value={purchaseRequest.id} />
+      )}
+
+      {state && "error" in state && (
+        <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-sm font-medium">
+          {state.error}
+        </div>
+      )}
+
+      {/* PR conversion banner */}
+      {purchaseRequest && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/50">
+          <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
+            Converting purchase request {purchaseRequest.pr_number} — line items are prefilled from the request. Choose a vendor and confirm actual prices.
+          </span>
+        </div>
+      )}
+
+      {/* Status Warning Banner */}
+      {statusBlocked && (
+        <div className="flex items-start gap-3 p-4 rounded-2xl bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50">
+          <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
           <div>
-            <label htmlFor="vendor_id" className="block text-sm font-medium text-gray-700">
-              Vendor
-            </label>
-            <select
-              id="vendor_id"
-              name="vendor_id"
-              required
-              value={selectedVendor}
-              onChange={(e) => setSelectedVendor(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="">Select a vendor</option>
-              {vendors.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="project_id" className="text-sm font-medium text-gray-700">
-              Project
-            </label>
-            <select
-              id="project_id"
-              name="project_id"
-              required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="">Select a project</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <p className="text-sm font-semibold text-red-700 dark:text-red-400">
+              Cannot Create PO — Vendor Not Active
+            </p>
+            <p className="text-xs text-red-600/80 dark:text-red-400/60 mt-1">
+              This vendor is currently marked as &quot;{vendor.status}&quot;. Only active
+              (Accredited) vendors can receive purchase orders.
+            </p>
           </div>
         </div>
-      </section>
+      )}
 
-      {/* PO Details */}
-      <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold text-gray-900">PO Details</h2>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {/* NDA Warning Banner */}
+      {ndaBlocked && !statusBlocked && (
+        <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50">
+          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <div>
-            <label htmlFor="po_number" className="block text-sm font-medium text-gray-700">
-              PO Number
-            </label>
-            <input
-              id="po_number"
-              name="po_number"
-              type="text"
-              required
-              placeholder="e.g. PO-2025-001"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label htmlFor="po_date" className="text-sm font-medium text-gray-700">
-              PO Date
-            </label>
-            <input
-              id="po_date"
-              name="po_date"
-              type="date"
-              required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label htmlFor="delivery_date" className="text-sm font-medium text-gray-700">
-              Delivery Date
-            </label>
-            <input
-              id="delivery_date"
-              name="delivery_date"
-              type="date"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label htmlFor="payment_terms" className="text-sm font-medium text-gray-700">
-              Payment Terms
-            </label>
-            <input
-              id="payment_terms"
-              name="payment_terms"
-              type="text"
-              required
-              placeholder="e.g. Net 30"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
+            <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+              Cannot Create PO — Signed NDA Not Approved
+            </p>
+            <p className="text-xs text-amber-600/80 dark:text-amber-400/60 mt-1">
+              This vendor does not have an approved Signed NDA on file. Go to the vendor&apos;s
+              Accreditation Docs tab to submit and approve the NDA before creating a purchase order.
+            </p>
           </div>
         </div>
-      </section>
+      )}
 
-      {/* Line Items */}
-      <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold text-gray-900">Line Items</h2>
-        <div className="mt-4 space-y-4">
-          {lineItems.map((item, index) => (
-            <div key={index} className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:grid-cols-6">
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-medium text-gray-700">Item Description</label>
-                <input
-                  name={`items[${index}][description]`}
-                  defaultValue={item.description}
-                  onChange={(e) => handleLineItemChange(index, "description", e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Qty</label>
-                <input
-                  name={`items[${index}][qty]`}
-                  type="number"
-                  defaultValue={item.qty}
-                  onChange={(e) => handleLineItemChange(index, "qty", e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Unit</label>
-                <input
-                  name={`items[${index}][unit]`}
-                  defaultValue={item.unit}
-                  onChange={(e) => handleLineItemChange(index, "unit", e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Category</label>
-                <select
-                  name={`items[${index}][category]`}
-                  defaultValue={item.category}
-                  onChange={(e) => handleLineItemChange(index, "category", e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="">Select category</option>
-                  <option value="Office Supplies">Office Supplies</option>
-                  <option value="Equipment">Equipment</option>
-                  <option value="Services">Services</option>
-                  <option value="Software">Software</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Cost</label>
-                <input
-                  name={`items[${index}][cost]`}
-                  type="number"
-                  step="0.01"
-                  defaultValue={item.cost}
-                  onChange={(e) => handleLineItemChange(index, "cost", e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-              {lineItems.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => handleRemoveLineItem(index)}
-                  className="self-end text-red-500 hover:text-red-700"
-                  aria-label="Remove line item"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
+      {vendor && vendor.nda_approved && vendor.status === "active" && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/50">
+          <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+          <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+            Signed NDA approved — PO creation allowed. Currency: {currencyLabel}
+          </span>
+        </div>
+      )}
+
+      {/* Admin-only waiver checkbox — shown only when there are blockers */}
+      {hasBlockers && isAdmin && (
+        <div className={`flex items-start gap-3 p-4 rounded-2xl border transition-colors ${
+          waiveRequirements
+            ? "bg-orange-50 dark:bg-orange-900/10 border-orange-300 dark:border-orange-700/50"
+            : "bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700"
+        }`}>
+          <ShieldAlert className={`h-5 w-5 shrink-0 mt-0.5 ${waiveRequirements ? "text-orange-600 dark:text-orange-400" : "text-slate-400"}`} />
+          <label className="flex items-start gap-3 cursor-pointer flex-1">
+            <input
+              type="checkbox"
+              name="waive_requirements"
+              checked={waiveRequirements}
+              onChange={(e) => setWaiveRequirements(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500"
+            />
+            <div>
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                Waive requirements and create PO anyway
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                This PO will be created pending executive approval and <span className="font-semibold">cannot be issued</span> until an executive approves the waiver.
+              </p>
             </div>
-          ))}
+          </label>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════
+          SECTION 1: PO Details
+         ════════════════════════════════════════════════════ */}
+      <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center gap-3">
+          <FileText className="h-5 w-5 text-primary" />
+          <h2 className="font-semibold text-slate-900 dark:text-white">PO Details</h2>
+        </div>
+
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2 md:col-span-2">
+            <label htmlFor="vendor_id" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Vendor <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <select
+                id="vendor_id"
+                name="vendor_id"
+                required
+                value={selectedVendor}
+                onChange={(e) => setSelectedVendor(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all appearance-none"
+              >
+                <option value="">Select a vendor</option>
+                {vendors.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name} ({v.currency})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <label htmlFor="project_id" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Project <span className="text-slate-400 font-normal ml-1">(Optional)</span>
+            </label>
+            <div className="relative">
+              <FolderGit2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <select
+                id="project_id"
+                name="project_id"
+                defaultValue={purchaseRequest?.project_id || ""}
+                className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all appearance-none"
+              >
+                <option value="">
+                  {projects.length > 0 ? "Select a project" : "No projects available"}
+                </option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <label htmlFor="description" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Description / Subject
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              type="text"
+              defaultValue={purchaseRequest?.description || ""}
+              className="w-full px-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+              placeholder="e.g. Server Maintenance for Q3"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="issued_date" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Issued Date <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                id="issued_date"
+                name="issued_date"
+                type="date"
+                required
+                defaultValue={manilaDateString()}
+                className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="due_date" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Due Date
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                id="due_date"
+                name="due_date"
+                type="date"
+                defaultValue={defaultDates.due}
+                className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="dp_amount" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Down Payment Amount <span className="text-slate-400 font-normal ml-1">(Optional)</span>
+            </label>
+            <div className="relative">
+              <CircleDollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                id="dp_amount"
+                name="dp_amount"
+                type="number"
+                min="0"
+                step="0.01"
+                className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="net_days" className="text-sm font-medium text-slate-700 dark:text-slate-300">Payment Terms (Net Days)</label>
+            <input id="net_days" name="net_days" type="number" min="1" step="1" defaultValue="30" required className={inputClass} />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="dp_due_days" className="text-sm font-medium text-slate-700 dark:text-slate-300">DP Due Days <span className="text-slate-400 font-normal ml-1">(Optional)</span></label>
+            <input id="dp_due_days" name="dp_due_days" type="number" min="0" step="1" className={inputClass} />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="penalty_rate" className="text-sm font-medium text-slate-700 dark:text-slate-300">Penalty Rate <span className="text-slate-400 font-normal ml-1">(Optional)</span></label>
+            <input id="penalty_rate" name="penalty_rate" type="number" min="0" max="1" step="0.0001" placeholder="0.1" className={inputClass} />
+            <p className="text-xs text-slate-500">Enter 0.1 for a 10% penalty rate.</p>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="penalty_type" className="text-sm font-medium text-slate-700 dark:text-slate-300">Penalty Type</label>
+            <select id="penalty_type" name="penalty_type" defaultValue="monthly" className={inputClass}>
+              <option value="monthly">Monthly (prorated daily)</option>
+              <option value="fixed">Fixed</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* ════════════════════════════════════════════════════
+          SECTION 2: Line Items Table
+         ════════════════════════════════════════════════════ */}
+      <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <CircleDollarSign className="h-5 w-5 text-primary" />
+            <h2 className="font-semibold text-slate-900 dark:text-white">Line Items</h2>
+            <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs px-2 py-0.5 rounded-full font-bold">
+              {lineItems.length}
+            </span>
+          </div>
           <button
             type="button"
-            onClick={handleAddLineItem}
-            className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            onClick={addLineItem}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-all"
           >
-            <Plus className="h-4 w-4" />
-            Add Line Item
+            <Plus className="h-3.5 w-3.5" />
+            Add Row
           </button>
         </div>
-      </section>
 
-      {/* Site Details */}
-      <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold text-gray-900">Site Details</h2>
-        <div className="mt-4 space-y-4">
-          {siteDetails.map((site, index) => (
-            <div key={index} className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:grid-cols-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Site Name</label>
-                <input
-                  name={`sites[${index}][name]`}
-                  defaultValue={site.name}
-                  onChange={(e) => handleSiteChange(index, "name", e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Address</label>
-                <input
-                  name={`sites[${index}][address]`}
-                  defaultValue={site.address}
-                  onChange={(e) => handleSiteChange(index, "address", e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Region</label>
-                <input
-                  name={`sites[${index}][region]`}
-                  defaultValue={site.region}
-                  onChange={(e) => handleSiteChange(index, "region", e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">City</label>
-                <input
-                  name={`sites[${index}][city]`}
-                  defaultValue={site.city}
-                  onChange={(e) => handleSiteChange(index, "city", e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Contact Person</label>
-                <input
-                  name={`sites[${index}][contact_person]`}
-                  defaultValue={site.contact_person}
-                  onChange={(e) => handleSiteChange(index, "contact_person", e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Contact Number</label>
-                <input
-                  name={`sites[${index}][contact_number]`}
-                  defaultValue={site.contact_number}
-                  onChange={(e) => handleSiteChange(index, "contact_number", e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-              {siteDetails.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => handleRemoveSite(index)}
-                  className="self-end text-red-500 hover:text-red-700"
-                  aria-label="Remove site"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          ))}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/10">
+                <th className={`${thClass} w-12`}>#</th>
+                <th className={`${thClass} w-24`}>Item Code</th>
+
+                <th className={`${thClass} min-w-[5rem]`}>Qty</th>
+                <th className={`${thClass} w-24`}>UoM</th>
+                <th className={`${thClass} w-32`}>Unit Price</th>
+                <th className={`${thClass} w-32`}>Amount</th>
+                <th className={`${thClass} w-10`}></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {lineItems.map((li, idx) => {
+                const rowAmount = (Number(li.qty) || 0) * (Number(li.unit_price) || 0);
+                return (
+                  <Fragment key={idx}>
+                    <tr className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
+                      <td className={`${tdClass} text-center text-slate-400 font-mono text-xs`}>
+                        {idx + 1}
+                      </td>
+                      <td className={tdClass}>
+                        <input
+                          type="text"
+                          value={li.item_code}
+                          onChange={(e) => updateLineItem(idx, "item_code", e.target.value)}
+                          className={inputClass}
+                          placeholder="—"
+                        />
+                      </td>
+                      <td className={tdClass}>
+                        <div className="grid w-fit">
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={li.qty || ""}
+                            onChange={(e) => updateLineItem(idx, "qty", parseFloat(e.target.value) || 0)}
+                            className="row-start-1 col-start-1 w-full min-w-[5rem] text-right px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                            placeholder="1"
+                          />
+                          <span
+                            className="invisible whitespace-nowrap row-start-1 col-start-1 text-right px-3 py-2 text-sm border border-transparent"
+                            aria-hidden="true"
+                          >
+                            {li.qty || "1"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className={tdClass}>
+                      <select
+                        value={li.uom}
+                        onChange={(e) => updateLineItem(idx, "uom", e.target.value)}
+                        className={`${inputClass} appearance-none`}
+                      >
+                        {UOM_OPTIONS.map((u) => (
+                          <option key={u} value={u}>
+                            {u}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className={tdClass}>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={li.unit_price || ""}
+                        onChange={(e) => updateLineItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
+                        className={`${inputClass} text-right`}
+                        placeholder="0.00"
+                      />
+                    </td>
+                    <td className={`${tdClass} text-right font-semibold text-slate-900 dark:text-white pr-4`}>
+                      {currencySymbol}
+                      {rowAmount.toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </td>
+                    <td className={tdClass}>
+                      <button
+                        type="button"
+                        onClick={() => removeLineItem(idx)}
+                        disabled={lineItems.length <= 1}
+                        className="p-1 text-slate-300 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                  <tr className="group">
+                    <td colSpan={7} className="px-3 pb-2 pt-0">
+                      <label className="block -mx-3 px-3 py-2 bg-slate-50/30 dark:bg-slate-800/10 border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                        Description
+                      </label>
+                      <textarea
+                        value={li.description}
+                        onChange={(e) => updateLineItem(idx, "description", e.target.value)}
+                        className={`${inputClass} resize-none min-h-[2.5rem]`}
+                        placeholder="Item description"
+                        rows={2}
+                      />
+                    </td>
+                  </tr>
+                </Fragment>);
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20">
+                <td colSpan={5} className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Total ({currencyLabel})
+                </td>
+                <td className="px-3 py-3 text-right font-bold text-lg text-slate-900 dark:text-white pr-4">
+                  {currencySymbol}
+                  {totalAmount.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {/* ════════════════════════════════════════════════════
+          SECTION 3: Site Details Table
+          awdhahdkjwahdkjwahda
+          adhihadjkwhad
+         ════════════════════════════════════════════════════ */}
+      <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <MapPin className="h-5 w-5 text-primary" />
+            <h2 className="font-semibold text-slate-900 dark:text-white">
+              Sites &amp; Details
+            </h2>
+            <span className="text-xs text-slate-400 font-normal">(Optional)</span>
+          </div>
           <button
             type="button"
-            onClick={handleAddSite}
-            className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            onClick={addSite}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-all"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-3.5 w-3.5" />
             Add Site
           </button>
         </div>
-      </section>
 
-      {/* Attachment */}
-      <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold text-gray-900">Attachment</h2>
-        <div className="mt-4">
-          <input
-            type="file"
-            name="attachment"
-            accept=".pdf,.xlsx,.xls"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                handleFileChange(file);
-              }
-            }}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
-          />
-          <FileUpload onUpload={handleUpload} />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/10">
+                <th className={`${thClass} w-12`}>S/N</th>
+                <th className={thClass}>Region</th>
+                <th className={thClass}>Area / City</th>
+                <th className={`${thClass} w-28`}>Node ID</th>
+                <th className={`${thClass} w-24`}>Phase</th>
+                <th className={`${thClass} w-28`}>No. of Nodes</th>
+                <th className={`${thClass} w-36`}>Cable Length (KM)</th>
+                <th className={`${thClass} w-10`}></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+              {siteDetails.map((site, idx) => (
+                <tr key={idx} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
+                  <td className={`${tdClass} text-center text-slate-400 font-mono text-xs`}>
+                    {idx + 1}
+                  </td>
+                  <td className={tdClass}>
+                    <Combobox
+                      options={regions}
+                      value={site.region}
+                      onChange={(val) => {
+                        updateSite(idx, "region", val);
+                        const allowedAreas = areaByRegion[val] || [];
+                        if (!allowedAreas.includes(site.area_city)) {
+                          updateSite(idx, "area_city", "");
+                        }
+                      }}
+                      placeholder="Region"
+                    />
+                  </td>
+                  <td className={tdClass}>
+                    <Combobox
+                      options={areaByRegion[site.region] || []}
+                      value={site.area_city}
+                      onChange={(val) => updateSite(idx, "area_city", val)}
+                      placeholder="Area / City"
+                    />
+                  </td>
+                  <td className={tdClass}>
+                    <input
+                      type="text"
+                      value={site.node_id}
+                      onChange={(e) => updateSite(idx, "node_id", e.target.value)}
+                      className={inputClass}
+                      placeholder="e.g. MN113"
+                    />
+                  </td>
+                  <td className={tdClass}>
+                    <input
+                      type="text"
+                      value={site.phase}
+                      onChange={(e) => updateSite(idx, "phase", e.target.value)}
+                      className={inputClass}
+                      placeholder="Phase"
+                    />
+                  </td>
+                  <td className={tdClass}>
+                    <input
+                      type="number"
+                      min="0"
+                      value={site.no_of_nodes || ""}
+                      onChange={(e) => updateSite(idx, "no_of_nodes", parseInt(e.target.value) || 0)}
+                      className={`${inputClass} text-right`}
+                      placeholder="0"
+                    />
+                  </td>
+                  <td className={tdClass}>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={site.cable_length_km || ""}
+                      onChange={(e) => updateSite(idx, "cable_length_km", parseFloat(e.target.value) || 0)}
+                      className={`${inputClass} text-right`}
+                      placeholder="0.00"
+                    />
+                  </td>
+                  <td className={tdClass}>
+                    <button
+                      type="button"
+                      onClick={() => removeSite(idx)}
+                      disabled={siteDetails.length <= 1}
+                      className="p-1 text-slate-300 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20">
+                <td colSpan={5} className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Total
+                </td>
+                <td className="px-3 py-3 text-right font-bold text-slate-900 dark:text-white">
+                  {totalNodes.toLocaleString()}
+                </td>
+                <td className="px-3 py-3 text-right font-bold text-slate-900 dark:text-white">
+                  {totalCable.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
-      </section>
+      </div>
 
-      {/* Submit */}
-      <div className="flex items-center justify-end gap-3 pt-4">
+      {/* ── Submit ── */}
+      <div className="flex items-center justify-end gap-4">
         <button
           type="button"
-          onClick={() => router.push("/dashboard/purchase-orders")}
-          className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+          onClick={() => window.history.back()}
+          className="px-6 py-2.5 rounded-xl font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
         >
-          <ArrowLeft className="h-4 w-4" />
           Cancel
         </button>
         <button
           type="submit"
-          disabled={isPending}
-          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+          disabled={isPending || (hasBlockers && !waiveRequirements)}
+          className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-xl font-medium transition-all hover:shadow-lg hover:shadow-primary/20 active:scale-95"
         >
-          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          {isPending ? "Creating..." : "Create PO"}
+          {isPending ? (
+            <span className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <Save className="h-5 w-5" />
+          )}
+          Create PO
         </button>
       </div>
+
+      {/* ── Result Modal ── */}
+      {resultModal && (
+        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-[#0a0a0a]/50">
+              <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                {resultModal.type === "success" ? (
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-red-500" />
+                )}
+                {resultModal.title}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setResultModal(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-slate-600 dark:text-slate-400">{resultModal.message}</p>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setResultModal(null)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  {resultModal.type === "error" ? "Close" : "Stay"}
+                </button>
+                {resultModal.type === "success" && resultModal.poUrl && (
+                  <button
+                    type="button"
+                    onClick={() => router.push(resultModal.poUrl!)}
+                    className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-95"
+                  >
+                    <FileText className="h-4 w-4" />
+                    View PO
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }
