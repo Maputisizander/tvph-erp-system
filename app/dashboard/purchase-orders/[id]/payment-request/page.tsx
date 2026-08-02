@@ -83,6 +83,7 @@ async function SendPaymentRequestContent({
       poId={po.id}
       poNumber={po.po_number}
       poAmount={Number(po.amount)}
+      poDpAmount={Number(po.dp_amount || 0)}
       vendorId={po.vendor_id}
       vendorName={po.vendors?.name || "Unknown Vendor"}
       vendorDocuments={vendorDocs || []}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useCallback, useMemo, useEffect, Fragment } from "react";
+import { useActionState, useState, useCallback, useMemo, useEffect, useLayoutEffect, useRef, startTransition, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import {
   Save,
@@ -22,6 +22,7 @@ import {
 import { createPurchaseOrder } from "@/app/dashboard/purchase-orders/actions";
 import { hasCapability } from "@/lib/auth/roles";
 import { Combobox } from "@/components/ui/combobox";
+import { manilaDateString } from "@/lib/payment-terms";
 
 interface VendorWithNda {
   id: string;
@@ -91,7 +92,13 @@ export function CreatePOForm({
   regions: string[];
   areaByRegion: Record<string, string[]>;
 }) {
-  const [state, formAction, isPending] = useActionState(createPurchaseOrder, null);
+  const clientAction = useCallback((prev: any, action: any) => {
+    if (action && action.type === "RESET") return null;
+    return createPurchaseOrder(prev, action);
+  }, []);
+  const [state, dispatch, isPending] = useActionState(clientAction, null);
+  const shouldReset = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
   const [selectedVendor, setSelectedVendor] = useState("");
   const [lineItems, setLineItems] = useState<LineItem[]>(
@@ -112,6 +119,7 @@ export function CreatePOForm({
 
   useEffect(() => {
     if (!state) return;
+    shouldReset.current = true;
     if ("error" in state) {
       setResultModal({ type: "error", title: "Failed to Create PO", message: state.error as string });
     } else if ("id" in state) {
@@ -123,6 +131,22 @@ export function CreatePOForm({
       });
     }
   }, [state]);
+
+  useLayoutEffect(() => {
+    const form = formRef.current;
+    return () => {
+      setResultModal(null);
+      if (shouldReset.current) {
+        shouldReset.current = false;
+        form?.reset();
+        setSelectedVendor("");
+        setLineItems([{ ...EMPTY_LINE_ITEM }]);
+        setSiteDetails([{ ...EMPTY_SITE }]);
+        setWaiveRequirements(false);
+        startTransition(() => dispatch({ type: "RESET" }));
+      }
+    };
+  }, [dispatch]);
 
   const defaultDates = useMemo(() => {
     const now = new Date();
@@ -201,7 +225,7 @@ export function CreatePOForm({
   const tdClass = "px-3 py-2";
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form ref={formRef} action={dispatch} className="space-y-6">
       {/* Hidden fields for serialized data */}
       <input type="hidden" name="line_items" value={JSON.stringify(lineItems)} />
       <input type="hidden" name="site_details" value={JSON.stringify(siteDetails)} />
@@ -357,10 +381,9 @@ export function CreatePOForm({
             <label htmlFor="description" className="text-sm font-medium text-slate-700 dark:text-slate-300">
               Description / Subject
             </label>
-            <input
+            <textarea
               id="description"
               name="description"
-              type="text"
               defaultValue={purchaseRequest?.description || ""}
               className="w-full px-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
               placeholder="e.g. Server Maintenance for Q3"
@@ -378,7 +401,7 @@ export function CreatePOForm({
                 name="issued_date"
                 type="date"
                 required
-                defaultValue={defaultDates.issued}
+                defaultValue={manilaDateString()}
                 className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
               />
             </div>
@@ -480,7 +503,7 @@ export function CreatePOForm({
                 <th className={`${thClass} w-10`}></th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {lineItems.map((li, idx) => {
                 const rowAmount = (Number(li.qty) || 0) * (Number(li.unit_price) || 0);
                 return (
@@ -560,8 +583,8 @@ export function CreatePOForm({
                     </td>
                   </tr>
                   <tr className="group">
-                    <td colSpan={7} className="px-3 pb-2 pt-0 border-b border-slate-100 dark:border-slate-800/50">
-                      <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                    <td colSpan={7} className="px-3 pb-2 pt-0">
+                      <label className="block -mx-3 px-3 py-2 bg-slate-50/30 dark:bg-slate-800/10 border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
                         Description
                       </label>
                       <textarea
@@ -597,6 +620,8 @@ export function CreatePOForm({
 
       {/* ════════════════════════════════════════════════════
           SECTION 3: Site Details Table
+          awdhahdkjwahdkjwahda
+          adhihadjkwhad
          ════════════════════════════════════════════════════ */}
       <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">

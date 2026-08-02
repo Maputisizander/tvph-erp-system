@@ -19,6 +19,7 @@ interface PaymentRequest {
   percent_complete: number | null;
   created_at: string;
   rejection_reason: string | null;
+  is_downpayment: boolean;
   purchase_orders: { po_number: string; vendors: { name: string } | null } | null;
   projects: { name: string } | null;
 }
@@ -81,6 +82,11 @@ export function PaymentRequestsTable({ requests, canApprove }: Props) {
                       <span className="font-mono text-xs font-bold text-slate-900 dark:text-white">
                         {r.request_number || "—"}
                       </span>
+                      {r.is_downpayment && (
+                        <span className="ml-1 inline-flex items-center px-1 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
+                          DP
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 pr-4">
                       <div className="font-semibold text-slate-900 dark:text-white">
