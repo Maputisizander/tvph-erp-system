@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { renderPoPdf } from '@/lib/pdf/renderPoPdf'
+import { renderPoDocument } from '@/lib/pdf/renderPoDocument'
 import { getCurrentProfile } from '@/lib/auth/permissions'
 
 export async function GET(
@@ -13,9 +13,8 @@ export async function GET(
     }
 
     const { id } = await params
-    const regenerate = _request.nextUrl.searchParams.get("regenerate") === "true"
 
-    const { buffer, filename } = await renderPoPdf(id, { forceRegenerate: regenerate })
+    const { buffer, filename } = await renderPoDocument(id)
 
     return new Response(buffer as unknown as BodyInit, {
       status: 200,
@@ -23,6 +22,7 @@ export async function GET(
         'Content-Type': 'application/pdf',
         'Content-Disposition': `inline; filename="${filename}"`,
         'Content-Length': String(buffer.byteLength),
+        'Cache-Control': 'no-store',
       },
     })
   } catch (error: any) {

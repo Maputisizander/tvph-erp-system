@@ -15,7 +15,6 @@ import {
   User,
   Mail,
   FolderGit2,
-  FileDown,
   Pencil,
   ShieldAlert,
   ShieldCheck,
@@ -379,6 +378,15 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
           {["issued", "paid", "overpaid"].includes(po.status) && canSendEmail && (
             <PoResendButton poId={po.id} />
           )}
+          <a
+            href={`/api/purchase-orders/${po.id}/pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95"
+          >
+            <FileText className="h-4 w-4" />
+            View PDF
+          </a>
           <PODownloadDropdown poId={po.id} />
           {canCreatePR && (!paymentRequest || paymentRequest.status === 'rejected' || paymentRequest.status === 'fully_invoiced') && (
             <Link
@@ -389,13 +397,6 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               Send Payment Request
             </Link>
           )}
-          <Link
-            href={`/dashboard/purchase-orders/${po.id}/editor`}
-            className="inline-flex items-center gap-2 bg-white dark:bg-[#0a0a0a] border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95"
-          >
-            <Pencil className="h-4 w-4" />
-            Edit DOCX
-          </Link>
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createServiceRoleClient } from "@/utils/supabase/service";
-import { renderPoPdf } from "@/lib/pdf/renderPoPdf";
+import { renderPoDocument } from "@/lib/pdf/renderPoDocument";
 import { sendEmail, internalCc, type SendEmailResult } from "./send";
 import { PoIssuedEmail } from "./templates/po-issued";
 
@@ -62,7 +62,7 @@ export async function sendPoIssuedEmail(
     phone?: string | null;
   };
 
-  const rendered = await renderPoPdf(poId);
+  const rendered = await renderPoDocument(poId);
   if (!rendered) {
     return { status: "failed", error: "Failed to render PO PDF." };
   }

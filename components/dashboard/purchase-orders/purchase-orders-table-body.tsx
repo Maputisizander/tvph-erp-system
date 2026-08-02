@@ -94,7 +94,7 @@ export function PurchaseOrdersTableBody({ pos, error }: { pos: any[] | null; err
             <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-end gap-1">
                 <a
-                  href={`/api/purchase-orders/${po.id}/download`}
+                  href={`/api/purchase-orders/${po.id}/pdf`}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}

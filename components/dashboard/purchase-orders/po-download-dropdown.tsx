@@ -40,16 +40,6 @@ export function PODownloadDropdown({ poId }: { poId: string }) {
             <FileText className="h-4 w-4 text-red-500" />
             PDF Document
           </a>
-          <a
-            href={`/api/purchase-orders/${poId}/docx`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => setIsOpen(false)}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-          >
-            <FileText className="h-4 w-4 text-blue-500" />
-            DOCX Document
-          </a>
         </div>
       )}
     </div>
