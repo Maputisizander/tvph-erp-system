@@ -6,6 +6,7 @@ import { SearchInput } from '@/components/ui/search-input';
 import { StatusSelect } from '@/components/ui/status-select';
 import { Pagination } from '@/components/ui/pagination';
 import { LIST_PAGE_SIZE, parsePage, pageRange } from '@/components/ui/pagination-utils';
+import { LiveListRefresh } from '@/components/dashboard/shared/live-list-refresh';
 
 export const unstable_instant = {
   prefetch: 'static',
@@ -151,6 +152,7 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
 
         <Pagination page={page} totalCount={count ?? 0} pageSize={LIST_PAGE_SIZE} />
       </div>
+      <LiveListRefresh />
     </div>
   );
 }
