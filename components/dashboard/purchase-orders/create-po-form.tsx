@@ -148,6 +148,12 @@ export function CreatePOForm({
     };
   }, [dispatch]);
 
+  const defaultDates = useMemo(() => {
+    const now = new Date();
+    const iso = (d: Date) => d.toISOString().split("T")[0];
+    return { issued: iso(now), due: iso(new Date(now.getTime() + 30 * 864e5)) };
+  }, []);
+
   const vendor = vendors.find((v) => v.id === selectedVendor);
   const ndaBlocked = vendor && !vendor.nda_approved;
   const statusBlocked = vendor && vendor.status !== "active";
