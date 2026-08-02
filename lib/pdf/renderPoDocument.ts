@@ -323,7 +323,13 @@ function drawVendorBlock(doc: Doc, data: PoData, pageNo: number) {
   doc.moveTo(c0, y + 2 * VENDOR_ROW_H).lineTo(c2, y + 2 * VENDOR_ROW_H).stroke();
   doc.moveTo(c1, y + 3 * VENDOR_ROW_H).lineTo(c2, y + 3 * VENDOR_ROW_H).stroke();
   doc.moveTo(c0, b).lineTo(c3, b).stroke();
-  for (const x of [c0, c1, c2, c3]) doc.moveTo(x, y).lineTo(x, b).stroke();
+  // the 284.25 vertical skips the CONTACT PERSON row (y+rowH..y+2rowH) so
+  // that row spans as one wide cell directly under the VENDOR NO. row
+  doc.moveTo(c0, y).lineTo(c0, b).stroke();
+  doc.moveTo(c1, y).lineTo(c1, y + VENDOR_ROW_H).stroke();
+  doc.moveTo(c1, y + 2 * VENDOR_ROW_H).lineTo(c1, b).stroke();
+  doc.moveTo(c2, y).lineTo(c2, b).stroke();
+  doc.moveTo(c3, y).lineTo(c3, b).stroke();
   doc.restore();
 
   const lx = cols[0] + 5.4;   // 41.8
@@ -421,12 +427,6 @@ function drawLineItems(doc: Doc, data: PoData): number {
   doc.text(`${nfMoney.format(li.amount)} ${data.currency}`, 529.9, rowTop + 9.06, { baseline: "alphabetic", pageBreaks: false });
 
     const rowBottom = lastDescBaseline + 2.44;
-    // golden: row-bottom line only across the small cells; the DESCRIPTION
-    // column stays open (one continuous frame is drawn after the loop)
-    doc.save().lineWidth(STROKE_W).strokeColor("black");
-    doc.moveTo(c0, rowBottom).lineTo(c2, rowBottom).stroke();
-    doc.moveTo(c3, rowBottom).lineTo(c7, rowBottom).stroke();
-    doc.restore();
     y = rowBottom;
   }
 

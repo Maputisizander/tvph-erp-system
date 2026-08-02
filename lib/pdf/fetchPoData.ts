@@ -75,7 +75,8 @@ export async function fetchPoData(id: string): Promise<PoData | null> {
     line_items: lineItems,
     terms_and_conditions: po.terms_and_conditions ?? '',
     mobilization_date: fmtSlashDate(po.mobilization_date),
-    delivery_date: fmtSlashDate(po.delivery_date),
+    // delivery date = the due date set in the PO creation form
+    delivery_date: fmtSlashDate(po.due_date ?? po.delivery_date),
     pr_number: po.pr_number ?? '',
     requisitioner: (po.profiles as any)?.full_name ?? po.requisitioner ?? '',
     site_details: siteDetails,
