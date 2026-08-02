@@ -378,7 +378,6 @@ export function CreatePOForm({
             <textarea
               id="description"
               name="description"
-              type="text"
               defaultValue={purchaseRequest?.description || ""}
               className="w-full px-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
               placeholder="e.g. Server Maintenance for Q3"
