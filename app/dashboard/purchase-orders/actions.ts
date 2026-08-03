@@ -349,6 +349,61 @@ export async function updatePurchaseOrderTerms(poId: string, formData: FormData)
   return { success: true };
 }
 
+export async function updatePOTermsAndConditions(poId: string, formData: FormData) {
+  const supabase = await createClient();
+  const { user, error: authError } = await requireCapability('po.write', supabase);
+  if (authError || !user) return { error: authError || 'Unauthorized' };
+
+  const { data: po } = await supabase.from('purchase_orders').select('status').eq('id', poId).single();
+  if (po?.status !== 'draft') return { error: 'Terms and conditions can only be edited while the PO is a draft.' };
+
+  // Empty = null restores the default golden template on the PDF. Non-empty
+  // must be a structured PoTc object (items/instructions/sitesLead); validate
+  // and canonicalize so the renderer never sees malformed data.
+  const raw = String(formData.get('terms_and_conditions') || '').trim();
+  let terms_and_conditions: string | null = null;
+  if (raw) {
+    try {
+      const o = JSON.parse(raw);
+      if (!o || !Array.isArray(o.items) || !Array.isArray(o.instructions)) {
+        return { error: 'Invalid terms payload.' };
+      }
+      terms_and_conditions = JSON.stringify({
+        items: o.items.map((it: any) => ({
+          text: String(it?.text ?? ''),
+          subs: Array.isArray(it?.subs) ? it.subs.map(String) : [],
+          conts: Array.isArray(it?.conts) ? it.conts.map(String) : [],
+        })),
+        instructions: o.instructions.map((ins: any) => ({
+          text: String(ins?.text ?? ''),
+          conts: Array.isArray(ins?.conts) ? ins.conts.map(String) : [],
+        })),
+        sitesLead: Array.isArray(o.sitesLead) ? o.sitesLead.map(String) : [],
+      });
+    } catch {
+      return { error: 'Invalid terms payload.' };
+    }
+  }
+  const updated_at = new Date().toISOString();
+  const { error, count } = await supabase
+    .from('purchase_orders')
+    .update({ terms_and_conditions, terms_configured_at: updated_at }, { count: 'exact' })
+    .eq('id', poId)
+    .eq('status', 'draft');
+  if (error) return { error: error.message };
+  if (count === 0) return { error: 'Terms and conditions can only be edited while the PO is a draft.' };
+
+  await recordAuditLog({
+    entity_type: 'purchase_order',
+    entity_id: poId,
+    action: 'UPDATE',
+    changes: { after: { terms_and_conditions } },
+    performed_by: user.id,
+  });
+  revalidatePath(`/dashboard/purchase-orders/${poId}`);
+  return { success: true };
+}
+
 // ── Originator-only draft editing ────────────────────────────────────────
 // The user who drafted the PO (created_by) may fix human errors while the PO
 // is still a draft or pending approval. No other role can edit these fields.

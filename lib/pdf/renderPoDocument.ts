@@ -11,6 +11,7 @@ import { readFileSync } from "fs";
 
 import { fetchPoData } from "./fetchPoData";
 import type { PoData } from "./types";
+import { TNC_LIST, TNC_INSTRUCTIONS, TNC_SITES_LEAD, parseTc } from "./terms";
 import { createClient } from "@/utils/supabase/server";
 
 // ─── Page geometry (golden po_original.pdf) ─────────────────────────────────
@@ -96,71 +97,9 @@ const LOGO_IMAGE = {
   },
 };
 
-// ─── Default T&C (mirrors the golden PO text) ────────────────────────────────
-const TNC_INTRO = [
-  "Project: {project_name} ({vendor_name})",
-  "",
-  "This PO is governed by the Service Agreement for {project_name} with Ref No. {ref_no}, as may be amended.",
-  "",
-  "Terms and Conditions:",
-];
-
-const TNC_LIST: Array<[string, string[] | null, string[]?]> = [
-  ["Amount indicated here are VAT-Inclusive.", null],
-  [
-    // golden: hard break after "superseded" (width-soft wrap would fit "by",
-    // but golden puts "by a mutually agreed..." on the hang-indented next line)
-    "Delivery Date/Period Covered: Vendor shall immediately mobilize upon PO release; any changes to the delivery date can only be superseded",
-    null,
-    ["by a mutually agreed and signed Project Timeline between TelcoVantage and Vendor"],
-  ],
-  [
-    "Payment Terms:",
-    [
-      "Thirty percent (30%) of the value of the scope shall be paid by TelcoVantage to the Vendor. Payment shall be within 10 days from date of issue of the PO.",
-      "The remaining balance of 60% of the value shall be paid via Progressive Billing on a per completed Node or batch of Nodes. Payment shall be made after the 30% Total DP is exhausted against completed works. Each Progressive Billing shall be paid by TelcoVantage to the Vendor within thirty (30) calendar days from the date of receipt of a complete and correct invoice.",
-      // golden: c-continuation ends without a period ("...correct invoice")
-      "Final Billing shall be 10% of the PO value as retention fee. Payment shall be made within thirty (30) calendar days from the date of receipt of complete and correct invoice",
-    ],
-  ],
-  ["Additional costs beyond the PO value indicated shall be handled via a Change Request, to be filed by the Project Manager for approval.", null],
-  [
-    "The issuance of any subsequent Purchase Order, call-off, or work release under this Agreement shall not give rise to any additional downpayment obligation, unless TVPH and the Subcontractor expressly agree in writing to increase the downpayment by way of a formal amendment to this Agreement.",
-    null,
-  ],
-  ["Liquidated Damages: As per Agreement", null],
-  ["Liabilities and Indemnities: As per Agreement", null],
-  ["Scope of Work: As per Agreement Annex A", null],
-  ["List of Sites: See next page, B (List of Sites and Details)", null],
-];
-
-// [numbered line, continuation lines drawn at the hanging indent]
-const TNC_INSTRUCTIONS: Array<[string, string[] | null]> = [
-  ["All invoice(s) should be provided in duplicate (2) copies.", null],
-  ["Indicate Purchase Order (PO) reference number in all copies of invoice(s).", null],
-  ["Ensure that authorized receiving personnel or users signs over his/her printed name & indicate the date received on all copies of invoice(s).", null],
-  ["If the billing is in the form of a Statement of Account (SOA), vendor should provide TIN on the face of the SOA.", null],
-  ["Issuance of handwritten or typewritten invoices is discouraged.", null],
-  [
-    "All original copy of invoices and proofs of delivery of goods or proofs of completion of service will be submitted to",
-    [
-      "Location: Unit 1811, North Tower, Park Triangle Corporate Plaza, 32nd street cor. 11th Ave, BGC, Taguig City.",
-      "Contact Person: Mae Selina H. Bacayo / Teresa Grecia N. Beltran",
-      "Contact Number: 0961-4734695 / 0920-9680070",
-    ],
-  ],
-  ["All other supporting documents other than those submitted to Finance, will be submitted to the Project Manager of TelcoVantage", null],
-  [
-    // golden: hard break after "start" ("...shall start" / "as items are tagged as GR.")
-    "Duplicate copies of invoice(s) shall be retained with the receiving personnel for Goods Receipt (GR). Processing of payment shall start as soon",
-    ["as items are tagged as GR."],
-  ],
-];
-
-const TNC_SITES_LEAD = [
-  "Any violation of the above instruction may lead to delay of payment or non-payment. In the event that payment is delayed (i.e. exceed the agreed payment terms indicated herein), please submit a Statement of Account (SOA) to Finance and notify Project Management team of such occurrence.",
-  "It is hereby understood that by serving the requirement of TelcoVantage, you agree to adhere to the terms & conditions stated in this PO.",
-];
+// ─── Default T&C ──────────────────────────────────────────────────────────────
+// TNC_INTRO / TNC_LIST / TNC_INSTRUCTIONS / TNC_SITES_LEAD live in ./terms.ts
+// (shared with the draft editor panel).
 
 const IMPORTANT_NOTE =
   "NOTE: THIS IS AN ELECTRONICALLY APPROVED PURCHASE ORDER (PO). MANUAL SIGNATURE IS NOT REQUIRED.";
@@ -402,7 +341,7 @@ function drawLineItems(doc: Doc, data: PoData): number {
 
   for (const li of data.line_items) {
     const rowTop = y;
-    const code = li.item_code ?? "";
+    const code = "Services";  //li.item_code ?? "";
     const boldW = code ? doc.font(FONT_BOLD).widthOfString(code) : 0;
     doc.font(FONT_REGULAR);
     const text = code ? `: ${li.description ?? ""}` : (li.description ?? "");
@@ -463,7 +402,7 @@ function drawLineItems(doc: Doc, data: PoData): number {
 }
 
 // ─── Section: terms and conditions (page 2) ──────────────────────────────────
-function drawTerms(doc: Doc, data: PoData): number {
+function drawTerms(doc: Doc, data: PoData): { lastBaseline: number; remainder: { indent: number; lines: string[] }[] } {
   const x0 = X0 + X_SHIFT;        // 50.85
   const x3 = X3 + X_SHIFT;        // 596.35
   const top = VENDOR_Y[2] + 4 * VENDOR_ROW_H; // 175.79, just under the vendor block
@@ -486,20 +425,36 @@ function drawTerms(doc: Doc, data: PoData): number {
   const subX = itemX + 35.9;      // 92.2
   // golden sub lines: a 473.9, c 478.3, b must break before +"Payment" (490.3)
   const subW = 486.0;
-  const subContW = subW - 18;     // 468.0
+  // pdfkit 0.18 removed `pageBreaks: false` — its LineWrapper auto-breaks when
+  // y exceeds the page and spawns a blank page per overflowing text() call.
+  // Cap the terms column so the bands below still fit: band top = lastBaseline
+  // + 15.06; the IMPORTANT note wraps to 2 lines on page 2, so its last
+  // baseline is y0+84.27 and must stay above 792 - lineHeight. Overflow
+  // beyond the cap continues on page 3 (drawTermsTail).
+  const TERMS_CAP = 679.0; // lastBaseline <= cap keeps the band stack on the page
   let y = 197.6;                  // golden first content baseline
   let lastBaseline = y;
+  const remainder: { indent: number; lines: string[] }[] = [];
 
+  // para/paraHang mirror the golden hanging-indent layout. Overflow lines are
+  // collected (indent = x - itemX relative) and continued on page 3 by the tail.
   const para = (text: string, x: number, w: number) => {
+    const indent = x - itemX;
+    let out: { indent: number; lines: string[] } | null = null;
     for (const l of wrapWords(doc, text, w)) {
+      if (y > TERMS_CAP) { out ??= { indent, lines: [] }; out.lines.push(l); continue; }
       doc.text(l, x, y, { baseline: "alphabetic", pageBreaks: false });
       lastBaseline = y;
       y += step;
     }
+    if (out) remainder.push(out);
   };
   // first line at (x, w), continuation lines hanging at x+18
   const paraHang = (text: string, x: number, w: number) => {
-    const first = wrapWords(doc, text, w)[0];
+    const indent = x - itemX;
+    const lines = wrapWords(doc, text, w);
+    if (y > TERMS_CAP) { remainder.push({ indent, lines }); return; }
+    const first = lines[0];
     doc.text(first, x, y, { baseline: "alphabetic", pageBreaks: false });
     lastBaseline = y;
     y += step;
@@ -507,61 +462,93 @@ function drawTerms(doc: Doc, data: PoData): number {
     if (rest) para(rest, x + 18, w - 18);
   };
 
-  if (data.terms_and_conditions) {
-    for (const p of data.terms_and_conditions.split(/\n+/)) para(p, itemX, itemW);
-  } else {
-    para(`Project: ${data.project_name} (${data.vendor_name})`, itemX, itemW);
-    y += step; // blank line
-    para(`This PO is governed by the Service Agreement for ${data.project_name}${data.ref_no ? ` with Ref No. ${data.ref_no}` : ""}, as may be amended.`, itemX, itemW);
-    y += step; // blank line
-    para("Terms and Conditions:", itemX, itemW);
+  const tc = data.terms_and_conditions ? parseTc(data.terms_and_conditions) : null;
+  // Custom T&C: structured object rendered with the golden hanging-indent
+  // geometry (sub-letters at subX, continuations at hangX). A non-JSON /
+  // wrong-shape stored string is treated as the golden template (parseTc
+  // returns null), so the layout never drifts regardless of edits.
+  const items: Array<[string, string[] | null, string[]?]> = tc ? tc.items.map((it) => [it.text, it.subs, it.conts]) : TNC_LIST;
+  const instructions: Array<[string, string[] | null]> = tc ? tc.instructions.map((ins) => [ins.text, ins.conts]) : TNC_INSTRUCTIONS;
 
-    TNC_LIST.forEach(([item, subs, conts], i) => {
-      paraHang(`${i + 1}. ${item}`, itemX, itemW);
-      // golden letters the Payment Terms sub-items a./b./c. at x92.2;
-      // plain continuation lines (item 2) hang at x+18 like instructions
-      subs?.forEach((s, j) => paraHang(`${String.fromCharCode(97 + j)}. ${s}`, subX, subW));
-      conts?.forEach((c) => paraHang(c, hangX, hangW));
-    });
+  para(`Project: ${data.project_name} (${data.vendor_name})`, itemX, itemW);
+  y += step; // blank line
+  para(`This PO is governed by the Service Agreement for ${data.project_name}${data.ref_no ? ` with Ref No. ${data.ref_no}` : ""}, as may be amended.`, itemX, itemW);
+  y += step; // blank line
+  para("Terms and Conditions:", itemX, itemW);
 
-    y += step; // blank line (golden: item 9 @461.3, A. @483.3)
-    para("A. Instructions to Vendor:", itemX, itemW);
-    TNC_INSTRUCTIONS.forEach(([text, cont], i) => {
-      paraHang(`${i + 1}. ${text}`, itemX, itemW);
-      cont?.forEach((c) => paraHang(c, hangX, hangW));
-    });
-  }
+  items.forEach(([item, subs, conts], i) => {
+    if (item) paraHang(`${i + 1}. ${item}`, itemX, itemW);
+    // golden letters the Payment Terms sub-items a./b./c. at x92.2;
+    // plain continuation lines (item 2) hang at x+18 like instructions
+    subs?.forEach((s, j) => { if (s) paraHang(`${String.fromCharCode(97 + j)}. ${s}`, subX, subW); });
+    conts?.forEach((c) => { if (c) paraHang(c, hangX, hangW); });
+  });
+
+  y += step; // blank line (golden: item 9 @461.3, A. @483.3)
+  para("A. Instructions to Vendor:", itemX, itemW);
+  instructions.forEach(([text, cont], i) => {
+    if (text) paraHang(`${i + 1}. ${text}`, itemX, itemW);
+    cont?.forEach((c) => { if (c) paraHang(c, hangX, hangW); });
+  });
 
   // golden: box around the terms column, bar bottom -> delivery band top
   doc.save().lineWidth(STROKE_W).strokeColor("black");
   doc.moveTo(x0, top + barH).lineTo(x0, lastBaseline + 15.06).stroke();
   doc.moveTo(x3, top + barH).lineTo(x3, lastBaseline + 15.06).stroke();
   doc.restore();
-  return lastBaseline;
+  return { lastBaseline, remainder };
+}
+
+// ─── Section: custom T&C overflow (page 3, above the sites section) ──────────
+function drawTermsTail(doc: Doc, remainder: { indent: number; lines: string[] }[], y0: number): number {
+  const leadX = X0 + 5.4;         // page 3 has no X_SHIFT
+  const step = 10.986;
+  // ponytail: hard cap so B./table/bands still fit on page 3; overflow
+  // beyond it is clipped (extreme edge case)
+  const CAP = 500;
+  doc.font(FONT_REGULAR).fontSize(9);
+  let y = y0;
+  for (const p of remainder) {
+    if (y > CAP) break;
+    for (const l of p.lines) {
+      if (y > CAP) break;
+      doc.text(l, leadX + p.indent, y, { baseline: "alphabetic", pageBreaks: false });
+      y += step;
+    }
+    y += step; // blank line between paragraphs
+  }
+  return y;
 }
 
 // ─── Section: sites list (page 3) ────────────────────────────────────────────
-function drawSites(doc: Doc, data: PoData): number {
-  const top = VENDOR_Y[3] + 4 * VENDOR_ROW_H; // 197.19, just under the vendor block
+function drawSites(doc: Doc, data: PoData, y0: number, sitesLead: string[] | null): number {
+  const top = VENDOR_Y[3] + 4 * VENDOR_ROW_H; // frame top (golden), content may start lower
   doc.font(FONT_REGULAR).fontSize(9);
   const leadX = X0 + 5.4;         // 41.8
   const leadW = 536.0;            // golden true wrap width (same family as p2 itemW)
-  let y = top + 9.03;             // 206.2 first lead baseline
+  let y = y0;
 
-  for (const [i, t] of TNC_SITES_LEAD.entries()) {
-    const text = `${i + 9}. ${t}`;
-    const first = wrapWords(doc, text, leadW)[0];
-    doc.text(first, leadX, y, { baseline: "alphabetic", pageBreaks: false });
-    y += 10.986;
-    const rest = text.slice(first.length).trimStart();
-    if (rest) {
-      for (const l of wrapWords(doc, rest, leadW - 18)) {
-        doc.text(l, leadX + 18, y, { baseline: "alphabetic", pageBreaks: false });
-        y += 10.986;
+  // The 9./10. lead paragraphs are part of the T&C template (page-2 items
+  // continue onto page 3). For custom T&C the stored sitesLead is rendered
+  // with the same geometry; null => golden template.
+  const lead = sitesLead ?? TNC_SITES_LEAD;
+  if (lead.length) {
+    for (const [i, t] of lead.entries()) {
+      if (!t) continue;
+      const text = `${i + 9}. ${t}`;
+      const first = wrapWords(doc, text, leadW)[0];
+      doc.text(first, leadX, y, { baseline: "alphabetic", pageBreaks: false });
+      y += 10.986;
+      const rest = text.slice(first.length).trimStart();
+      if (rest) {
+        for (const l of wrapWords(doc, rest, leadW - 18)) {
+          doc.text(l, leadX + 18, y, { baseline: "alphabetic", pageBreaks: false });
+          y += 10.986;
+        }
       }
     }
+    y += 10.986; // blank line (golden: lead-10 @239.2, B. @261.2)
   }
-  y += 10.986; // blank line (golden: lead-10 @239.2, B. @261.2)
   doc.text("B. List of Sites and Details", X0 + 5.4, y, { baseline: "alphabetic", pageBreaks: false });
   y += 10.986;
   y += 10.986; // blank line
@@ -743,14 +730,18 @@ export async function renderPoDocument(poId: string): Promise<{ buffer: Buffer; 
 
     doc.addPage();
     chrome();
-    const termsLastY = drawTerms(doc, data);
-    drawBands(doc, data, termsLastY + 15.06, pageNo);
+    const tc = data.terms_and_conditions ? parseTc(data.terms_and_conditions) : null;
+    const terms = drawTerms(doc, data);
+    drawBands(doc, data, terms.lastBaseline + 15.06, pageNo);
 
     // golden template always carries the sites page, even with no sites
-    // (SUMMARY table renders header + TOTAL + empty skeleton rows)
+    // (SUMMARY table renders header + TOTAL + empty skeleton rows); custom
+    // T&C overflow from page 2 continues here above the sites section
     doc.addPage();
     chrome();
-    const tableBottom = drawSites(doc, data);
+    let sitesY0 = VENDOR_Y[3] + 4 * VENDOR_ROW_H + 9.03;
+    if (terms.remainder.length) sitesY0 = drawTermsTail(doc, terms.remainder, sitesY0);
+    const tableBottom = drawSites(doc, data, sitesY0, tc ? tc.sitesLead : null);
     // short tables end flush on the golden band top; long tables push it down
     drawBands(doc, data, tableBottom > BAND_ANCHOR_3 ? tableBottom + 32.96 : tableBottom, pageNo);
 
