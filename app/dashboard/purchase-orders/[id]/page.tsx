@@ -12,10 +12,13 @@ import {
   Clock,
   User,
   Mail,
+  MapPin,
   FolderGit2,
+  History,
   ShieldAlert,
   ShieldCheck,
   ClipboardCheck,
+  ClipboardList,
   TrendingUp,
   Pencil,
   Eye,
@@ -31,6 +34,7 @@ import { PoApprovalActions } from "@/components/dashboard/purchase-orders/po-app
 import { PoCertUpload } from "@/components/dashboard/purchase-orders/po-cert-upload";
 import { NotifyFinanceButton } from "@/components/dashboard/purchase-orders/notify-finance-button";
 import { PaymentRequestButton } from "@/components/dashboard/purchase-orders/payment-request-button";
+import { PoCollapsibleCard } from "@/components/dashboard/purchase-orders/po-collapsible-card";
 import { PoTermsCard } from "@/components/dashboard/purchase-orders/po-terms-card";
 import { PODetailsEditor } from "@/components/dashboard/purchase-orders/po-details-editor";
 import { POLineItemsEditor } from "@/components/dashboard/purchase-orders/po-line-items-editor";
@@ -576,114 +580,6 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
         ))}
       </nav>
 
-      {/* Completion Certificates */}
-      {(signedCerts.length > 0 || canSubmitCert) && (
-        <div id="certificates" className="scroll-mt-28 bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
-            <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <ClipboardCheck className="h-5 w-5 text-primary" /> Completion Certificates
-            </h2>
-            {maxApprovedPercent !== null && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800/50">
-                <TrendingUp className="h-3 w-3" /> {maxApprovedPercent}% Approved
-              </span>
-            )}
-          </div>
-          <div className="p-6 space-y-4">
-            {signedCerts.length > 0 ? (
-              <div className="space-y-3">
-                {signedCerts.map((cert) => {
-                  const isPendingCert = cert.status === 'submitted';
-                  const isApproved = cert.status === 'approved';
-                  const isRejected = cert.status === 'rejected';
-                  const canActOnCert = canApproveCert && isPendingCert && cert.submitted_by !== currentUser?.id;
-                  return (
-                    <div key={cert.id} className={`flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl border ${
-                      isApproved ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800/50'
-                      : isRejected ? 'bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-800 opacity-60'
-                      : 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/50'
-                    }`}>
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-3">
-                          <span className="text-lg font-bold text-slate-900 dark:text-white">{Number(cert.percent_complete)}% Complete</span>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                            isApproved ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400'
-                            : isRejected ? 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400'
-                            : 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400'
-                          }`}>
-                            {cert.status.toUpperCase()}
-                          </span>
-                          {cert.file_url && (
-                            <a href={cert.file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline font-medium">
-                              {cert.file_name || 'View File'}
-                            </a>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500">
-                          Submitted by {certProfiles[cert.submitted_by] || 'PM'} on {new Date(cert.submitted_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
-                          {isApproved && cert.approved_by && ` · Approved by ${certProfiles[cert.approved_by] || 'Admin'}`}
-                        </p>
-                        {cert.notes && <p className="text-xs text-slate-600 dark:text-slate-400 italic">{cert.notes}</p>}
-                      </div>
-                      {canActOnCert && (
-                        <div className="flex items-center gap-2 shrink-0">
-                          <form action={async () => {
-                            'use server';
-                            const { approveCompletionCertificate } = await import('../actions');
-                            await approveCompletionCertificate(cert.id);
-                          }}>
-                            <button type="submit" className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-95">
-                              <CheckCircle2 className="h-3.5 w-3.5" /> Approve
-                            </button>
-                          </form>
-                          <form action={async () => {
-                            'use server';
-                            const { rejectCompletionCertificate } = await import('../actions');
-                            await rejectCompletionCertificate(cert.id);
-                          }}>
-                            <button type="submit" className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-95">
-                              <XCircle className="h-3.5 w-3.5" /> Reject
-                            </button>
-                          </form>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-sm text-slate-400 italic">No certificates submitted yet.</p>
-            )}
-            {canSubmitCert && (
-              <PoCertUpload poId={po.id} vendorId={po.vendor_id} />
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Payment Request */}
-      <PaymentRequestButton
-        poId={po.id}
-        poAmount={poAmount}
-        paymentRequest={paymentRequest as any}
-        approvedCerts={approvedCerts}
-        canCreate={canCreatePR}
-        canApprove={canApprovePR}
-        consumed={prConsumed}
-        remaining={prRemaining}
-      />
-
-      {/* Payment Notification */}
-      <NotifyFinanceButton
-        poId={po.id}
-        reservationId={activeReservation?.id ?? null}
-        reservationStatus={(activeReservation?.status as any) ?? null}
-        reservedAmount={activeReservation ? Number(activeReservation.reserved_amount) : remainingBalance}
-        canNotify={canNotify}
-        canAcknowledge={canAcknowledge}
-        projectCompletionPct={project ? Number((project as any).completion_pct ?? 0) : null}
-      />
-
       {/* Financial Summary */}
       <section id="overview" className="scroll-mt-28">
         <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-6">
@@ -865,140 +761,259 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
         </div>
       </section>
 
+      {/* Payment Request */}
+      <PaymentRequestButton
+        poId={po.id}
+        poAmount={poAmount}
+        paymentRequest={paymentRequest as any}
+        approvedCerts={approvedCerts}
+        canCreate={canCreatePR}
+        canApprove={canApprovePR}
+        consumed={prConsumed}
+        remaining={prRemaining}
+      />
+
+      {/* Payment Notification */}
+      <NotifyFinanceButton
+        poId={po.id}
+        reservationId={activeReservation?.id ?? null}
+        reservationStatus={(activeReservation?.status as any) ?? null}
+        reservedAmount={activeReservation ? Number(activeReservation.reserved_amount) : remainingBalance}
+        canNotify={canNotify}
+        canAcknowledge={canAcknowledge}
+        projectCompletionPct={project ? Number((project as any).completion_pct ?? 0) : null}
+      />
+
+      {/* Completion Certificates */}
+      {(signedCerts.length > 0 || canSubmitCert) && (
+        <section id="certificates" className="scroll-mt-28 bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
+            <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <ClipboardCheck className="h-5 w-5 text-primary" /> Completion Certificates
+            </h2>
+            {maxApprovedPercent !== null && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800/50">
+                <TrendingUp className="h-3 w-3" /> {maxApprovedPercent}% Approved
+              </span>
+            )}
+          </div>
+          <div className="p-6 space-y-4">
+            {signedCerts.length > 0 ? (
+              <div className="space-y-3">
+                {signedCerts.map((cert) => {
+                  const isPendingCert = cert.status === 'submitted';
+                  const isApproved = cert.status === 'approved';
+                  const isRejected = cert.status === 'rejected';
+                  const canActOnCert = canApproveCert && isPendingCert && cert.submitted_by !== currentUser?.id;
+                  return (
+                    <div key={cert.id} className={`flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl border ${
+                      isApproved ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800/50'
+                      : isRejected ? 'bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-800 opacity-60'
+                      : 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/50'
+                    }`}>
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg font-bold text-slate-900 dark:text-white">{Number(cert.percent_complete)}% Complete</span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                            isApproved ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400'
+                            : isRejected ? 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400'
+                            : 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400'
+                          }`}>
+                            {cert.status.toUpperCase()}
+                          </span>
+                          {cert.file_url && (
+                            <a href={cert.file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline font-medium">
+                              {cert.file_name || 'View File'}
+                            </a>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          Submitted by {certProfiles[cert.submitted_by] || 'PM'} on {new Date(cert.submitted_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                          {isApproved && cert.approved_by && ` · Approved by ${certProfiles[cert.approved_by] || 'Admin'}`}
+                        </p>
+                        {cert.notes && <p className="text-xs text-slate-600 dark:text-slate-400 italic">{cert.notes}</p>}
+                      </div>
+                      {canActOnCert && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <form action={async () => {
+                            'use server';
+                            const { approveCompletionCertificate } = await import('../actions');
+                            await approveCompletionCertificate(cert.id);
+                          }}>
+                            <button type="submit" className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-95">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Approve
+                            </button>
+                          </form>
+                          <form action={async () => {
+                            'use server';
+                            const { rejectCompletionCertificate } = await import('../actions');
+                            await rejectCompletionCertificate(cert.id);
+                          }}>
+                            <button type="submit" className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-95">
+                              <XCircle className="h-3.5 w-3.5" /> Reject
+                            </button>
+                          </form>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400 italic">No certificates submitted yet.</p>
+            )}
+            {canSubmitCert && (
+              <PoCertUpload poId={po.id} vendorId={po.vendor_id} />
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Linked Invoices */}
+      <section id="invoices" className="scroll-mt-28 bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <h2 className="font-semibold text-slate-900 dark:text-white">
+            Linked Invoices
+          </h2>
+          <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs px-2 py-0.5 rounded-full font-bold">
+            {invoices?.length || 0}
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="text-[10px] text-slate-500 uppercase bg-slate-50/50 dark:bg-slate-800/20 border-b border-slate-200 dark:border-slate-800">
+              <tr>
+                <th className="px-6 py-3 font-semibold">Invoice #</th>
+                <th className="px-6 py-3 font-semibold">Amount</th>
+                <th className="px-6 py-3 font-semibold">Payment Request</th>
+                <th className="px-6 py-3 font-semibold">Status</th>
+                <th className="px-6 py-3 font-semibold text-right">Carry-Forward</th>
+                <th className="px-6 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {invoices?.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-6 py-12 text-center text-slate-400 italic"
+                  >
+                    No invoices linked to this PO yet.
+                  </td>
+                </tr>
+              ) : (
+                invoices?.map((inv: any) => (
+                  <tr
+                    key={inv.id}
+                    className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors"
+                  >
+                    <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">
+                      {inv.invoice_number}
+                    </td>
+                    <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">
+                      ₱{Number(inv.amount).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 text-xs text-slate-500">
+                      {inv.payment_request_id
+                        ? (invoices as any[])?.find((i: any) => i.id === inv.id)?.carry_forward_amount != null
+                          ? 'PR linked'
+                          : 'PR linked'
+                        : '—'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${invoiceStatusBadgeClasses(inv.status)}`}
+                      >
+                        {invoiceStatusLabel(inv.status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      {inv.carry_forward_amount != null && (
+                        <span className={`text-xs font-semibold ${
+                          Number(inv.carry_forward_amount) > 0
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : Number(inv.carry_forward_amount) < 0
+                            ? 'text-red-600 dark:text-red-400'
+                            : 'text-slate-400'
+                        }`}>
+                          {Number(inv.carry_forward_amount) > 0
+                            ? `₱${Number(inv.carry_forward_amount).toLocaleString()}`
+                            : Number(inv.carry_forward_amount) < 0
+                            ? `(₱${Math.abs(Number(inv.carry_forward_amount)).toLocaleString()})`
+                            : '—'}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <Link
+                        href={`/dashboard/invoices/${inv.id}`}
+                        className="text-primary hover:underline font-medium"
+                      >
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Details */}
-        <div className="lg:col-span-2 space-y-8">
-          <PoTermsCard
-            poId={po.id}
-            status={po.status}
-            terms={po}
-            penalty={penalty}
-            canEdit={false}
-            canOverride={canOverridePenalty}
-          />
-          <PODetailsEditor
-            poId={po.id}
-            description={po.description}
-            issuedDate={po.issued_date}
-            dueDate={po.due_date}
-            draftedBy={draftedByLabel}
-            approvedBy={approvedByLabel}
-            canEdit={false}
-          />
-          {(canEditDraft || (lineItems && lineItems.length > 0)) && (
-            <POLineItemsEditor
+        <div id="details" className="lg:col-span-2 space-y-8 scroll-mt-28">
+          <PoCollapsibleCard title="Terms & Conditions" icon={<FileText className="h-5 w-5 text-primary" />} defaultOpen>
+            <PoTermsCard
               poId={po.id}
-              items={lineItems || []}
-              currencySymbol={currencySymbol}
+              status={po.status}
+              terms={po}
+              penalty={penalty}
+              canEdit={false}
+              canOverride={canOverridePenalty}
+            />
+          </PoCollapsibleCard>
+          <PoCollapsibleCard title="PO Details" icon={<Pencil className="h-5 w-5 text-primary" />}>
+            <PODetailsEditor
+              poId={po.id}
+              description={po.description}
+              issuedDate={po.issued_date}
+              dueDate={po.due_date}
+              draftedBy={draftedByLabel}
+              approvedBy={approvedByLabel}
               canEdit={false}
             />
+          </PoCollapsibleCard>
+          {(canEditDraft || (lineItems && lineItems.length > 0)) && (
+            <PoCollapsibleCard title="Line Items" icon={<ClipboardList className="h-5 w-5 text-primary" />} count={lineItems?.length ?? 0}>
+              <POLineItemsEditor
+                poId={po.id}
+                items={lineItems || []}
+                currencySymbol={currencySymbol}
+                canEdit={false}
+              />
+            </PoCollapsibleCard>
           )}
 
           {(canEditDraft || (siteDetails && siteDetails.length > 0)) && (
-            <POSiteDetailsEditor
-              poId={po.id}
-              sites={siteDetails || []}
-              canEdit={false}
-            />
+            <PoCollapsibleCard title="Site Details" icon={<MapPin className="h-5 w-5 text-primary" />} count={siteDetails?.length ?? 0}>
+              <POSiteDetailsEditor
+                poId={po.id}
+                sites={siteDetails || []}
+                canEdit={false}
+              />
+            </PoCollapsibleCard>
           )}
 
-          {/* Linked Invoices Section */}
-          <div id="invoices" className="scroll-mt-28 bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-              <h2 className="font-semibold text-slate-900 dark:text-white">
-                Linked Invoices
-              </h2>
-              <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs px-2 py-0.5 rounded-full font-bold">
-                {invoices?.length || 0}
-              </span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-[10px] text-slate-500 uppercase bg-slate-50/50 dark:bg-slate-800/20 border-b border-slate-200 dark:border-slate-800">
-                  <tr>
-                    <th className="px-6 py-3 font-semibold">Invoice #</th>
-                    <th className="px-6 py-3 font-semibold">Amount</th>
-                    <th className="px-6 py-3 font-semibold">Payment Request</th>
-                    <th className="px-6 py-3 font-semibold">Status</th>
-                    <th className="px-6 py-3 font-semibold text-right">Carry-Forward</th>
-                    <th className="px-6 py-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {invoices?.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className="px-6 py-12 text-center text-slate-400 italic"
-                      >
-                        No invoices linked to this PO yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    invoices?.map((inv: any) => (
-                      <tr
-                        key={inv.id}
-                        className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors"
-                      >
-                        <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">
-                          {inv.invoice_number}
-                        </td>
-                        <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">
-                          ₱{Number(inv.amount).toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 text-xs text-slate-500">
-                          {inv.payment_request_id
-                            ? (invoices as any[])?.find((i: any) => i.id === inv.id)?.carry_forward_amount != null
-                              ? 'PR linked'
-                              : 'PR linked'
-                            : '—'}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${invoiceStatusBadgeClasses(inv.status)}`}
-                          >
-                            {invoiceStatusLabel(inv.status)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          {inv.carry_forward_amount != null && (
-                            <span className={`text-xs font-semibold ${
-                              Number(inv.carry_forward_amount) > 0
-                                ? 'text-emerald-600 dark:text-emerald-400'
-                                : Number(inv.carry_forward_amount) < 0
-                                ? 'text-red-600 dark:text-red-400'
-                                : 'text-slate-400'
-                            }`}>
-                              {Number(inv.carry_forward_amount) > 0
-                                ? `₱${Number(inv.carry_forward_amount).toLocaleString()}`
-                                : Number(inv.carry_forward_amount) < 0
-                                ? `(₱${Math.abs(Number(inv.carry_forward_amount)).toLocaleString()})`
-                                : '—'}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <Link
-                            href={`/dashboard/invoices/${inv.id}`}
-                            className="text-primary hover:underline font-medium"
-                          >
-                            View
-                          </Link>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Edit History */}
-          <POEditHistory poId={po.id} />
+          <section id="history" className="scroll-mt-28">
+            <PoCollapsibleCard title="Edit History" icon={<History className="h-5 w-5 text-primary" />}>
+              <POEditHistory poId={po.id} />
+            </PoCollapsibleCard>
+          </section>
         </div>
 
         {/* Right Column: Vendor Info */}
-        <div className="space-y-8">
+        <div id="vendor" className="space-y-8 scroll-mt-28">
           <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
             <h3 className="font-semibold text-slate-900 dark:text-white mb-4">
               Vendor Information
