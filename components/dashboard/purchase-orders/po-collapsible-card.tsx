@@ -5,18 +5,20 @@ export function PoCollapsibleCard({
   icon,
   count,
   defaultOpen = false,
+  className,
   children,
 }: {
   title: string;
   icon?: React.ReactNode;
   count?: number;
   defaultOpen?: boolean;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
     <details
       open={defaultOpen}
-      className="group bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm [&>summary]:list-none [&>summary::-webkit-details-marker]:hidden"
+      className={`group bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm [&>summary]:list-none [&>summary::-webkit-details-marker]:hidden ${className ?? ""}`}
     >
       <summary className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between cursor-pointer select-none">
         <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">

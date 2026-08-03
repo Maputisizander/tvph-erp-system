@@ -320,7 +320,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
     .join(", ");
 
   return (
-    <div className="p-6 lg:p-8 max-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="p-6 lg:p-8 max-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-full flex flex-col">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div className="flex items-start gap-4">
@@ -964,9 +964,9 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
         </div>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 lg:auto-rows-fr">
         {/* Left Column: Details */}
-        <div id="details" className="lg:col-span-2 space-y-8 scroll-mt-28">
+        <div id="details" className="lg:col-span-2 space-y-8 scroll-mt-28 flex flex-col">
           <PoCollapsibleCard title="Terms & Conditions" icon={<FileText className="h-5 w-5 text-primary" />} defaultOpen>
             <PoTermsCard
               poId={po.id}
@@ -1009,15 +1009,15 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
             </PoCollapsibleCard>
           )}
 
-          <section id="history" className="scroll-mt-28">
-            <PoCollapsibleCard title="Edit History" icon={<History className="h-5 w-5 text-primary" />}>
+          <section id="history" className="scroll-mt-28 flex flex-col flex-1">
+            <PoCollapsibleCard title="Edit History" icon={<History className="h-5 w-5 text-primary" />} className="flex-1">
               <POEditHistory poId={po.id} />
             </PoCollapsibleCard>
           </section>
         </div>
 
         {/* Right Column: Vendor Info */}
-        <div id="vendor" className="space-y-8 scroll-mt-28">
+        <div id="vendor" className="space-y-8 scroll-mt-28 flex flex-col">
           <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
             <h3 className="font-semibold text-slate-900 dark:text-white mb-4">
               Vendor Information
@@ -1058,7 +1058,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
             />
           </div>
 
-          <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-2xl p-6">
+          <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-2xl p-6 flex-1">
             <h3 className="font-semibold text-primary dark:text-primary mb-2">
               Internal Note
             </h3>
