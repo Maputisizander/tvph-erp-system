@@ -43,6 +43,10 @@ import { POEditHistory } from "@/components/dashboard/purchase-orders/po-edit-hi
 import { getCurrentProfile, hasCapability } from "@/lib/auth/permissions";
 import { signDocUrls } from "@/utils/storage";
 
+const menuItemClass = "flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors";
+const DRAFT_OR_PENDING = ["draft", "pending_approval"];
+const ISSUED_OR_LATER = ["issued", "paid", "overpaid"];
+
 export const unstable_instant = {
   prefetch: 'static',
   samples: [{ params: { id: 'sample-id' } }]
@@ -377,7 +381,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
           {po.status === "draft" && hasCapability(currentRole, "po.status") && (
             <PoIssueButton poId={po.id} eligibleApprovers={eligibleApprovers} />
           )}
-          {!["draft", "pending_approval"].includes(po.status) && (
+          {!DRAFT_OR_PENDING.includes(po.status) && (
             <a
               href={`/api/purchase-orders/${po.id}/pdf`}
               target="_blank"
@@ -390,19 +394,19 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
           )}
           <PODownloadDropdown poId={po.id} />
           {(canEditAny ||
-            (["issued", "paid", "overpaid"].includes(po.status) && canSendEmail) ||
+            (ISSUED_OR_LATER.includes(po.status) && canSendEmail) ||
             (canCreatePR &&
               (!paymentRequest ||
                 paymentRequest.status === "rejected" ||
                 paymentRequest.status === "fully_invoiced")) ||
-            ["draft", "pending_approval"].includes(po.status)) && (
+            DRAFT_OR_PENDING.includes(po.status)) && (
             <PoMoreDropdown>
-              {["draft", "pending_approval"].includes(po.status) && (
+              {DRAFT_OR_PENDING.includes(po.status) && (
                 <a
                   href={`/api/purchase-orders/${po.id}/pdf`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  className={menuItemClass}
                 >
                   <Eye className="h-4 w-4" />
                   View PDF
@@ -411,13 +415,13 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               {canEditAny && (
                 <Link
                   href={`/dashboard/purchase-orders/${po.id}/editor`}
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  className={menuItemClass}
                 >
                   <Pencil className="h-4 w-4" />
                   Edit PO
                 </Link>
               )}
-              {["issued", "paid", "overpaid"].includes(po.status) && canSendEmail && (
+              {ISSUED_OR_LATER.includes(po.status) && canSendEmail && (
                 <PoResendButton poId={po.id} />
               )}
               {canCreatePR &&
@@ -426,7 +430,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                   paymentRequest.status === "fully_invoiced") && (
                   <Link
                     href={`/dashboard/purchase-orders/${po.id}/payment-request`}
-                    className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    className={menuItemClass}
                   >
                     <Send className="h-4 w-4" />
                     Send Payment Request
