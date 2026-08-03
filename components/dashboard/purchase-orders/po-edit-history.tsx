@@ -25,6 +25,7 @@ const FIELD_LABELS: Record<string, string> = {
   waived_requirements: "Waived requirements",
   line_items_count: "Line items",
   sites_count: "Sites & details",
+  terms_and_conditions: "Terms & conditions",
   currency: "Currency",
   project_id: "Project",
 };
@@ -35,8 +36,22 @@ function prettify(key: string) {
   return key.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
 
+// terms_and_conditions is a long JSON blob; show a short, stable summary
+// instead of the full payload (which can be thousands of chars).
+function tcSummary(raw: any): string {
+  if (raw === null || raw === undefined || raw === "") return "cleared (standard template)";
+  let o: any = null;
+  try { o = typeof raw === "string" ? JSON.parse(raw) : raw; } catch { o = null; }
+  if (!o || typeof o !== "object") return "updated";
+  const items = Array.isArray(o.items) ? o.items.length : 0;
+  const ins = Array.isArray(o.instructions) ? o.instructions.length : 0;
+  const lead = Array.isArray(o.sitesLead) ? o.sitesLead.length : 0;
+  return `updated (${items} items, ${ins} instructions, ${lead} page-3 leads)`;
+}
+
 function formatValue(key: string, value: any) {
   if (value === null || value === undefined || value === "") return "empty";
+  if (key === "terms_and_conditions") return tcSummary(value);
   if (key === "amount" || key === "dp_amount" || key === "override_amount") {
     return `₱${Number(value).toLocaleString()}`;
   }
@@ -61,6 +76,10 @@ function summarize(log: any): string[] {
   for (const [key, val] of Object.entries(after)) {
     if (ignored.has(key)) continue;
     const label = prettify(key);
+    if (key === "terms_and_conditions") {
+      lines.push(`${label}: ${formatValue(key, val)}`);
+      continue;
+    }
     if (before && before[key] !== undefined && String(before[key]) !== String(val)) {
       lines.push(`${label}: ${formatValue(key, before[key])} → ${formatValue(key, val)}`);
     } else if (key === "dp_amount" && Number(val) > 0) {

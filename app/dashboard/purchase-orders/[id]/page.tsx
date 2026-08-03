@@ -4,7 +4,6 @@ import { invoiceStatusLabel, invoiceStatusBadgeClasses } from "@/lib/invoices/st
 import {
   ArrowLeft,
   Building2,
-  Calendar,
   FileText,
   CheckCircle2,
   XCircle,
@@ -15,12 +14,13 @@ import {
   User,
   Mail,
   FolderGit2,
-  Pencil,
   ShieldAlert,
   ShieldCheck,
   ClipboardCheck,
   TrendingUp,
   Settings,
+  Pencil,
+  Eye,
 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -33,16 +33,14 @@ import { PoCertUpload } from "@/components/dashboard/purchase-orders/po-cert-upl
 import { NotifyFinanceButton } from "@/components/dashboard/purchase-orders/notify-finance-button";
 import { PaymentRequestButton } from "@/components/dashboard/purchase-orders/payment-request-button";
 import { PoTermsCard } from "@/components/dashboard/purchase-orders/po-terms-card";
-import { PoCcRecipients } from "@/components/dashboard/purchase-orders/po-cc-recipients";
 import { PODetailsEditor } from "@/components/dashboard/purchase-orders/po-details-editor";
 import { POLineItemsEditor } from "@/components/dashboard/purchase-orders/po-line-items-editor";
 import { POSiteDetailsEditor } from "@/components/dashboard/purchase-orders/po-site-details-editor";
-import { AddDownpayment } from "@/components/dashboard/purchase-orders/po-add-downpayment";
 import { POEditHistory } from "@/components/dashboard/purchase-orders/po-edit-history";
 import { getCurrentProfile, hasCapability } from "@/lib/auth/permissions";
 import { signDocUrls } from "@/utils/storage";
 
-export const unstable_instant = { 
+export const unstable_instant = {
   prefetch: 'static',
   samples: [{ params: { id: 'sample-id' } }]
 };
@@ -132,9 +130,11 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
   const canOverridePenalty = ["finance", "admin", "superadmin"].includes(currentRole || "");
 
   // Originator-only draft editing: only the user who drafted the PO can fix it
-  // while it is still a draft or pending approval.
+  // while it is still a draft or pending approval. Editing happens on the
+  // dedicated /editor page — this page is read-only.
   const isOriginator = !!currentUser && currentUser.id === po.created_by;
   const canEditDraft = isOriginator && ["draft", "pending_approval"].includes(po.status);
+  const canEditAny = canEditDraft || (canEditTerms && po.status === "draft");
   const currencySymbol = po.currency === "USD" ? "$" : "₱";
 
   const invoiceIds = invoices?.map((i) => i.id) || [];
@@ -371,27 +371,36 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
           </div>
         </div>
 
-        <div className="flex items-center gap-3 md:ml-auto">
+        <div className="flex items-center gap-2 md:ml-auto">
           {po.status === "draft" && hasCapability(currentRole, "po.status") && (
             <PoIssueButton poId={po.id} eligibleApprovers={eligibleApprovers} />
           )}
           {["issued", "paid", "overpaid"].includes(po.status) && canSendEmail && (
             <PoResendButton poId={po.id} />
           )}
+          {canEditAny && (
+            <Link
+              href={`/dashboard/purchase-orders/${po.id}/editor`}
+              className="inline-flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-white px-3 py-2 rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95 shrink-0 whitespace-nowrap"
+            >
+              <Pencil className="h-4 w-4" />
+              Edit PO
+            </Link>
+          )}
           <a
             href={`/api/purchase-orders/${po.id}/pdf`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95"
+            className="inline-flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-white px-3 py-2 rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95 shrink-0 whitespace-nowrap"
           >
-            <FileText className="h-4 w-4" />
+            <Eye className="h-4 w-4" />
             View PDF
           </a>
           <PODownloadDropdown poId={po.id} />
           {canCreatePR && (!paymentRequest || paymentRequest.status === 'rejected' || paymentRequest.status === 'fully_invoiced') && (
             <Link
               href={`/dashboard/purchase-orders/${po.id}/payment-request`}
-              className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95"
+              className="inline-flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-white px-3 py-2 rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95 shrink-0 whitespace-nowrap"
             >
               <Send className="h-4 w-4" />
               Send Payment Request
@@ -713,7 +722,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
             )}
 
             {canEditDraft && dpTarget === 0 && (
-              <AddDownpayment poId={po.id} poAmount={poAmount} currencySymbol={currencySymbol} />
+              <p className="text-xs text-slate-500">No downpayment set. Add one on the Edit PO page while this PO is a draft.</p>
             )}
 
             <div className="pt-6 border-t border-slate-100 dark:border-slate-800/50">
@@ -906,102 +915,32 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
             status={po.status}
             terms={po}
             penalty={penalty}
-            canEdit={canEditTerms}
+            canEdit={false}
             canOverride={canOverridePenalty}
           />
-          <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
-              <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" /> PO Details
-              </h2>
-            </div>
-            <div className="p-6 space-y-6">
-              <div>
-                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Description
-                </label>
-                <p className="mt-1 text-slate-900 dark:text-slate-300 text-lg">
-                  {po.description || "No description provided"}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-8 pt-4 border-t border-slate-100 dark:border-slate-800/50">
-                <div>
-                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5" /> Issued Date
-                  </label>
-                  <p className="mt-1 text-slate-900 dark:text-slate-300 font-medium">
-                    {new Date(po.issued_date).toLocaleDateString(undefined, {
-                      dateStyle: "long",
-                    })}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5" /> Due Date
-                  </label>
-                  <p className="mt-1 text-slate-900 dark:text-slate-300 font-medium">
-                    {po.due_date
-                      ? new Date(po.due_date).toLocaleDateString(undefined, {
-                          dateStyle: "long",
-                        })
-                      : "No due date set"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-8 pt-4 border-t border-slate-100 dark:border-slate-800/50">
-                <div>
-                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <User className="h-3.5 w-3.5" /> Drafted by
-                  </label>
-                  <p className="mt-1 text-slate-900 dark:text-slate-300 font-medium">
-                    {poProfiles[po.created_by]
-                      ? `${poProfiles[po.created_by].full_name} (${poProfiles[po.created_by].role})`
-                      : "Unknown"}
-                    {po.created_at && (
-                      <span className="text-slate-400 font-normal">
-                        {" "}on {new Date(po.created_at).toLocaleDateString(undefined, { dateStyle: "long" })}
-                      </span>
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Approved by
-                  </label>
-                  <p className="mt-1 text-slate-900 dark:text-slate-300 font-medium">
-                    {po.approved_by_user_id
-                      ? `${poProfiles[po.approved_by_user_id] ? `${poProfiles[po.approved_by_user_id].full_name} (${poProfiles[po.approved_by_user_id].role})` : "Unknown"} on ${new Date(po.approved_at).toLocaleDateString(undefined, { dateStyle: "long" })}`
-                      : "Not yet approved"}
-                  </p>
-                </div>
-              </div>
-              {(po.status === "draft" || po.status === "pending_approval") && (
-                <PoCcRecipients
-                  poId={po.id}
-                  initialEmails={(po.cc_emails as string[] | null) || []}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Line Items Table */}
+          <PODetailsEditor
+            poId={po.id}
+            description={po.description}
+            issuedDate={po.issued_date}
+            dueDate={po.due_date}
+            draftedBy={draftedByLabel}
+            approvedBy={approvedByLabel}
+            canEdit={false}
+          />
           {(canEditDraft || (lineItems && lineItems.length > 0)) && (
             <POLineItemsEditor
               poId={po.id}
               items={lineItems || []}
               currencySymbol={currencySymbol}
-              canEdit={canEditDraft}
+              canEdit={false}
             />
           )}
 
-          {/* Site Details Table */}
           {(canEditDraft || (siteDetails && siteDetails.length > 0)) && (
             <POSiteDetailsEditor
               poId={po.id}
               sites={siteDetails || []}
-              canEdit={canEditDraft}
+              canEdit={false}
             />
           )}
 
@@ -1135,10 +1074,10 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
             <h3 className="font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
               <FolderGit2 className="h-4 w-4 text-primary" /> Associated Project
             </h3>
-            <POProjectAssigner 
-              poId={po.id} 
-              currentProjectId={po.project_id} 
-              projects={allProjects || []} 
+            <POProjectAssigner
+              poId={po.id}
+              currentProjectId={po.project_id}
+              projects={allProjects || []}
             />
           </div>
 
