@@ -22,7 +22,7 @@ type Penalty = {
 
 // section="payment" / section="tc" split the card across two editor steps;
 // "all" keeps the original combined view (read-only detail page).
-export function PoTermsCard({ poId, status, terms, penalty, canEdit, canOverride, defaultTcValue, section = "all" }: {
+export function PoTermsCard({ poId, status, terms, penalty, canEdit, canOverride, defaultTcValue, section = "all", embedded = false }: {
   poId: string;
   status: string;
   terms: Terms;
@@ -31,6 +31,7 @@ export function PoTermsCard({ poId, status, terms, penalty, canEdit, canOverride
   canOverride: boolean;
   defaultTcValue?: PoTc;
   section?: "all" | "payment" | "tc";
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -53,10 +54,10 @@ export function PoTermsCard({ poId, status, terms, penalty, canEdit, canOverride
   const showTc = section !== "payment";
 
   return (
-    <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
+    <div className={embedded ? "space-y-4" : "bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-4"}>
       {showPayment && (
         <div>
-          <h2 className="font-semibold text-slate-900 dark:text-white">Payment Terms</h2>
+          <h2 className={embedded ? "text-[10px] font-bold text-slate-400 uppercase tracking-widest" : "font-semibold text-slate-900 dark:text-white"}>Payment Terms</h2>
           <p className="text-sm text-slate-500 mt-1">Net {terms.net_days ?? 30} days{terms.dp_due_days != null ? ` · DP due in ${terms.dp_due_days} days` : ""}</p>
           <p className="text-sm text-slate-500">{terms.penalty_rate == null ? "No penalty rate configured" : `${Number(terms.penalty_rate) * 100}% ${terms.penalty_type === "fixed" ? "fixed (once)" : "monthly (daily-prorated)"}`}</p>
           {penaltyAmount != null && <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mt-2">Current penalty: ₱{Number(penaltyAmount).toLocaleString()}</p>}

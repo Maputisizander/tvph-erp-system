@@ -92,8 +92,8 @@ function summarize(log: any): string[] {
   return lines.length > 0 ? lines : ["Details updated"];
 }
 
-export function POEditHistory({ poId }: { poId: string }) {
-  const [visible, setVisible] = useState(false);
+export function POEditHistory({ poId, embedded = false }: { poId: string; embedded?: boolean }) {
+  const [visible, setVisible] = useState(embedded);
   const [logs, setLogs] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,20 +139,22 @@ export function POEditHistory({ poId }: { poId: string }) {
         : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/50";
 
   return (
-    <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-      <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
-        <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-          <History className="h-5 w-5 text-primary" /> Edit History
-        </h2>
-        <button
-          type="button"
-          onClick={toggle}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-primary bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/60 px-3 py-1.5 rounded-lg transition-all"
-        >
-          {visible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-          {visible ? "Hide" : "Show"}
-        </button>
-      </div>
+    <div className={embedded ? "" : "bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm"}>
+      {!embedded && (
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
+          <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+            <History className="h-5 w-5 text-primary" /> Edit History
+          </h2>
+          <button
+            type="button"
+            onClick={toggle}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-primary bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/60 px-3 py-1.5 rounded-lg transition-all"
+          >
+            {visible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            {visible ? "Hide" : "Show"}
+          </button>
+        </div>
+      )}
 
       {visible &&
         (loading ? (
