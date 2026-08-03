@@ -422,7 +422,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                 </Link>
               )}
               {ISSUED_OR_LATER.includes(po.status) && canSendEmail && (
-                <PoResendButton poId={po.id} />
+                <PoResendButton poId={po.id} menu />
               )}
               {canCreatePR &&
                 (!paymentRequest ||
@@ -975,6 +975,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               penalty={penalty}
               canEdit={false}
               canOverride={canOverridePenalty}
+              embedded
             />
           </PoCollapsibleCard>
           <PoCollapsibleCard title="PO Details" icon={<Pencil className="h-5 w-5 text-primary" />}>
@@ -986,6 +987,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               draftedBy={draftedByLabel}
               approvedBy={approvedByLabel}
               canEdit={false}
+              embedded
             />
           </PoCollapsibleCard>
           {(canEditDraft || (lineItems && lineItems.length > 0)) && (
@@ -995,6 +997,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                 items={lineItems || []}
                 currencySymbol={currencySymbol}
                 canEdit={false}
+                embedded
               />
             </PoCollapsibleCard>
           )}
@@ -1005,13 +1008,14 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                 poId={po.id}
                 sites={siteDetails || []}
                 canEdit={false}
+                embedded
               />
             </PoCollapsibleCard>
           )}
 
           <section id="history" className="scroll-mt-28 flex flex-col flex-1">
             <PoCollapsibleCard title="Edit History" icon={<History className="h-5 w-5 text-primary" />} className="flex-1">
-              <POEditHistory poId={po.id} />
+              <POEditHistory poId={po.id} embedded />
             </PoCollapsibleCard>
           </section>
         </div>

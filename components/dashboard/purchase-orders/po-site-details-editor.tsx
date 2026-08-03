@@ -31,10 +31,12 @@ export function POSiteDetailsEditor({
   poId,
   sites,
   canEdit,
+  embedded = false,
 }: {
   poId: string;
   sites: SiteDetail[];
   canEdit: boolean;
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -106,34 +108,36 @@ export function POSiteDetailsEditor({
   const tdClass = "px-3 py-2";
 
   return (
-    <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-      <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <MapPin className="h-5 w-5 text-primary" />
-          <h2 className="font-semibold text-slate-900 dark:text-white">Sites &amp; Details</h2>
-          <span className="text-xs text-slate-400 font-normal">(Optional)</span>
+    <div className={embedded ? "" : "bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm"}>
+      {!embedded && (
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-primary" />
+            <h2 className="font-semibold text-slate-900 dark:text-white">Sites &amp; Details</h2>
+            <span className="text-xs text-slate-400 font-normal">(Optional)</span>
+          </div>
+          {canEdit &&
+            (editing ? (
+              <button
+                type="button"
+                onClick={addSite}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-all"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add Site
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={startEditing}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-all"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit
+              </button>
+            ))}
         </div>
-        {canEdit &&
-          (editing ? (
-            <button
-              type="button"
-              onClick={addSite}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-all"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add Site
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={startEditing}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-all"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              Edit
-            </button>
-          ))}
-      </div>
+      )}
 
       {editing ? (
         <>

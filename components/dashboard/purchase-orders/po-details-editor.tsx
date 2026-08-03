@@ -13,6 +13,7 @@ export function PODetailsEditor({
   draftedBy,
   approvedBy,
   canEdit,
+  embedded = false,
 }: {
   poId: string;
   description: string | null;
@@ -21,6 +22,7 @@ export function PODetailsEditor({
   draftedBy: string;
   approvedBy: string;
   canEdit: boolean;
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -47,25 +49,27 @@ export function PODetailsEditor({
     "w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all";
 
   return (
-    <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-      <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
-        <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-          <FileText className="h-5 w-5 text-primary" /> PO Details
-        </h2>
-        {canEdit && !editing && (
-          <button
-            type="button"
-            onClick={() => {
-              setEditing(true);
-              setError(null);
-            }}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-all"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-            Edit
-          </button>
-        )}
-      </div>
+    <div className={embedded ? "" : "bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm"}>
+      {!embedded && (
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
+          <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" /> PO Details
+          </h2>
+          {canEdit && !editing && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(true);
+                setError(null);
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-all"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Edit
+            </button>
+          )}
+        </div>
+      )}
 
       {editing ? (
         <form onSubmit={submit} className="p-6 space-y-6">
@@ -135,7 +139,7 @@ export function PODetailsEditor({
           </div>
         </form>
       ) : (
-        <div className="p-6 space-y-6">
+        <div className={`space-y-6${embedded ? "" : " p-6"}`}>
           <div>
             <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Description
