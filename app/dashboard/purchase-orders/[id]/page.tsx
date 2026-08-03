@@ -28,6 +28,7 @@ import { POProjectAssigner } from "@/components/dashboard/purchase-orders/po-pro
 import { PODownloadDropdown } from "@/components/dashboard/purchase-orders/po-download-dropdown";
 import { PoResendButton } from "@/components/dashboard/purchase-orders/po-resend-button";
 import { PoIssueButton } from "@/components/dashboard/purchase-orders/po-issue-button";
+import { PoMoreDropdown } from "@/components/dashboard/purchase-orders/po-more-dropdown";
 import { PoApprovalActions } from "@/components/dashboard/purchase-orders/po-approval-actions";
 import { PoCertUpload } from "@/components/dashboard/purchase-orders/po-cert-upload";
 import { NotifyFinanceButton } from "@/components/dashboard/purchase-orders/notify-finance-button";
@@ -375,36 +376,62 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
           {po.status === "draft" && hasCapability(currentRole, "po.status") && (
             <PoIssueButton poId={po.id} eligibleApprovers={eligibleApprovers} />
           )}
-          {["issued", "paid", "overpaid"].includes(po.status) && canSendEmail && (
-            <PoResendButton poId={po.id} />
-          )}
-          {canEditAny && (
-            <Link
-              href={`/dashboard/purchase-orders/${po.id}/editor`}
+          {!["draft", "pending_approval"].includes(po.status) && (
+            <a
+              href={`/api/purchase-orders/${po.id}/pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-white px-3 py-2 rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95 shrink-0 whitespace-nowrap"
             >
-              <Pencil className="h-4 w-4" />
-              Edit PO
-            </Link>
+              <Eye className="h-4 w-4" />
+              View PDF
+            </a>
           )}
-          <a
-            href={`/api/purchase-orders/${po.id}/pdf`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-white px-3 py-2 rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95 shrink-0 whitespace-nowrap"
-          >
-            <Eye className="h-4 w-4" />
-            View PDF
-          </a>
           <PODownloadDropdown poId={po.id} />
-          {canCreatePR && (!paymentRequest || paymentRequest.status === 'rejected' || paymentRequest.status === 'fully_invoiced') && (
-            <Link
-              href={`/dashboard/purchase-orders/${po.id}/payment-request`}
-              className="inline-flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-white px-3 py-2 rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95 shrink-0 whitespace-nowrap"
-            >
-              <Send className="h-4 w-4" />
-              Send Payment Request
-            </Link>
+          {(canEditAny ||
+            (["issued", "paid", "overpaid"].includes(po.status) && canSendEmail) ||
+            (canCreatePR &&
+              (!paymentRequest ||
+                paymentRequest.status === "rejected" ||
+                paymentRequest.status === "fully_invoiced")) ||
+            ["draft", "pending_approval"].includes(po.status)) && (
+            <PoMoreDropdown>
+              {["draft", "pending_approval"].includes(po.status) && (
+                <a
+                  href={`/api/purchase-orders/${po.id}/pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <Eye className="h-4 w-4" />
+                  View PDF
+                </a>
+              )}
+              {canEditAny && (
+                <Link
+                  href={`/dashboard/purchase-orders/${po.id}/editor`}
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Edit PO
+                </Link>
+              )}
+              {["issued", "paid", "overpaid"].includes(po.status) && canSendEmail && (
+                <PoResendButton poId={po.id} />
+              )}
+              {canCreatePR &&
+                (!paymentRequest ||
+                  paymentRequest.status === "rejected" ||
+                  paymentRequest.status === "fully_invoiced") && (
+                  <Link
+                    href={`/dashboard/purchase-orders/${po.id}/payment-request`}
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <Send className="h-4 w-4" />
+                    Send Payment Request
+                  </Link>
+                )}
+            </PoMoreDropdown>
           )}
         </div>
       </div>
@@ -532,9 +559,29 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
         </div>
       )}
 
+      {/* Section nav */}
+      <nav className="sticky top-0 z-30 flex items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#071F15]/90 backdrop-blur px-3 py-2 shadow-sm">
+        {[
+          { href: "#overview", label: "Overview" },
+          { href: "#certificates", label: "Certificates" },
+          { href: "#invoices", label: "Invoices" },
+          { href: "#details", label: "Details" },
+          { href: "#history", label: "History" },
+          { href: "#vendor", label: "Vendor" },
+        ].map((item) => (
+          <a
+            key={item.href}
+            href={item.href}
+            className="px-3 py-1.5 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors whitespace-nowrap"
+          >
+            {item.label}
+          </a>
+        ))}
+      </nav>
+
       {/* Completion Certificates */}
       {(signedCerts.length > 0 || canSubmitCert) && (
-        <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+        <div id="certificates" className="scroll-mt-28 bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
           <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
             <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
               <ClipboardCheck className="h-5 w-5 text-primary" /> Completion Certificates
@@ -945,7 +992,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
           )}
 
           {/* Linked Invoices Section */}
-          <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+          <div id="invoices" className="scroll-mt-28 bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
             <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <h2 className="font-semibold text-slate-900 dark:text-white">
                 Linked Invoices
