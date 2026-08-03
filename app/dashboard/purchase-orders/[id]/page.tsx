@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   XCircle,
   Send,
-  AlertCircle,
   CreditCard,
   Clock,
   User,
@@ -18,7 +17,6 @@ import {
   ShieldCheck,
   ClipboardCheck,
   TrendingUp,
-  Settings,
   Pencil,
   Eye,
 } from "lucide-react";
@@ -244,7 +242,6 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
 
   const remainingBalance = Math.max(0, poAmount - dpAmount - totalPaid);
   const overpaidAmount = Math.max(0, totalPaid - poAmount);
-  const progress = Math.min(100, billingPct);
   const isOverpaid = totalPaid > poAmount;
 
   // Downpayment tranche split: PO is billed as DP + the balance after DP.
@@ -687,272 +684,186 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
         projectCompletionPct={project ? Number((project as any).completion_pct ?? 0) : null}
       />
 
-      {/* New Intuitive Financial Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Main Balance Ring/Card */}
-        <div className="md:col-span-2 bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-sm flex flex-col md:flex-row items-center gap-8">
-          <div className="relative h-40 w-40 shrink-0">
-            <svg className="h-full w-full -rotate-90">
-              <circle
-                cx="80"
-                cy="80"
-                r="70"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="12"
-                className="text-slate-100 dark:text-slate-800"
-              />
-              <circle
-                cx="80"
-                cy="80"
-                r="70"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="12"
-                strokeDasharray={440}
-                strokeDashoffset={440 - (440 * progress) / 100}
-                strokeLinecap="round"
-                className={isOverpaid ? "text-red-500" : "text-primary"}
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-              <span className="text-3xl font-bold text-slate-900 dark:text-white">
-                {progress}%
-              </span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                Paid
-              </span>
-            </div>
-          </div>
-
-          <div className="flex-1 space-y-6 w-full">
-            <div className="grid grid-cols-2 gap-8">
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">
-                  Original Commitment
-                </label>
-                <div className="text-2xl font-bold text-slate-900 dark:text-white">
-                  ₱{poAmount.toLocaleString()}
-                </div>
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">
-                  Total Paid to Date
-                </label>
-                <div
-                  className={`text-2xl font-bold ${isOverpaid ? "text-red-600" : "text-emerald-600 dark:text-emerald-400"}`}
-                >
-                  ₱{totalPaid.toLocaleString()}
-                </div>
-              </div>
-            </div>
-
-            {dpTarget > 0 && (
-              <div className="grid grid-cols-2 gap-8">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">
-                    Downpayment
-                  </label>
-                  <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                    ₱{dpTarget.toLocaleString()}
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">
-                    Balance after Downpayment
-                  </label>
-                  <div className="text-2xl font-bold text-slate-900 dark:text-white">
-                    ₱{balanceAfterDp.toLocaleString()}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {canEditDraft && dpTarget === 0 && (
-              <p className="text-xs text-slate-500">No downpayment set. Add one on the Edit PO page while this PO is a draft.</p>
-            )}
-
-            <div className="pt-6 border-t border-slate-100 dark:border-slate-800/50">
-              {isOverpaid ? (
-                <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-2xl">
-                  <AlertCircle className="h-6 w-6 text-red-500" />
-                  <div>
-                    <p className="text-xs font-bold text-red-800 dark:text-red-400 uppercase">
-                      Overpaid Balance
-                    </p>
-                    <p className="text-lg font-bold text-red-600">
-                      ₱{overpaidAmount.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 rounded-2xl">
-                  <CreditCard className="h-6 w-6 text-slate-400" />
-                  <div>
-                    <p className="text-xs font-bold text-slate-500 uppercase">
-                      Remaining to Pay
-                    </p>
-                    <p className="text-lg font-bold text-slate-900 dark:text-white">
-                      ₱{remainingBalance.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Invoicing Progress Card */}
+      {/* Financial Summary */}
+      <section id="overview" className="scroll-mt-28">
         <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <FileText className="h-4 w-4 text-primary" /> Billing Health
-            </h3>
-            <button type="button" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
-              <Settings className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <div className="space-y-4">
-            {/* Completion vs Billing */}
-            <div>
-              <div className="flex justify-between text-xs font-bold mb-2">
-                <span className="text-slate-500 uppercase">Billing % (incl. DP)</span>
-                <span className={effectiveBilled > poAmount ? "text-red-500" : "text-slate-900 dark:text-white"}>
-                  {billingPct}%
-                </span>
-              </div>
-              <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                <div className={`h-full ${effectiveBilled > poAmount ? "bg-red-500" : "bg-blue-500"}`}
-                  style={{ width: `${Math.min(100, billingPct)}%` }}
-                ></div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs font-bold mb-2">
-                <span className="text-slate-500 uppercase">Completion %</span>
-                <span className="text-emerald-600 dark:text-emerald-400">{compPct}%</span>
-              </div>
-              <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full"
-                  style={{ width: `${Math.min(100, compPct)}%` }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Variance */}
-            <div className={`p-3 rounded-xl text-center ${
-              billingVariance > 0
-                ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50'
-                : billingVariance < 0
-                  ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50'
-                  : 'bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800'
+            <h2 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-primary" /> Financial Summary
+            </h2>
+            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${
+              isOverpaid
+                ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/50"
+                : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800/50"
             }`}>
-              {billingVariance > 0 ? (
-                <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                  Need to pay {billingVariance}% more
-                </p>
-              ) : billingVariance < 0 ? (
-                <p className="text-xs font-bold text-red-700 dark:text-red-400">
-                  Overpaid by {Math.abs(billingVariance)}%
-                </p>
-              ) : (
-                <p className="text-xs font-bold text-slate-500">On track</p>
-              )}
-            </div>
-
-            <div className="pt-4 space-y-3 border-t border-slate-100 dark:border-slate-800">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">Bills Received</span>
-                <span className="font-bold text-slate-900 dark:text-white">
-                  ₱{totalInvoiced.toLocaleString()}
-                </span>
-              </div>
-              {dpAmount > 0 && (
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Downpayment (DP)</span>
-                  <span className="font-bold text-blue-600 dark:text-blue-400">
-                    ₱{dpAmount.toLocaleString()} ({Math.round((dpAmount / poAmount) * 100)}%)
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between items-center text-sm font-semibold">
-                <span className="text-slate-700 dark:text-slate-300">Effective Billed</span>
-                <span className="font-bold text-slate-900 dark:text-white">
-                  ₱{effectiveBilled.toLocaleString()} ({billingPct}%)
-                </span>
-              </div>
-              {billingCeiling !== null ? (
-                <>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-500">Approved Ceiling ({maxApprovedPercent}%)</span>
-                    <span className="font-bold text-emerald-700 dark:text-emerald-400">
-                      ₱{billingCeiling.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-500">Available to Bill</span>
-                    <span className="font-bold text-slate-900 dark:text-white">
-                      ₱{availableToBill.toLocaleString()} ({Math.max(0, compPct - billingPct)}%)
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Unbilled PO Amount</span>
-                  <span className="font-bold text-slate-900 dark:text-white">
-                    ₱{Math.max(0, poAmount - effectiveBilled).toLocaleString()}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Payment Request Consumption */}
-            {paymentRequest && (
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-3">
-                  Payment Request: {paymentRequest.request_number}
-                  {paymentRequest.is_downpayment && (
-                    <span className="ml-1.5 inline-flex items-center px-1 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
-                      DP
-                    </span>
-                  )}
-                </label>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-500">Approved Amount</span>
-                    <span className="font-bold text-slate-900 dark:text-white">₱{Number(paymentRequest.amount).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-500">Invoiced</span>
-                    <span className="font-bold text-slate-900 dark:text-white">₱{prConsumed.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-100 dark:border-slate-800">
-                    <span className="text-slate-500">Remaining / Carry-Forward</span>
-                    <span className={`font-bold ${prRemaining > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
-                      {paymentRequest.status === 'fully_invoiced' ? 'Fully Invoiced' : `₱${prRemaining.toLocaleString()}`}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-500">Status</span>
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold border ${
-                      paymentRequest.status === 'fully_invoiced'
-                        ? 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400'
-                        : paymentRequest.status === 'approved'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400'
-                        : paymentRequest.status === 'rejected'
-                        ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400'
-                        : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400'
-                    }`}>
-                      {paymentRequest.status.replace(/_/g, ' ').toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
+              {isOverpaid ? `Overpaid ₱${overpaidAmount.toLocaleString()}` : "On Track"}
+            </span>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Hero */}
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">
+                {isOverpaid ? "Overpaid Balance" : "Remaining to Pay"}
+              </label>
+              <div className={`text-3xl font-bold ${isOverpaid ? "text-red-600" : "text-slate-900 dark:text-white"}`}>
+                ₱{(isOverpaid ? overpaidAmount : remainingBalance).toLocaleString()}
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                {isOverpaid
+                  ? "Total payments exceeded the PO amount."
+                  : "Outstanding balance after downpayment and all payments."}
+              </p>
+            </div>
+
+            {/* Progress bars + variance */}
+            <div className="space-y-3">
+              <div>
+                <div className="flex justify-between text-xs font-bold mb-1.5">
+                  <span className="text-slate-500 uppercase">Billing % (incl. DP)</span>
+                  <span className={effectiveBilled > poAmount ? "text-red-500" : "text-slate-900 dark:text-white"}>
+                    {billingPct}%
+                  </span>
+                </div>
+                <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full ${effectiveBilled > poAmount ? "bg-red-500" : "bg-blue-500"}`}
+                    style={{ width: `${Math.min(100, billingPct)}%` }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs font-bold mb-1.5">
+                  <span className="text-slate-500 uppercase">Completion %</span>
+                  <span className="text-emerald-600 dark:text-emerald-400">{compPct}%</span>
+                </div>
+                <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 rounded-full"
+                    style={{ width: `${Math.min(100, compPct)}%` }}
+                  />
+                </div>
+              </div>
+              <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${
+                billingVariance > 0
+                  ? "bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400"
+                  : billingVariance < 0
+                    ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-400"
+                    : "bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 text-slate-500"
+              }`}>
+                {billingVariance > 0
+                  ? `Need to pay ${billingVariance}% more`
+                  : billingVariance < 0
+                    ? `Overpaid by ${Math.abs(billingVariance)}%`
+                    : "On track"}
+              </div>
+            </div>
+          </div>
+
+          {/* Secondary stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 pt-5 border-t border-slate-100 dark:border-slate-800">
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Original Commitment</label>
+              <div className="text-sm font-bold text-slate-900 dark:text-white">₱{poAmount.toLocaleString()}</div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Total Paid to Date</label>
+              <div className={`text-sm font-bold ${isOverpaid ? "text-red-600" : "text-emerald-600 dark:text-emerald-400"}`}>
+                ₱{totalPaid.toLocaleString()}
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Downpayment</label>
+              <div className="text-sm font-bold text-amber-600 dark:text-amber-400">
+                {dpTarget > 0 ? `₱${dpTarget.toLocaleString()}` : "—"}
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Balance after DP</label>
+              <div className="text-sm font-bold text-slate-900 dark:text-white">
+                {dpTarget > 0 ? `₱${balanceAfterDp.toLocaleString()}` : "—"}
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Bills Received</label>
+              <div className="text-sm font-bold text-slate-900 dark:text-white">₱{totalInvoiced.toLocaleString()}</div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Effective Billed</label>
+              <div className="text-sm font-bold text-slate-900 dark:text-white">
+                ₱{effectiveBilled.toLocaleString()} ({billingPct}%)
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">
+                {billingCeiling !== null ? "Approved Ceiling" : "Unbilled PO Amount"}
+              </label>
+              <div className={`text-sm font-bold ${billingCeiling !== null ? "text-emerald-700 dark:text-emerald-400" : "text-slate-900 dark:text-white"}`}>
+                ₱{(billingCeiling !== null ? billingCeiling : Math.max(0, poAmount - effectiveBilled)).toLocaleString()}
+                {billingCeiling !== null && ` (${maxApprovedPercent}%)`}
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">
+                {billingCeiling !== null ? "Available to Bill" : "Ceiling"}
+              </label>
+              <div className="text-sm font-bold text-slate-900 dark:text-white">
+                {billingCeiling !== null
+                  ? `₱${availableToBill.toLocaleString()} (${Math.max(0, compPct - billingPct)}%)`
+                  : "Full PO amount"}
+              </div>
+            </div>
+          </div>
+
+          {canEditDraft && dpTarget === 0 && (
+            <p className="text-xs text-slate-500">No downpayment set. Add one on the Edit PO page while this PO is a draft.</p>
+          )}
+
+          {/* Payment Request Consumption */}
+          {paymentRequest && (
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-3">
+                Payment Request: {paymentRequest.request_number}
+                {paymentRequest.is_downpayment && (
+                  <span className="ml-1.5 inline-flex items-center px-1 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
+                    DP
+                  </span>
+                )}
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500">Approved Amount</span>
+                  <span className="font-bold text-slate-900 dark:text-white">₱{Number(paymentRequest.amount).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500">Invoiced</span>
+                  <span className="font-bold text-slate-900 dark:text-white">₱{prConsumed.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500">Remaining / Carry-Forward</span>
+                  <span className={`font-bold ${prRemaining > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
+                    {paymentRequest.status === "fully_invoiced" ? "Fully Invoiced" : `₱${prRemaining.toLocaleString()}`}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500">Status</span>
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold border ${
+                    paymentRequest.status === "fully_invoiced"
+                      ? "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400"
+                      : paymentRequest.status === "approved"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400"
+                        : paymentRequest.status === "rejected"
+                          ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400"
+                          : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400"
+                  }`}>
+                    {paymentRequest.status.replace(/_/g, " ").toUpperCase()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Details */}
