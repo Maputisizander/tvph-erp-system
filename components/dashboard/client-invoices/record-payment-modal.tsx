@@ -54,7 +54,7 @@ export function RecordClientPaymentModal({
               <input
                 type="number"
                 name="amount_paid"
-                step="0.01"
+                step="any"
                 min="0.01"
                 required
                 placeholder="0.00"

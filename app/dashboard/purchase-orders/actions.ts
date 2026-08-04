@@ -581,11 +581,12 @@ export async function addDownPayment(poId: string, amount: number) {
 
   if (Number(po.dp_amount || 0) !== 0) return { error: 'This PO already has a downpayment set.' };
   if (!Number.isFinite(amount) || amount <= 0) return { error: 'Downpayment must be greater than zero.' };
-  if (amount > Number(po.amount)) return { error: 'Downpayment cannot exceed the PO total.' };
+  const dp_amount = Math.round(amount * 100) / 100;
+  if (dp_amount > Number(po.amount)) return { error: 'Downpayment cannot exceed the PO total.' };
 
   const { error } = await supabase
     .from('purchase_orders')
-    .update({ dp_amount: amount, updated_at: new Date().toISOString() })
+    .update({ dp_amount, updated_at: new Date().toISOString() })
     .eq('id', poId);
   if (error) return { error: error.message };
 
@@ -593,7 +594,7 @@ export async function addDownPayment(poId: string, amount: number) {
     entity_type: 'purchase_order',
     entity_id: poId,
     action: 'UPDATE',
-    changes: { before: { dp_amount: 0 }, after: { dp_amount: amount } },
+    changes: { before: { dp_amount: 0 }, after: { dp_amount } },
     performed_by: user.id,
   });
   revalidatePath(`/dashboard/purchase-orders/${poId}`);

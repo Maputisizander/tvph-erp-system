@@ -18,6 +18,7 @@ export function AddDownpayment({
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [successAmount, setSuccessAmount] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -28,6 +29,7 @@ export function AddDownpayment({
       if (result?.error) setError(result.error);
       else {
         setOpen(false);
+        setSuccessAmount(Number(amount));
         setAmount("");
         router.refresh();
       }
@@ -82,7 +84,7 @@ export function AddDownpayment({
                     type="number"
                     min="0.01"
                     max={poAmount}
-                    step="0.01"
+                    step="any"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.00"
@@ -124,6 +126,48 @@ export function AddDownpayment({
               </div>
             </div>
           </form>
+        </div>
+      )}
+
+      {successAmount !== null && (
+        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-8 flex flex-col items-center text-center space-y-4">
+              <span className="h-14 w-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+              </span>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Downpayment Added</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  The downpayment has been recorded against this PO.
+                </p>
+              </div>
+              <div className="w-full p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 text-center">
+                <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest block mb-1">
+                  Downpayment Amount
+                </p>
+                <p className="text-2xl font-bold text-amber-700 dark:text-amber-400 tabular-nums">
+                  {currencySymbol}
+                  {successAmount.toLocaleString()}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Balance after downpayment updates automatically.
+                </p>
+              </div>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => {
+                  setSuccessAmount(null);
+                  setOpen(false);
+                  setAmount("");
+                }}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-all active:scale-95"
+              >
+                Done
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>

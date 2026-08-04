@@ -20,5 +20,5 @@ export function calculatePaymentDueDate(submittedAt: Date, netDays: number): str
 export function calculatePenaltyAmount({ amount, rate, type, overdueDays }: {
   amount: number; rate: number; type: PenaltyType; overdueDays: number;
 }): number {
-  return Math.round(amount * rate * (type === "fixed" ? 1 : Math.max(0, overdueDays) / 30) * 100) / 100;
+  return amount * rate * (type === "fixed" ? 1 : Math.max(0, overdueDays) / 30);
 }

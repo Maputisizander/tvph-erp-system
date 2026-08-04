@@ -195,7 +195,7 @@ export function POLineItemsEditor({
                           <input
                             type="number"
                             min="0"
-                            step="0.01"
+                            step="any"
                             value={li.unit_price || ""}
                             onChange={(e) => updateDraft(idx, "unit_price", parseFloat(e.target.value) || 0)}
                             className={`${inputClass} text-right`}

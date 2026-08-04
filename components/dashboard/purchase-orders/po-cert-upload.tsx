@@ -39,7 +39,7 @@ export function PoCertUpload({ poId, vendorId }: { poId: string; vendorId: strin
             type="number"
             min="1"
             max="100"
-            step="0.01"
+            step="any"
             required
             placeholder="e.g. 50"
             className="border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#0a0a0a] text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/40"

@@ -286,7 +286,7 @@ describe('PoCertUpload', () => {
       render(<PoCertUpload poId="po-123" vendorId="vendor-456" />);
 
       const percentInput = screen.getByPlaceholderText('e.g. 50') as HTMLInputElement;
-      expect(percentInput.step).toBe('0.01');
+      expect(percentInput.step).toBe('any');
     });
   });
 
@@ -325,7 +325,7 @@ describe('PoCertUpload', () => {
       expect(percentInput.type).toBe('number');
       expect(percentInput.min).toBe('1');
       expect(percentInput.max).toBe('100');
-      expect(percentInput.step).toBe('0.01');
+      expect(percentInput.step).toBe('any');
       expect(percentInput.required).toBe(true);
 
       expect(fileInput.accept).toBe('.pdf,.jpg,.jpeg,.png');

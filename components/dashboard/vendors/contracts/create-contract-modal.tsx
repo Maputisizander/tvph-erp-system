@@ -125,7 +125,7 @@ export function CreateContractModal({
                   <input 
                     name="total_value"
                     type="number"
-                    step="0.01"
+                    step="any"
                     className="w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:border-primary"
                   />
                 </div>

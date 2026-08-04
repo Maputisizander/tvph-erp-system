@@ -207,7 +207,7 @@ export default function AddAssetPage() {
                       <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                       <input
                         type="number"
-                        step="0.01"
+                        step="any"
                         placeholder="0.00"
                         value={formData.purchase_cost}
                         onChange={(e) => setFormData({ ...formData, purchase_cost: e.target.value })}

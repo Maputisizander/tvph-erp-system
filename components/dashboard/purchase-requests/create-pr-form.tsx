@@ -299,7 +299,7 @@ export function CreatePRForm({
                       <input
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="any"
                         value={li.unit_price || ""}
                         onChange={(e) => updateLineItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
                         className={`${inputClass} text-right`}
@@ -443,7 +443,7 @@ export function CreatePRForm({
                     <input
                       type="number"
                       min="0"
-                      step="0.01"
+                      step="any"
                       value={site.cable_length_km || ""}
                       onChange={(e) => updateSite(idx, "cable_length_km", parseFloat(e.target.value) || 0)}
                       className={`${inputClass} text-right`}

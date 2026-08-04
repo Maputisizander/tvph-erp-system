@@ -91,7 +91,7 @@ export function MaintenanceLog({ assetId, logs }: { assetId: string, logs: any[]
               <label className="text-xs font-medium text-slate-500">Cost (₱)</label>
               <input
                 type="number"
-                step="0.01"
+                step="any"
                 placeholder="0.00"
                 value={formData.cost}
                 onChange={e => setFormData({...formData, cost: e.target.value})}

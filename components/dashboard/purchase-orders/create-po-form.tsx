@@ -434,7 +434,7 @@ export function CreatePOForm({
                 name="dp_amount"
                 type="number"
                 min="0"
-                step="0.01"
+                step="any"
                 className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                 placeholder="0.00"
               />
@@ -557,7 +557,7 @@ export function CreatePOForm({
                       <input
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="any"
                         value={li.unit_price || ""}
                         onChange={(e) => updateLineItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
                         className={`${inputClass} text-right`}
@@ -716,7 +716,7 @@ export function CreatePOForm({
                     <input
                       type="number"
                       min="0"
-                      step="0.01"
+                      step="any"
                       value={site.cable_length_km || ""}
                       onChange={(e) => updateSite(idx, "cable_length_km", parseFloat(e.target.value) || 0)}
                       className={`${inputClass} text-right`}
