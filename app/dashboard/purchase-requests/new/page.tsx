@@ -13,6 +13,12 @@ export default async function NewPurchaseRequestPage() {
     .is('deleted_at', null)
     .order('name');
 
+  const { data: vendors } = await supabase
+    .from('vendors')
+    .select('id, name')
+    .is('deleted_at', null)
+    .order('name');
+
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
@@ -33,7 +39,7 @@ export default async function NewPurchaseRequestPage() {
         </div>
       </div>
 
-      <CreatePRForm projects={projects || []} regions={REGION_NAMES} areaByRegion={REGIONS} />
+      <CreatePRForm projects={projects || []} vendors={vendors || []} regions={REGION_NAMES} areaByRegion={REGIONS} />
     </div>
   );
 }

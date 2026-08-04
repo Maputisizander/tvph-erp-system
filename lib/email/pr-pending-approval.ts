@@ -32,7 +32,7 @@ export async function sendPrPendingApprovalEmail(
   const { data: pr, error } = await supabase
     .from("purchase_requests")
     .select(
-      `pr_number, amount, currency, approval_requested_from, submitted_for_approval_by`,
+      `pr_number, amount, dp_amount, dp_percent, currency, approval_requested_from, submitted_for_approval_by`,
     )
     .eq("id", prId)
     .single();
@@ -71,6 +71,8 @@ export async function sendPrPendingApprovalEmail(
   }
 
   const currency = (pr.currency as string) || "PHP";
+  const downpayment = Number(pr.dp_amount) || 0;
+  const dpPercent = Number(pr.dp_percent) || 0;
 
   return sendEmail({
     kind: "pr_pending_approval",
@@ -80,6 +82,8 @@ export async function sendPrPendingApprovalEmail(
     react: PrPendingApprovalEmail({
       prNumber: pr.pr_number as string,
       amountLabel: formatAmount(pr.amount as number, currency),
+      downpaymentLabel: downpayment > 0 ? formatAmount(downpayment, currency) : null,
+      downpaymentPercent: dpPercent > 0 ? dpPercent : null,
       submittedByName,
       reviewUrl: `${BASE_URL}/dashboard/purchase-requests/${prId}`,
     }),

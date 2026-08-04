@@ -128,6 +128,42 @@ describe('createPurchaseRequestCore', () => {
       });
       expect(mockSupabase.from).not.toHaveBeenCalled();
     });
+
+    it('returns error when downpayment exceeds the total amount', async () => {
+      const result = await createPurchaseRequestCore({
+        line_items: [{ description: 'Item 1', qty: 1, unit_price: 100 }],
+        dp_amount: 200,
+      });
+
+      expect(result).toEqual({
+        error: 'Downpayment cannot exceed the estimated total.',
+      });
+      expect(mockSupabase.from).not.toHaveBeenCalled();
+    });
+
+    it('returns error when downpayment percent is above 100', async () => {
+      const result = await createPurchaseRequestCore({
+        line_items: [{ description: 'Item 1', qty: 1, unit_price: 100 }],
+        dp_percent: 120,
+      });
+
+      expect(result).toEqual({
+        error: 'Downpayment percent must be between 0 and 100.',
+      });
+      expect(mockSupabase.from).not.toHaveBeenCalled();
+    });
+
+    it('returns error when downpayment percent is negative', async () => {
+      const result = await createPurchaseRequestCore({
+        line_items: [{ description: 'Item 1', qty: 1, unit_price: 100 }],
+        dp_percent: -5,
+      });
+
+      expect(result).toEqual({
+        error: 'Downpayment percent must be between 0 and 100.',
+      });
+      expect(mockSupabase.from).not.toHaveBeenCalled();
+    });
   });
 
   describe('Happy path', () => {
@@ -153,10 +189,84 @@ describe('createPurchaseRequestCore', () => {
         project_id: 'proj-1',
         description: 'Fiber for Cebu',
         amount: 2000,
+        dp_amount: 0,
         status: 'draft',
         internal_entity_id: 'entity-1',
         created_by: 'user-1',
       });
+    });
+
+    it('persists the downpayment amount when provided', async () => {
+      await createPurchaseRequestCore({
+        description: 'Cable + DP',
+        line_items: [
+          { description: 'Cable', qty: 2, unit_price: 500 },
+          { description: 'Splice kits', qty: 1, unit_price: 1000 },
+        ],
+        dp_amount: 750.5,
+      });
+
+const insertedData = mockSupabase.prInsertMock.mock.calls[0][0];
+      expect(insertedData).toMatchObject({
+        amount: 2000,
+        dp_amount: 750.5,
+      });
+    });
+
+    it('computes the peso downpayment from the percent input', async () => {
+      await createPurchaseRequestCore({
+        description: 'Cable + 30% DP',
+        line_items: [
+          { description: 'Cable', qty: 2, unit_price: 500 },
+          { description: 'Splice kits', qty: 1, unit_price: 1000 },
+        ],
+        dp_percent: 30,
+      });
+
+      const insertedData = mockSupabase.prInsertMock.mock.calls[0][0];
+      expect(insertedData).toMatchObject({
+        amount: 2000,
+        dp_amount: 600,
+        dp_percent: 30,
+      });
+    });
+
+    it('derives the percent when only a legacy peso amount is provided', async () => {
+      await createPurchaseRequestCore({
+        line_items: [
+          { description: 'Cable', qty: 2, unit_price: 500 },
+        ],
+        dp_amount: 400,
+      });
+
+      const insertedData = mockSupabase.prInsertMock.mock.calls[0][0];
+      expect(insertedData).toMatchObject({
+        amount: 1000,
+        dp_amount: 400,
+        dp_percent: 40,
+      });
+    });
+
+    it('persists the nominated vendor id', async () => {
+      await createPurchaseRequestCore({
+        description: 'Cable for Cebu',
+        vendor_id: 'vendor-1',
+        line_items: [{ description: 'Cable', qty: 1, unit_price: 500 }],
+      });
+
+      const insertedData = mockSupabase.prInsertMock.mock.calls[0][0];
+      expect(insertedData).toMatchObject({
+        vendor_id: 'vendor-1',
+      });
+    });
+
+    it('stores a null vendor when none is nominated', async () => {
+      await createPurchaseRequestCore({
+        line_items: [{ description: 'Cable', qty: 1, unit_price: 500 }],
+      });
+
+      const insertedData = mockSupabase.prInsertMock.mock.calls[0][0];
+      expect(insertedData).toMatchObject({ vendor_id: null });
     });
 
     it('inserts line items with sequential line numbers and defaults', async () => {

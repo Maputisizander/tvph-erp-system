@@ -1,6 +1,6 @@
 # Project Analysis — TelcoVantage ERP System
 
-> Last updated: 2026-07-28
+> Last updated: 2026-08-04
 
 ## Stack
 
@@ -71,7 +71,7 @@ utils/
 ├── string-similarity.ts
 
 supabase/
-└── migrations/        # 38 SQL migrations (schema source of truth)
+└── migrations/        # 39 SQL migrations (schema source of truth)
 
 scripts/               # Operational scripts (purge-db, seed docs, Telegram webhook)
 __tests__/             # Jest tests (business logic focus)
@@ -119,7 +119,7 @@ __tests__/             # Jest tests (business logic focus)
 ## Database
 
 - **38 migrations** in `supabase/migrations/` — additive only, no down-migrations
-- **Key tables**: `profiles`, `vendors`, `vendor_documents`, `tvph_documents`, `projects`, `project_vendors`, `vendor_contracts`, `purchase_orders`, `service_invoices`, `payments`, `audit_logs`, `notifications`, `crm_accounts`, `crm_contacts`, `erp_documents`, `customer_documents`, `employee_documents`, `assets`, `email_logs`, `chat_messages`, `payment_requests`, `payment_reservations`, `completion_certificates`, `internal_entities`
+- **Key tables**: `profiles`, `vendors`, `vendor_documents`, `tvph_documents`, `projects`, `project_vendors`, `vendor_contracts`, `purchase_orders`, `service_invoices`, `payments`, `audit_logs`, `notifications`, `crm_accounts`, `crm_contacts`, `erp_documents`, `customer_documents`, `employee_documents`, `assets`, `email_logs`, `chat_messages`, `payment_requests`, `payment_reservations`, `completion_certificates`, `internal_entities`, `purchase_requests` (+ `pr_line_items`, `pr_site_details`; header carries `vendor_id` — optional nominated vendor prefilled onto the PO at conversion — plus `dp_amount`/`dp_percent` where `dp_amount = amount × dp_percent/100`, inherited by the PO, which also stores `dp_percent`)
 - **RLS** enabled on all tables
 - **Storage buckets**: `avatars`, `vendor-documents`, `tvph-documents`, `erp-documents`, `customer-documents`, `employee-documents`, + payment/PO buckets
 - **Cron**: `pg_cron` + `pg_net` for document expiry + invoice due reminders

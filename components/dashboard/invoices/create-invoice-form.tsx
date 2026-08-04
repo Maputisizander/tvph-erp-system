@@ -236,7 +236,7 @@ export function CreateInvoiceForm({ vendors, pos }: { vendors: Vendor[], pos: PO
                   <input
                     name="amount"
                     type="number"
-                    step="0.01"
+                    step="any"
                     required
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}

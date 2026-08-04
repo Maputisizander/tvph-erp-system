@@ -138,7 +138,7 @@ export async function recordClientPayment(formData: FormData) {
   if (authError || !user) return { error: authError || "Unauthorized" };
 
   const invoice_id = formData.get("invoice_id") as string;
-  const amount_paid = parseFloat(formData.get("amount_paid") as string);
+  const amount_paid = Math.round(parseFloat(formData.get("amount_paid") as string) * 100) / 100;
   const payment_date = formData.get("payment_date") as string;
   const payment_type = formData.get("payment_type") as string;
   const payment_method = formData.get("payment_method") as string;

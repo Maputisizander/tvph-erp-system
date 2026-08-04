@@ -180,7 +180,7 @@ export function CreateOpportunityForm({
             <input
               name="estimated_contract_value"
               type="number"
-              step="0.01"
+              step="any"
               placeholder="0.00"
               className="w-full px-3 py-2.5 text-sm bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:border-primary"
             />
@@ -191,7 +191,7 @@ export function CreateOpportunityForm({
             <input
               name="estimated_copper_volume"
               type="number"
-              step="0.01"
+              step="any"
               placeholder="In tons or agreed unit"
               className="w-full px-3 py-2.5 text-sm bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:border-primary"
             />

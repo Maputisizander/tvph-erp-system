@@ -213,7 +213,7 @@ export function POSiteDetailsEditor({
                       <input
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="any"
                         value={site.cable_length_km || ""}
                         onChange={(e) => updateDraft(idx, "cable_length_km", parseFloat(e.target.value) || 0)}
                         className={`${inputClass} text-right`}

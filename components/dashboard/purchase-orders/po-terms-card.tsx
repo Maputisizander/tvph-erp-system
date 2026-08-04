@@ -9,6 +9,7 @@ import { defaultTc, parseTc, type PoTc } from "@/lib/pdf/terms";
 type Terms = {
   net_days?: number | null;
   dp_due_days?: number | null;
+  dp_amount?: number | null;
   penalty_rate?: number | null;
   penalty_type?: "monthly" | "fixed" | null;
   terms_and_conditions?: string | null;
@@ -59,6 +60,11 @@ export function PoTermsCard({ poId, status, terms, penalty, canEdit, canOverride
         <div>
           <h2 className={embedded ? "text-[10px] font-bold text-slate-400 uppercase tracking-widest" : "font-semibold text-slate-900 dark:text-white"}>Payment Terms</h2>
           <p className="text-sm text-slate-500 mt-1">Net {terms.net_days ?? 30} days{terms.dp_due_days != null ? ` · DP due in ${terms.dp_due_days} days` : ""}</p>
+          {Number(terms.dp_amount) > 0 && (
+            <p className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-400 mt-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 px-2.5 py-1 rounded-lg">
+              Downpayment: ₱{Number(terms.dp_amount).toLocaleString()}
+            </p>
+          )}
           <p className="text-sm text-slate-500">{terms.penalty_rate == null ? "No penalty rate configured" : `${Number(terms.penalty_rate) * 100}% ${terms.penalty_type === "fixed" ? "fixed (once)" : "monthly (daily-prorated)"}`}</p>
           {penaltyAmount != null && <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mt-2">Current penalty: ₱{Number(penaltyAmount).toLocaleString()}</p>}
         </div>
@@ -89,7 +95,7 @@ export function PoTermsCard({ poId, status, terms, penalty, canEdit, canOverride
 
       {showPayment && canOverride && (
         <form onSubmit={submit((data) => overridePurchaseOrderPenalty(poId, data))} className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-          <label htmlFor="penalty-override-amount" className="sr-only">Manual penalty amount</label><input id="penalty-override-amount" name="override_amount" type="number" min="0" step="0.01" placeholder="Manual penalty amount" defaultValue={penalty?.override_amount ?? ""} className="border rounded-lg px-3 py-2 text-sm dark:bg-[#0a0a0a]" />
+          <label htmlFor="penalty-override-amount" className="sr-only">Manual penalty amount</label><input id="penalty-override-amount" name="override_amount" type="number" min="0" step="any" placeholder="Manual penalty amount" defaultValue={penalty?.override_amount ?? ""} className="border rounded-lg px-3 py-2 text-sm dark:bg-[#0a0a0a]" />
           <label htmlFor="penalty-override-reason" className="sr-only">Reason for override</label><input id="penalty-override-reason" name="override_reason" placeholder="Reason for override" defaultValue={penalty?.override_reason ?? ""} className="border rounded-lg px-3 py-2 text-sm dark:bg-[#0a0a0a]" />
           <button disabled={isPending} className="justify-self-start border border-primary text-primary rounded-lg px-4 py-2 text-sm disabled:opacity-60">Override penalty</button>
         </form>

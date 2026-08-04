@@ -203,7 +203,7 @@ export function SettingsTabs({ initialSettings, reminderDays = [30, 14, 7, 1], t
                          <input 
                             name="default_vat_rate"
                             type="number"
-                            step="0.01"
+                            step="any"
                             defaultValue={initialSettings?.default_vat_rate}
                             className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:border-primary"
                          />

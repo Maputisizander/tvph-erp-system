@@ -39,14 +39,15 @@ async function EditPurchaseRequestContent({
   const { id } = await paramsPromise;
   const supabase = await createClient();
 
-  const [{ data: pr, error }, { data: projects }] = await Promise.all([
+  const [{ data: pr, error }, { data: projects }, { data: vendors }] = await Promise.all([
     supabase
       .from('purchase_requests')
-      .select('id, pr_number, description, project_id, status')
+      .select('id, pr_number, description, project_id, vendor_id, dp_amount, dp_percent, status')
       .eq('id', id)
       .is('deleted_at', null)
       .single(),
     supabase.from('projects').select('id, name').is('deleted_at', null).order('name'),
+    supabase.from('vendors').select('id, name').is('deleted_at', null).order('name'),
   ]);
 
   if (error || !pr) notFound();
@@ -85,6 +86,7 @@ async function EditPurchaseRequestContent({
 
       <CreatePRForm
         projects={projects || []}
+        vendors={vendors || []}
         regions={REGION_NAMES}
         areaByRegion={REGIONS}
         initialData={{
@@ -92,6 +94,9 @@ async function EditPurchaseRequestContent({
           pr_number: pr.pr_number,
           description: pr.description,
           project_id: pr.project_id,
+          vendor_id: pr.vendor_id,
+          dp_amount: Number(pr.dp_amount) || 0,
+          dp_percent: Number(pr.dp_percent) || 0,
           line_items: (lineItems || []).map((li: any) => ({
             item_code: li.item_code || '',
             description: li.description || '',

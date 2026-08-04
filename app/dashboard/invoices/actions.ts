@@ -505,7 +505,7 @@ export async function recordPayment(prevState: any, formData: FormData) {
   // Insert payment
   const { data: payment, error } = await supabase.from('payments').insert({
     invoice_id,
-    amount_paid: parseFloat(amount_paid),
+    amount_paid: Math.round(parseFloat(amount_paid) * 100) / 100,
     payment_date,
     payment_type,
     payment_method,

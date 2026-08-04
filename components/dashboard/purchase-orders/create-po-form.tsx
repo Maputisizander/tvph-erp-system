@@ -54,11 +54,16 @@ interface PRPrefill {
   pr_number: string;
   description: string | null;
   project_id: string | null;
+  vendor_id?: string | null;
+  dp_amount?: number;
+  dp_percent?: number;
   line_items: LineItem[];
   site_details?: SiteDetail[];
 }
 
 const UOM_OPTIONS = ["LOT", "PCS", "SET", "HRS", "DAYS", "MOS", "SQM", "LM", "KG", "KM"];
+
+const DP_PRESETS = [30, 40, 50, 60, 70, 80, 90, 100];
 
 const EMPTY_LINE_ITEM: LineItem = {
   item_code: "",
@@ -100,7 +105,7 @@ export function CreatePOForm({
   const shouldReset = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
-  const [selectedVendor, setSelectedVendor] = useState("");
+  const [selectedVendor, setSelectedVendor] = useState(purchaseRequest?.vendor_id || "");
   const [lineItems, setLineItems] = useState<LineItem[]>(
     purchaseRequest?.line_items?.length ? purchaseRequest.line_items : [{ ...EMPTY_LINE_ITEM }]
   );
@@ -116,6 +121,25 @@ export function CreatePOForm({
     message: string;
     poUrl?: string;
   } | null>(null);
+
+  // Downpayment is percent-driven: default 30% when "has dp" is toggled on.
+  // Legacy PRs only carry a peso amount → derive the percent for the prefill.
+  const initialDpPercent = useMemo(() => {
+    const p = Number(purchaseRequest?.dp_percent || 0);
+    const dp = Number(purchaseRequest?.dp_amount || 0);
+    if (p > 0) return Math.round(p * 100) / 100;
+    if (dp > 0) {
+      const t = (purchaseRequest?.line_items || []).reduce(
+        (s, li) => s + (Number(li.qty) || 0) * (Number(li.unit_price) || 0),
+        0
+      );
+      if (t > 0) return Math.round((dp / t) * 10000) / 100;
+    }
+    return 0;
+  }, [purchaseRequest]);
+
+  const [hasDp, setHasDp] = useState<boolean>(initialDpPercent > 0);
+  const [dpPercent, setDpPercent] = useState<number>(initialDpPercent > 0 ? initialDpPercent : 30);
 
   useEffect(() => {
     if (!state) return;
@@ -143,6 +167,8 @@ export function CreatePOForm({
         setLineItems([{ ...EMPTY_LINE_ITEM }]);
         setSiteDetails([{ ...EMPTY_SITE }]);
         setWaiveRequirements(false);
+        setHasDp(false);
+        setDpPercent(30);
         startTransition(() => dispatch({ type: "RESET" }));
       }
     };
@@ -218,6 +244,8 @@ export function CreatePOForm({
   const totalNodes = siteDetails.reduce((sum, s) => sum + (Number(s.no_of_nodes) || 0), 0);
   const totalCable = siteDetails.reduce((sum, s) => sum + (Number(s.cable_length_km) || 0), 0);
 
+  const dpAmount = hasDp ? Math.round(totalAmount * dpPercent) / 100 : 0;
+
   const inputClass =
     "w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all";
   const thClass =
@@ -230,6 +258,8 @@ export function CreatePOForm({
       <input type="hidden" name="line_items" value={JSON.stringify(lineItems)} />
       <input type="hidden" name="site_details" value={JSON.stringify(siteDetails)} />
       <input type="hidden" name="amount" value={totalAmount.toString()} />
+      <input type="hidden" name="dp_amount" value={dpAmount.toString()} />
+      <input type="hidden" name="dp_percent" value={(hasDp ? dpPercent : 0).toString()} />
       {purchaseRequest && (
         <input type="hidden" name="purchase_request_id" value={purchaseRequest.id} />
       )}
@@ -351,6 +381,11 @@ export function CreatePOForm({
                 ))}
               </select>
             </div>
+            {purchaseRequest?.vendor_id && selectedVendor === purchaseRequest.vendor_id && (
+              <p className="text-xs text-blue-600 dark:text-blue-400">
+                Pre-filled from {purchaseRequest.pr_number} — change it here if the vendor terms differ.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2 md:col-span-2">
@@ -423,22 +458,98 @@ export function CreatePOForm({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label htmlFor="dp_amount" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Down Payment Amount <span className="text-slate-400 font-normal ml-1">(Optional)</span>
-            </label>
-            <div className="relative">
-              <CircleDollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input
-                id="dp_amount"
-                name="dp_amount"
-                type="number"
-                min="0"
-                step="0.01"
-                className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                placeholder="0.00"
-              />
+          <div className="space-y-2 md:col-span-2">
+            <div className="flex items-center justify-between">
+              <label htmlFor="has_dp" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Downpayment <span className="text-slate-400 font-normal ml-1">(Optional)</span>
+              </label>
+              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  id="has_dp"
+                  type="checkbox"
+                  checked={hasDp}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setHasDp(next);
+                    if (next && dpPercent <= 0) setDpPercent(30);
+                  }}
+                  className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                />
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                  {hasDp ? "Has downpayment" : "No downpayment"}
+                </span>
+              </label>
             </div>
+
+            {hasDp && (
+              <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-900/10 border border-amber-200/70 dark:border-amber-800/40 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_11rem] gap-3">
+                  <div>
+                    <label htmlFor="dp_percent" className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">
+                      Percent of Total (%)
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="dp_percent"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="any"
+                        value={dpPercent || ""}
+                        onChange={(e) => setDpPercent(parseFloat(e.target.value) || 0)}
+                        className="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                        placeholder="30"
+                      />
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">%</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="dp_preset" className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">
+                      Quick Select
+                    </label>
+                    <select
+                      id="dp_preset"
+                      value={DP_PRESETS.includes(dpPercent) ? dpPercent : ""}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        if (!Number.isNaN(val)) setDpPercent(val);
+                      }}
+                      className="w-full px-3 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all appearance-none"
+                    >
+                      <option value="" disabled>
+                        Custom…
+                      </option>
+                      {DP_PRESETS.map((p) => (
+                        <option key={p} value={p}>
+                          {p}%
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
+                    DOWNPAYMENT {dpPercent || 0}%
+                  </span>
+                  <p className="text-lg font-bold text-amber-700 dark:text-amber-400 tabular-nums">
+                    {currencySymbol}{dpAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Balance: {currencySymbol}{Math.max(0, totalAmount - dpAmount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Enter a percent or pick a preset — the peso amount is computed automatically from the PO total.
+                </p>
+              </div>
+            )}
+
+            {!hasDp && (
+              <p className="text-xs text-slate-500">
+                No upfront payment required. Toggle on to set a downpayment (defaults to 30%).
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -557,7 +668,7 @@ export function CreatePOForm({
                       <input
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="any"
                         value={li.unit_price || ""}
                         onChange={(e) => updateLineItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
                         className={`${inputClass} text-right`}
@@ -716,7 +827,7 @@ export function CreatePOForm({
                     <input
                       type="number"
                       min="0"
-                      step="0.01"
+                      step="any"
                       value={site.cable_length_km || ""}
                       onChange={(e) => updateSite(idx, "cable_length_km", parseFloat(e.target.value) || 0)}
                       className={`${inputClass} text-right`}
