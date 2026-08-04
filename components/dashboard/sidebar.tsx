@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -154,6 +154,7 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   isCollapsed: boolean;
+  scrollTargetRef: React.RefObject<HTMLElement | null>;
 }
 
 function SidebarItem({
@@ -252,10 +253,30 @@ function SidebarItem({
   );
 }
 
-export function Sidebar({ userEmail, userRole, isOpen, onClose, isCollapsed }: SidebarProps) {
+export function Sidebar({ userEmail, userRole, isOpen, onClose, isCollapsed, scrollTargetRef }: SidebarProps) {
   const pathname = usePathname();
+  const asideRef = useRef<HTMLElement>(null);
+  const navRef = useRef<HTMLDivElement>(null);
 
   const visibleModules = MODULE_CONFIG.filter((m) => canSee(m.roles, userRole));
+
+  useEffect(() => {
+    const aside = asideRef.current;
+    const main = scrollTargetRef?.current;
+    const nav = navRef.current;
+    if (!aside || !main || !nav) return;
+
+    const onWheel = (e: WheelEvent) => {
+      const atTop = nav.scrollTop <= 0;
+      const atBottom = nav.scrollTop + nav.clientHeight >= nav.scrollHeight;
+      if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) {
+        main.scrollBy(0, e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY);
+      }
+    };
+
+    aside.addEventListener("wheel", onWheel, { passive: true });
+    return () => aside.removeEventListener("wheel", onWheel);
+  }, [scrollTargetRef]);
 
   return (
     <>
@@ -264,6 +285,7 @@ export function Sidebar({ userEmail, userRole, isOpen, onClose, isCollapsed }: S
       )}
 
       <aside
+        ref={asideRef}
         className={`fixed inset-y-0 left-0 z-[var(--z-sidebar)] flex flex-col bg-slate-50 dark:bg-[#071F15] border-r border-slate-200 dark:border-slate-800 transition-all duration-300 lg:static ${
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         } ${isCollapsed ? "w-[72px]" : "w-64"}`}
@@ -293,7 +315,7 @@ export function Sidebar({ userEmail, userRole, isOpen, onClose, isCollapsed }: S
         </div>
 
         {/* Navigation Items */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-6 space-y-1">
+        <div ref={navRef} className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-6 space-y-1">
           {visibleModules.map((config) => (
             <SidebarItem
               key={config.id}

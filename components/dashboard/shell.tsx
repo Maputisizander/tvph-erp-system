@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { Sidebar } from './sidebar'
 import { Header } from './header'
@@ -27,9 +27,10 @@ export function DashboardShell({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [auditOpen, setAuditOpen] = useState(false)
+  const mainRef = useRef<HTMLElement>(null)
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-[#071F15] overflow-hidden text-slate-600 dark:text-slate-300">
+    <div className="flex h-full bg-slate-50 dark:bg-[#071F15] overflow-auto overscroll-y-contain text-slate-600 dark:text-slate-300">
         {/* Sidebar */}
         <Sidebar
           userEmail={userEmail}
@@ -37,6 +38,7 @@ export function DashboardShell({
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           isCollapsed={isCollapsed}
+          scrollTargetRef={mainRef}
         />
 
         {/* Main Content */}
@@ -50,7 +52,7 @@ export function DashboardShell({
             onCollapseToggle={() => setIsCollapsed(!isCollapsed)}
             onAuditOpen={() => setAuditOpen(true)}
           />
-          <main className="flex-1 overflow-auto overscroll-y-contain bg-white dark:bg-[#0a0a0a]">
+          <main ref={mainRef} className="flex-1 overflow-auto overscroll-y-contain bg-white dark:bg-[#0a0a0a]">
             {children}
           </main>
         </div>
