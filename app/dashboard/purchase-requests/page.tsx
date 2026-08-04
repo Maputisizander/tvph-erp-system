@@ -7,6 +7,9 @@ import { StatusSelect } from '@/components/ui/status-select';
 import { Pagination } from '@/components/ui/pagination';
 import { LIST_PAGE_SIZE, parsePage, pageRange } from '@/components/ui/pagination-utils';
 import { LiveListRefresh } from '@/components/dashboard/shared/live-list-refresh';
+import { PrTableRow } from '@/components/dashboard/purchase-requests/pr-table-row';
+import { PrDeleteRowButton } from '@/components/dashboard/purchase-requests/pr-cancel-button';
+import { getCurrentProfile, hasCapability } from '@/lib/auth/permissions';
 
 export const unstable_instant = {
   prefetch: 'static',
@@ -38,6 +41,9 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
   const statusFilter = searchParams?.status || 'all';
   const page = parsePage(searchParams?.page);
   const [from, to] = pageRange(page, LIST_PAGE_SIZE);
+
+  const { role: currentRole } = await getCurrentProfile(supabase);
+  const canDelete = hasCapability(currentRole, 'pr.delete');
 
   let listQuery = supabase
     .from('purchase_requests')
@@ -112,8 +118,8 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
                 </tr>
               )}
               {(prs || []).map((pr: any) => (
-                <tr key={pr.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
-                  <td className="px-6 py-4">
+                <PrTableRow key={pr.id} href={`/dashboard/purchase-requests/${pr.id}`}>
+                  <td className="px-6 py-5">
                     <Link href={`/dashboard/purchase-requests/${pr.id}`} className="font-semibold text-primary hover:underline">
                       {pr.pr_number}
                     </Link>
@@ -121,16 +127,16 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
                       {new Date(pr.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-slate-700 dark:text-slate-300 max-w-xs truncate">
+                  <td className="px-6 py-5 text-slate-700 dark:text-slate-300 max-w-xs truncate">
                     {pr.description || '—'}
                   </td>
-                  <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
+                  <td className="px-6 py-5 text-slate-600 dark:text-slate-400">
                     {pr.projects?.name || '—'}
                   </td>
-                  <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
+                  <td className="px-6 py-5 text-slate-600 dark:text-slate-400">
                     {pr.vendors?.name || '—'}
                   </td>
-                  <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
+                  <td className="px-6 py-5 font-medium text-slate-900 dark:text-white">
                     <span className="inline-flex items-center gap-2">
                       {pr.currency === 'USD' ? '$' : '₱'}{Number(pr.amount).toLocaleString()}
                       {Number(pr.dp_amount) > 0 && (
@@ -143,22 +149,27 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
                       )}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-5">
                     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${STATUS_BADGE[pr.status] || STATUS_BADGE.draft}`}>
                       {pr.status.replace(/_/g, ' ').toUpperCase()}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    {pr.status === 'approved' && (
-                      <Link
-                        href={`/dashboard/purchase-orders/new?from_pr=${pr.id}`}
-                        className="inline-flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-95"
-                      >
-                        Convert to PO
-                      </Link>
-                    )}
+                  <td className="px-6 py-5 text-right">
+                    <span className="inline-flex items-center justify-end gap-2">
+                      {['draft', 'cancelled'].includes(pr.status) && canDelete && (
+                        <PrDeleteRowButton prId={pr.id} />
+                      )}
+                      {pr.status === 'approved' && (
+                        <Link
+                          href={`/dashboard/purchase-orders/new?from_pr=${pr.id}`}
+                          className="inline-flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-95"
+                        >
+                          Convert to PO
+                        </Link>
+                      )}
+                    </span>
                   </td>
-                </tr>
+                </PrTableRow>
               ))}
             </tbody>
           </table>

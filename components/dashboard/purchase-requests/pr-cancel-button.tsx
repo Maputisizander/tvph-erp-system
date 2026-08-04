@@ -42,7 +42,7 @@ export function PrDeleteButton({ prId }: { prId: string }) {
   const router = useRouter();
 
   function handleDelete() {
-    if (!window.confirm("Permanently delete this draft purchase request?")) return;
+    if (!window.confirm("Permanently delete this purchase request?")) return;
     setError(null);
     startTransition(async () => {
       const result = await deletePurchaseRequest(prId);
@@ -68,5 +68,39 @@ export function PrDeleteButton({ prId }: { prId: string }) {
       </button>
       {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
     </div>
+  );
+}
+
+export function PrDeleteRowButton({ prId }: { prId: string }) {
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
+  function handleDelete() {
+    if (!window.confirm("Permanently delete this purchase request?")) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await deletePurchaseRequest(prId);
+      if (result?.error) {
+        setError(result.error);
+      } else {
+        router.refresh();
+      }
+    });
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={handleDelete}
+        disabled={isPending}
+        title="Delete draft"
+        className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all active:scale-95 disabled:opacity-60"
+      >
+        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+      </button>
+      {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
+    </span>
   );
 }

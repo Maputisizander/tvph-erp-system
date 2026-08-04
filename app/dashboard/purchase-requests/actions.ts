@@ -520,7 +520,9 @@ export async function deletePurchaseRequest(prId: string) {
     .eq('id', prId)
     .single();
 
-  if (pr?.status !== 'draft') return { error: 'Only draft PRs can be deleted.' };
+  if (!pr || !['draft', 'cancelled'].includes(pr.status)) {
+    return { error: 'Only draft or cancelled PRs can be deleted.' };
+  }
 
   const { error } = await supabase
     .from('purchase_requests')
