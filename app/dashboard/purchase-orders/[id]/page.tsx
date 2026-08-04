@@ -245,6 +245,8 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
   const dpAmount = Number(po.dp_amount || 0);
   const effectiveBilled = totalInvoiced + dpAmount;
   const billingPct = poAmount > 0 ? Math.round((effectiveBilled / poAmount) * 100) : 0;
+  const dpPct = poAmount > 0 ? Math.min(100, (dpAmount / poAmount) * 100) : 0;
+  const invPct = poAmount > 0 ? Math.min(100, (totalInvoiced / poAmount) * 100) : 0;
   const compPct = maxApprovedPercent || 0;
   const billingVariance = compPct - billingPct;
 
@@ -625,11 +627,19 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                     {billingPct}%
                   </span>
                 </div>
-                <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${effectiveBilled > poAmount ? "bg-red-500" : "bg-blue-500"}`}
-                    style={{ width: `${Math.min(100, billingPct)}%` }}
-                  />
+                <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
+                  {effectiveBilled > poAmount ? (
+                    <div className="h-full bg-red-500 flex-1" />
+                  ) : (
+                    <>
+                      {dpPct > 0 && (
+                        <div className="h-full bg-amber-500" style={{ width: `${Math.min(100, dpPct)}%` }} />
+                      )}
+                      {invPct > 0 && (
+                        <div className="h-full bg-blue-500" style={{ width: `${Math.min(100 - dpPct, invPct)}%` }} />
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
               <div>
@@ -645,17 +655,21 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                 </div>
               </div>
               <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${
-                billingVariance > 0
-                  ? "bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400"
-                  : billingVariance < 0
-                    ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-400"
-                    : "bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 text-slate-500"
+                isOverpaid
+                  ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-400"
+                  : billingVariance > 0
+                    ? "bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400"
+                    : billingVariance < 0
+                      ? "bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400"
+                      : "bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 text-slate-500"
               }`}>
                 {billingVariance > 0
                   ? `Need to pay ${billingVariance}% more`
-                  : billingVariance < 0
+                  : isOverpaid
                     ? `Overpaid by ${Math.abs(billingVariance)}%`
-                    : "On track"}
+                    : billingVariance < 0
+                      ? `Billed ahead by ${Math.abs(billingVariance)}%`
+                      : "On track"}
               </div>
             </div>
           </div>
