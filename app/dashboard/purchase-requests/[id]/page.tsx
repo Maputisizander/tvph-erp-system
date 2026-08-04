@@ -13,6 +13,8 @@ import {
   ArrowRight,
   Pencil,
   MapPin,
+  Wallet,
+  Building2,
 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -51,7 +53,7 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
   const [{ data: pr, error }, { user: currentUser, role: currentRole }] = await Promise.all([
     supabase
       .from("purchase_requests")
-      .select("*, projects(name)")
+      .select("*, projects(name), vendors(name)")
       .eq("id", params.id)
       .is("deleted_at", null)
       .single(),
@@ -227,6 +229,42 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
         </div>
       )}
 
+      {/* Downpayment highlight — approvers must see this at a glance */}
+      {Number(pr.dp_amount) > 0 ? (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50">
+          <div className="flex items-start gap-3 flex-1">
+            <Wallet className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
+                DOWNPAYMENT {Number(pr.dp_percent) > 0 ? `${Number(pr.dp_percent)}%` : ""}
+              </span>
+              <p className="text-xl font-bold text-amber-700 dark:text-amber-400 tabular-nums">
+                {currencySymbol}{Number(pr.dp_amount).toLocaleString()}
+              </p>
+            </div>
+          </div>
+          <p className="text-xs text-amber-600/80 dark:text-amber-400/60 sm:text-right">
+            Balance after downpayment:{" "}
+            <span className="font-bold">
+              {currencySymbol}
+              {Math.max(0, Number(pr.amount) - Number(pr.dp_amount)).toLocaleString()}
+            </span>
+          </p>
+        </div>
+      ) : (
+        <div className="flex items-start gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800">
+          <Wallet className="h-5 w-5 text-slate-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              No Downpayment
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              This request does not carry an upfront payment. The full estimated amount is payable on the PO.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Details */}
       <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center gap-2">
@@ -240,6 +278,17 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
             </label>
             <p className="mt-1 text-slate-900 dark:text-slate-300 font-medium">
               {(pr.projects as any)?.name || "No project linked"}
+            </p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Building2 className="h-3.5 w-3.5" /> Preferred Vendor
+            </label>
+            <p className="mt-1 text-slate-900 dark:text-slate-300 font-medium">
+              {(pr.vendors as any)?.name || "Not nominated"}
+              {pr.vendor_id && (
+                <span className="text-slate-400 font-normal"> — pre-filled on the PO</span>
+              )}
             </p>
           </div>
           <div>

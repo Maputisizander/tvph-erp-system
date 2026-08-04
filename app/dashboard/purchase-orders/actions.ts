@@ -20,6 +20,7 @@ interface CreatePOInput {
   issued_date?: string;
   due_date?: string;
   dp_amount?: number;
+  dp_percent?: number;
   net_days?: number;
   dp_due_days?: number;
   penalty_rate?: number;
@@ -49,7 +50,7 @@ export async function createPurchaseOrderCore(input: CreatePOInput) {
   const { user, role, error: authError } = await requireCapability('po.create', supabase);
   if (authError || !user) return { error: authError || 'Unauthorized' };
 
-  const { vendor_id, project_id, line_items, site_details = [], description, due_date, dp_amount = 0, waive_requirements: waive = false } = input;
+  const { vendor_id, project_id, line_items, site_details = [], description, due_date, dp_amount = 0, dp_percent, waive_requirements: waive = false } = input;
   const issued_date = input.issued_date ?? new Date().toISOString().slice(0, 10);
   const mobilization_date = getTomorrowDateInTimeZone('Asia/Manila');
   const net_days = input.net_days ?? 30;
@@ -65,6 +66,20 @@ export async function createPurchaseOrderCore(input: CreatePOInput) {
 
   const totalAmount = line_items.reduce((sum, li) => sum + (Number(li.qty) || 0) * (Number(li.unit_price) || 0), 0);
   if (totalAmount <= 0) return { error: 'Total amount must be greater than zero. Add at least one line item with a price.' };
+
+  // Percent is the primary input on the form; the peso amount is derived.
+  // Legacy callers (chat tool) pass dp_amount only — kept as-is, percent derived.
+  let dpAmount = Math.max(0, Number(dp_amount) || 0);
+  let dpPercent = 0;
+  if (dp_percent !== undefined && dp_percent !== null && !Number.isNaN(dp_percent)) {
+    if (dp_percent < 0 || dp_percent > 100) return { error: 'Downpayment percent must be between 0 and 100.' };
+    dpPercent = Math.round(dp_percent * 100) / 100;
+    dpAmount = Math.round(((totalAmount * dpPercent) / 100) * 100) / 100;
+  } else if (dpAmount > totalAmount) {
+    return { error: 'Downpayment cannot exceed the PO total.' };
+  } else if (dpAmount > 0 && totalAmount > 0) {
+    dpPercent = Math.round((dpAmount / totalAmount) * 100 * 100) / 100;
+  }
 
   const { data: ndaDoc } = await supabase
     .from('vendor_documents')
@@ -148,7 +163,8 @@ export async function createPurchaseOrderCore(input: CreatePOInput) {
     project_id: project_id || null,
     description: description || null,
     amount: totalAmount,
-    dp_amount,
+    dp_amount: dpAmount,
+    dp_percent: dpPercent,
     issued_date,
     mobilization_date,
     due_date: due_date || null,
@@ -301,6 +317,7 @@ export async function createPurchaseOrder(prevState: any, formData: FormData) {
     issued_date: formData.get('issued_date') as string || undefined,
     due_date: formData.get('due_date') as string || undefined,
     dp_amount: parseFloat(formData.get('dp_amount') as string) || 0,
+    dp_percent: formData.get('dp_percent') ? parseFloat(formData.get('dp_percent') as string) : undefined,
     net_days: Number(formData.get('net_days') || 30),
     dp_due_days: dpDueDays == null || dpDueDays === '' ? undefined : Number(dpDueDays),
     penalty_rate: penaltyRate == null || penaltyRate === '' ? undefined : Number(penaltyRate),

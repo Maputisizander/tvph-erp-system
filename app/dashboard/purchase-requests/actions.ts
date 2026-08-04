@@ -21,9 +21,36 @@ type PRSiteDetail = {
 
 interface CreatePRInput {
   project_id?: string;
+  vendor_id?: string;
   line_items: PRLineItem[];
   site_details?: PRSiteDetail[];
   description?: string;
+  dp_amount?: number;
+  dp_percent?: number;
+}
+
+// The percent is the primary input on the forms; the peso amount is always
+// derived. A legacy dp_amount (chat tool / pre-existing callers) with no
+// percent is kept as-is and its percent derived for display/re-prefill.
+function resolveDownpayment(
+  dpPercent: number | undefined,
+  dpAmount: number | undefined,
+  totalAmount: number
+): { dp_amount: number; dp_percent: number } | string {
+  if (dpPercent !== undefined && dpPercent !== null && !Number.isNaN(dpPercent)) {
+    if (dpPercent < 0 || dpPercent > 100) {
+      return 'Downpayment percent must be between 0 and 100.';
+    }
+    const percent = Math.round(dpPercent * 100) / 100;
+    const amount = Math.round(((totalAmount * percent) / 100) * 100) / 100;
+    return { dp_amount: amount, dp_percent: percent };
+  }
+  const dp = Math.max(0, Number(dpAmount) || 0);
+  if (dp > totalAmount) {
+    return 'Downpayment cannot exceed the estimated total.';
+  }
+  const percent = totalAmount > 0 ? (dp / totalAmount) * 100 : 0;
+  return { dp_amount: Math.round(dp * 100) / 100, dp_percent: Math.round(percent * 100) / 100 };
 }
 
 function siteDetailRows(prId: string, siteDetails: PRSiteDetail[]) {
@@ -54,17 +81,23 @@ export async function createPurchaseRequestCore(input: CreatePRInput) {
   const { user, error: authError } = await requireCapability('pr.create', supabase);
   if (authError || !user) return { error: authError || 'Unauthorized' };
 
-  const { project_id, line_items, site_details = [], description } = input;
+  const { project_id, vendor_id, line_items, site_details = [], description, dp_amount = 0, dp_percent } = input;
 
   const totalAmount = line_items.reduce((sum, li) => sum + (Number(li.qty) || 0) * (Number(li.unit_price) || 0), 0);
   if (totalAmount <= 0) return { error: 'Total amount must be greater than zero. Add at least one line item with a price.' };
+
+  const downpayment = resolveDownpayment(dp_percent, dp_amount, totalAmount);
+  if (typeof downpayment === 'string') return { error: downpayment };
 
   const { data: entity } = await supabase.from('internal_entities').select('id').limit(1).single();
 
   const { data: newPR, error } = await supabase.from('purchase_requests').insert({
     project_id: project_id || null,
+    vendor_id: vendor_id || null,
     description: description || null,
     amount: totalAmount,
+    dp_amount: downpayment.dp_amount,
+    dp_percent: downpayment.dp_percent,
     status: 'draft',
     internal_entity_id: entity?.id || null,
     created_by: user.id,
@@ -103,6 +136,9 @@ export async function createPurchaseRequestCore(input: CreatePRInput) {
     changes: {
       after: {
         amount: totalAmount,
+        dp_amount: downpayment.dp_amount,
+        dp_percent: downpayment.dp_percent,
+        vendor_id: vendor_id || null,
         status: 'draft',
         line_items_count: line_items.length,
         site_details_count: site_details.length,
@@ -129,9 +165,12 @@ export async function createPurchaseRequest(prevState: any, formData: FormData) 
 
   const result = await createPurchaseRequestCore({
     project_id: formData.get('project_id') as string || undefined,
+    vendor_id: formData.get('vendor_id') as string || undefined,
     line_items: lineItems,
     site_details: siteDetails,
     description: formData.get('description') as string || undefined,
+    dp_amount: parseFloat(formData.get('dp_amount') as string) || 0,
+    dp_percent: formData.get('dp_percent') ? parseFloat(formData.get('dp_percent') as string) : undefined,
   });
 
   if ('error' in result) return { error: result.error };
@@ -167,13 +206,23 @@ export async function updatePurchaseRequest(prId: string, formData: FormData) {
   const totalAmount = lineItems.reduce((sum, li) => sum + (Number(li.qty) || 0) * (Number(li.unit_price) || 0), 0);
   if (totalAmount <= 0) return { error: 'Total amount must be greater than zero. Add at least one line item with a price.' };
 
+  const downpayment = resolveDownpayment(
+    formData.get('dp_percent') ? parseFloat(formData.get('dp_percent') as string) : undefined,
+    parseFloat(formData.get('dp_amount') as string) || 0,
+    totalAmount
+  );
+  if (typeof downpayment === 'string') return { error: downpayment };
+
   const now = new Date().toISOString();
   const { error, count } = await supabase
     .from('purchase_requests')
     .update({
       description: (formData.get('description') as string) || null,
       project_id: (formData.get('project_id') as string) || null,
+      vendor_id: (formData.get('vendor_id') as string) || null,
       amount: totalAmount,
+      dp_amount: downpayment.dp_amount,
+      dp_percent: downpayment.dp_percent,
       updated_at: now,
     }, { count: 'exact' })
     .eq('id', prId)
@@ -209,7 +258,7 @@ export async function updatePurchaseRequest(prId: string, formData: FormData) {
     entity_id: prId,
     action: 'UPDATE',
     changes: {
-      after: { amount: totalAmount, line_items_count: lineItems.length, site_details_count: siteDetails.length },
+      after: { amount: totalAmount, dp_amount: downpayment.dp_amount, dp_percent: downpayment.dp_percent, vendor_id: (formData.get('vendor_id') as string) || null, line_items_count: lineItems.length, site_details_count: siteDetails.length },
     },
     performed_by: user.id,
   });

@@ -5,6 +5,8 @@ import { EmailLayout, styles } from "./layout";
 export interface PrPendingApprovalEmailProps {
   prNumber: string;
   amountLabel?: string | null;
+  downpaymentLabel?: string | null;
+  downpaymentPercent?: number | null;
   submittedByName?: string | null;
   reviewUrl: string;
 }
@@ -17,6 +19,8 @@ export interface PrPendingApprovalEmailProps {
 export function PrPendingApprovalEmail({
   prNumber,
   amountLabel,
+  downpaymentLabel,
+  downpaymentPercent,
   submittedByName,
   reviewUrl,
 }: PrPendingApprovalEmailProps) {
@@ -34,6 +38,11 @@ export function PrPendingApprovalEmail({
       <Section style={styles.panel}>
         <Text style={styles.meta}>PR Number: {prNumber}</Text>
         {amountLabel ? <Text style={styles.meta}>Estimated Total: {amountLabel}</Text> : null}
+        <Text style={{ ...styles.meta, ...(downpaymentLabel ? { color: "#b45309", fontWeight: 700 } : {}) }}>
+          {downpaymentLabel
+            ? `Downpayment: ${downpaymentPercent ? `${downpaymentPercent}% — ` : ""}${downpaymentLabel}`
+            : "Downpayment: None"}
+        </Text>
         {submittedByName ? (
           <Text style={styles.meta}>Submitted by: {submittedByName}</Text>
         ) : null}

@@ -41,7 +41,7 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
 
   let listQuery = supabase
     .from('purchase_requests')
-    .select('id, pr_number, description, amount, currency, status, created_at, projects(name)', { count: 'exact' })
+    .select('id, pr_number, description, amount, dp_amount, currency, status, created_at, projects(name), vendors(name)', { count: 'exact' })
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
@@ -93,6 +93,7 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
                 <th className="px-6 py-4 font-semibold">PR</th>
                 <th className="px-6 py-4 font-semibold">Description</th>
                 <th className="px-6 py-4 font-semibold">Project</th>
+                <th className="px-6 py-4 font-semibold">Preferred Vendor</th>
                 <th className="px-6 py-4 font-semibold">Est. Amount</th>
                 <th className="px-6 py-4 font-semibold">Status</th>
                 <th className="px-6 py-4 font-semibold text-right">Actions</th>
@@ -100,11 +101,11 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {error && (
-                <tr><td colSpan={6} className="px-6 py-8 text-center text-red-500">{error.message}</td></tr>
+                <tr><td colSpan={7} className="px-6 py-8 text-center text-red-500">{error.message}</td></tr>
               )}
               {!error && (prs || []).length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
                     <FileText className="h-8 w-8 mx-auto mb-2 opacity-40" />
                     No purchase requests found.
                   </td>
@@ -126,8 +127,21 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
                   <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
                     {pr.projects?.name || '—'}
                   </td>
+                  <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
+                    {pr.vendors?.name || '—'}
+                  </td>
                   <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
-                    {pr.currency === 'USD' ? '$' : '₱'}{Number(pr.amount).toLocaleString()}
+                    <span className="inline-flex items-center gap-2">
+                      {pr.currency === 'USD' ? '$' : '₱'}{Number(pr.amount).toLocaleString()}
+                      {Number(pr.dp_amount) > 0 && (
+                        <span
+                          title={`Downpayment: ${pr.currency === 'USD' ? '$' : '₱'}${Number(pr.dp_amount).toLocaleString()}`}
+                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700"
+                        >
+                          DP
+                        </span>
+                      )}
+                    </span>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${STATUS_BADGE[pr.status] || STATUS_BADGE.draft}`}>

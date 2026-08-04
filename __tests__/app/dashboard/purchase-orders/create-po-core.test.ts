@@ -769,6 +769,45 @@ describe('createPurchaseOrderCore', () => {
 
       expect(insertedData.dp_amount).toBe(0);
     });
+
+    it('computes the peso downpayment from the percent input', async () => {
+      await createPurchaseOrderCore({
+        vendor_id: 'vendor-1',
+        line_items: [{ description: 'Item 1', qty: 2, unit_price: 500 }],
+        dp_percent: 50,
+      });
+
+      const insertedData = mockSupabase.poInsertMock.mock.calls[0][0];
+
+      expect(insertedData.dp_amount).toBe(500);
+      expect(insertedData.dp_percent).toBe(50);
+    });
+
+    it('rejects a downpayment percent above 100', async () => {
+      const result = await createPurchaseOrderCore({
+        vendor_id: 'vendor-1',
+        line_items: [{ description: 'Item 1', qty: 1, unit_price: 100 }],
+        dp_percent: 150,
+      });
+
+      expect(result).toEqual({ error: 'Downpayment percent must be between 0 and 100.' });
+      const fromCalls = mockSupabase.from.mock.calls;
+      const poInsertCall = fromCalls.find((c: any[]) => c[0] === 'purchase_orders');
+      expect(poInsertCall).toBeUndefined();
+    });
+
+    it('derives the percent when only a legacy peso amount is provided', async () => {
+      await createPurchaseOrderCore({
+        vendor_id: 'vendor-1',
+        line_items: [{ description: 'Item 1', qty: 2, unit_price: 500 }],
+        dp_amount: 300,
+      });
+
+      const insertedData = mockSupabase.poInsertMock.mock.calls[0][0];
+
+      expect(insertedData.dp_amount).toBe(300);
+      expect(insertedData.dp_percent).toBe(30);
+    });
   });
 
   describe('Database errors', () => {

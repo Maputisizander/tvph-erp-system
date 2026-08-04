@@ -52,7 +52,7 @@ async function NewPurchaseOrderContent({
   // Validate the PR is convertible. If not, its detail page explains the status.
   const { data: pr } = await supabase
     .from('purchase_requests')
-    .select('id, pr_number, description, project_id, status')
+    .select('id, pr_number, description, project_id, vendor_id, dp_amount, dp_percent, status')
     .eq('id', fromPr)
     .is('deleted_at', null)
     .single();
@@ -134,6 +134,9 @@ async function NewPurchaseOrderContent({
           pr_number: pr.pr_number,
           description: pr.description,
           project_id: pr.project_id,
+          vendor_id: pr.vendor_id || null,
+          dp_amount: Number(pr.dp_amount) || 0,
+          dp_percent: Number(pr.dp_percent) || 0,
           line_items: (prLineItems || []).map((li: any) => ({
             item_code: li.item_code || '',
             description: li.description || '',
