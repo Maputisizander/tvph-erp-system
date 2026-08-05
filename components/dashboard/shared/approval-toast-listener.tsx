@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/client";
+import { Avatar } from "@/components/ui/avatar";
 
 type ApprovalTable = "purchase_orders" | "purchase_requests";
 
@@ -110,6 +111,15 @@ export function ApprovalToastListener() {
         if (!row || row.status !== "pending_approval") return;
         if (!shouldShowApprovalToast(uid, role, row)) return;
 
+        const submitter = row.submitted_for_approval_by
+          ? await supabase
+              .from("profiles")
+              .select("full_name, avatar_url")
+              .eq("id", row.submitted_for_approval_by)
+              .maybeSingle<{ full_name: string; avatar_url: string | null }>()
+          : null;
+        const submitterProfile = submitter?.data ?? null;
+
         const isSubmitter = row.submitted_for_approval_by === uid;
         const number = table === "purchase_orders" ? row.po_number : row.pr_number;
         const code = `#${number ?? id.slice(0, 8)}`;
@@ -119,17 +129,23 @@ export function ApprovalToastListener() {
             ? `${row.vendors.name} · ₱${Number(row.amount ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
             : row.projects?.name;
 
-        toast.info(`${table === "purchase_orders" ? "📋 PO" : "📋 PR"} ${code} submitted for approval`, {
-          description: detail
-            ? `${isSubmitter ? "Awaiting your approvers" : "Requires your approval"} · ${detail}`
-            : isSubmitter
-              ? "Awaiting your approvers"
-              : "Requires your approval",
-          action: {
-            label: "Review",
-            onClick: () => router.push(`/dashboard/${route}/${id}`),
+        toast.info(
+          <>
+            <b>{submitterProfile?.full_name ?? "Someone"}</b> submitted {code} for approval
+          </>,
+          {
+            icon: <Avatar name={submitterProfile?.full_name} src={submitterProfile?.avatar_url} />,
+            description: detail
+              ? `${isSubmitter ? "Awaiting your approvers" : "Requires your approval"} · ${detail}`
+              : isSubmitter
+                ? "Awaiting your approvers"
+                : "Requires your approval",
+            action: {
+              label: "Review",
+              onClick: () => router.push(`/dashboard/${route}/${id}`),
+            },
           },
-        });
+        );
       }
     }
 
