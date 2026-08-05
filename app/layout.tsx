@@ -51,7 +51,7 @@ export default function RootLayout({
           <Toaster
             position="top-right"
             closeButton
-            theme="system"
+            theme="light"
             toastOptions={{ style: { zIndex: "var(--z-toast)" } }}
           />
         </ThemeProvider>
