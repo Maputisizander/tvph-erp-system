@@ -292,6 +292,31 @@ export async function updateVendorProfile(prevState: any, formData: FormData) {
   const id = formData.get("id") as string;
   if (!id) return { error: "Vendor ID is required." };
 
+  // Only written when the form sends them, so the detail-page profile form
+  // (which omits these fields) can't clobber them.
+  const rawName = formData.get("name") as string | null;
+  const rawVendorCode = formData.get("vendor_code") as string | null;
+  const rawCurrency = formData.get("currency") as string | null;
+
+  const name = rawName?.trim() ?? "";
+  const vendor_code = rawVendorCode?.trim() ?? "";
+
+  if (rawName !== null && !name) return { error: "Vendor name is required." };
+  if (rawVendorCode !== null && !vendor_code) {
+    return { error: "Vendor code is required." };
+  }
+  if (rawVendorCode !== null) {
+    const { data: clash } = await supabase
+      .from("vendors")
+      .select("id")
+      .eq("vendor_code", vendor_code)
+      .neq("id", id)
+      .maybeSingle();
+    if (clash) {
+      return { error: `Vendor code "${vendor_code}" is already in use by another vendor.` };
+    }
+  }
+
   const address = formData.get("address") as string;
   const tin = formData.get("tin") as string;
   const contact_person = formData.get("contact_person") as string;
@@ -303,7 +328,6 @@ export async function updateVendorProfile(prevState: any, formData: FormData) {
   const bank_account_name = formData.get("bank_account_name") as string;
   const payment_terms = formData.get("payment_terms") as string;
   const notes = formData.get("notes") as string;
-  const currency = (formData.get("currency") as string) || "PHP";
 
   let secondary_contacts = [];
   try {
@@ -326,6 +350,9 @@ export async function updateVendorProfile(prevState: any, formData: FormData) {
   const { error } = await supabase
     .from("vendors")
     .update({
+      ...(rawName !== null ? { name } : {}),
+      ...(rawVendorCode !== null ? { vendor_code } : {}),
+      ...(rawCurrency !== null ? { currency: rawCurrency } : {}),
       address,
       tin,
       contact_person,
@@ -353,7 +380,13 @@ export async function updateVendorProfile(prevState: any, formData: FormData) {
     entity_id: id,
     action: "UPDATE",
     changes: {
-      after: { contact_person, secondary_contacts, secondary_banking },
+      after: {
+        ...(rawName !== null ? { name } : {}),
+        ...(rawVendorCode !== null ? { vendor_code } : {}),
+        contact_person,
+        secondary_contacts,
+        secondary_banking,
+      },
     },
     performed_by: user.id,
   });
