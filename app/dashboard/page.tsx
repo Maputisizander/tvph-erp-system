@@ -2,8 +2,8 @@ import { createClient } from "@/utils/supabase/server";
 import { getCurrentProfile, hasCapability } from "@/lib/auth/permissions";
 import { computeComplianceSummary } from "@/lib/reports/compliance";
 import { EMPTY_DASHBOARD_FINANCIALS, getDashboardFinancials, getProjectProgress } from "@/lib/dashboard/queries";
-import { TrendsChart } from "@/components/dashboard/trends-chart";
 import { ProjectProgressList } from "@/components/dashboard/project-progress-list";
+import { TrendsChartLazy } from "@/components/dashboard/trends-chart-lazy";
 import {
   Building2,
   FileText,
@@ -435,7 +435,7 @@ export async function DashboardContent() {
             subtitle="Last 6 months — AP paid vs AR collected"
           />
           <div className="p-5">
-            <TrendsChart data={monthlyTrends} />
+            <TrendsChartLazy data={monthlyTrends} />
           </div>
         </SectionCard>
       )}
