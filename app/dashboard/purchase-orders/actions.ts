@@ -981,7 +981,13 @@ export async function assignProjectToPO(poId: string, projectId: string | null) 
   return { success: true };
 }
 
-/** Delete every row referencing this PO (child-first so FKs don't block). Returns an error message or null. */
+/**
+ * Delete the rows referencing this PO that are NOT covered by ON DELETE CASCADE:
+ * service_invoices is the only FK to purchase_orders without cascade (its children
+ * payments -> payment_documents must go first). The rest (line items, site details,
+ * payment requests, reservations, certs, artifacts, penalties) cascade automatically.
+ * Returns an error message or null.
+ */
 async function deletePurchaseOrderDependents(
   supabase: Awaited<ReturnType<typeof createClient>>,
   poId: string,
@@ -1015,19 +1021,6 @@ async function deletePurchaseOrderDependents(
       .delete()
       .eq('po_id', poId);
     if (invoiceError) return invoiceError.message;
-  }
-
-  for (const table of [
-    'payment_requests',
-    'po_completion_certificates',
-    'po_line_items',
-    'po_site_details',
-    'purchase_order_artifacts',
-    'payment_reservations',
-    'po_penalties',
-  ]) {
-    const { error } = await supabase.from(table).delete().eq('po_id', poId);
-    if (error) return error.message;
   }
 
   return null;
