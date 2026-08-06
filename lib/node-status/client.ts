@@ -52,7 +52,7 @@ export type NodeStatusResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: NodeStatusError };
 
-const DEFAULT_RETRIES = 1;
+const DEFAULT_RETRIES = 2; // 3 total attempts, per the twinbackend guide
 
 function backoffMs(attempt: number) {
   return 2000 * 2 ** attempt; // 2s, 4s

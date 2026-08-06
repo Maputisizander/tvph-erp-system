@@ -31,7 +31,7 @@ const envSchema = z.object({
   RESEND_WEBHOOK_SECRET: z.string().min(1).optional(),
 });
 
-export const env = envSchema.parse({
+const rawEnv = {
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -47,4 +47,10 @@ export const env = envSchema.parse({
   TELEGRAM_ADMIN_CHAT_ID: process.env.TELEGRAM_ADMIN_CHAT_ID,
   TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET,
   RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET,
-});
+};
+
+// A `.env` file left as `KEY=` yields an empty string, which would fail
+// `z.string().min(1)` on optional fields. Treat empty as unset.
+export const env = envSchema.parse(
+  Object.fromEntries(Object.entries(rawEnv).filter(([, v]) => v !== "")),
+);
