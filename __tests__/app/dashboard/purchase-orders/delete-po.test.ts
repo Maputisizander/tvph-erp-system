@@ -32,7 +32,7 @@ const mockRequireCapability = requireCapability as jest.MockedFunction<typeof re
 const mockRecordAuditLog = recordAuditLog as jest.MockedFunction<typeof recordAuditLog>;
 const mockRevalidatePath = revalidatePath as jest.MockedFunction<typeof revalidatePath>;
 
-const DEPENDENT_TABLES = [
+const CASCADE_TABLES = [
   'payment_requests',
   'po_completion_certificates',
   'po_line_items',
@@ -78,7 +78,7 @@ describe('deletePurchaseOrder', () => {
     mockRevalidatePath.mockReturnValue(undefined);
   });
 
-  it('cascades dependents in FK-safe order, then deletes the PO', async () => {
+  it('deletes the non-cascaded invoice chain in FK-safe order, then the PO', async () => {
     mock = setupSupabaseMock({
       invoices: [{ id: 'inv-1' }, { id: 'inv-2' }],
       payments: [{ id: 'pay-1' }],
@@ -88,13 +88,13 @@ describe('deletePurchaseOrder', () => {
     const result = await deletePurchaseOrder('po-1');
 
     expect(result).toEqual({ success: true });
-    // payments are children of service_invoices; invoices precede their parent PO
+    // payment_documents -> payments -> service_invoices -> purchase_orders
     expect(mock.deleteOrder.indexOf('payment_documents')).toBeLessThan(mock.deleteOrder.indexOf('payments'));
     expect(mock.deleteOrder.indexOf('payments')).toBeLessThan(mock.deleteOrder.indexOf('service_invoices'));
     expect(mock.deleteOrder.indexOf('service_invoices')).toBeLessThan(mock.deleteOrder.indexOf('purchase_orders'));
-    // every other dependent is deleted before the PO
-    for (const t of DEPENDENT_TABLES) {
-      expect(mock.deleteOrder.indexOf(t)).toBeLessThan(mock.deleteOrder.indexOf('purchase_orders'));
+    // tables with ON DELETE CASCADE are left for the DB to clean up
+    for (const t of CASCADE_TABLES) {
+      expect(mock.deleteOrder).not.toContain(t);
     }
     expect(mockRecordAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({ entity_type: 'purchase_order', entity_id: 'po-1', action: 'DELETE' }),
@@ -112,7 +112,7 @@ describe('deletePurchaseOrder', () => {
     expect(mock.deleteOrder).not.toContain('payments');
     expect(mock.deleteOrder).not.toContain('payment_documents');
     expect(mock.deleteOrder).not.toContain('service_invoices');
-    expect(mock.deleteOrder).toContain('purchase_orders');
+    expect(mock.deleteOrder).toEqual(['purchase_orders']);
   });
 
   it('stops and returns the error when a dependent delete fails, without touching the PO', async () => {
