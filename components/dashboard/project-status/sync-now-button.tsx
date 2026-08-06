@@ -2,7 +2,31 @@
 
 import { useState, useTransition } from "react";
 import { RefreshCw } from "lucide-react";
-import { syncVendorNow } from "@/app/dashboard/project-status/actions";
+import { syncAllNow, syncVendorNow } from "@/app/dashboard/project-status/actions";
+
+export function SyncAllButton() {
+  const [isPending, startTransition] = useTransition();
+  const [message, setMessage] = useState<string | null>(null);
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button
+        onClick={() =>
+          startTransition(async () => {
+            const result = await syncAllNow();
+            setMessage(result?.success ? null : (result?.error ?? "Sync failed"));
+          })
+        }
+        disabled={isPending}
+        className="inline-flex shrink-0 items-center gap-2 bg-primary hover:bg-primary/90 text-white px-3 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+      >
+        <RefreshCw className={`h-3.5 w-3.5 ${isPending ? "animate-spin" : ""}`} />
+        {isPending ? "Syncing..." : "Run sync"}
+      </button>
+      {message && <span className="text-xs text-rose-600 dark:text-rose-400">{message}</span>}
+    </div>
+  );
+}
 
 export function SyncNowButton({ vendorId }: { vendorId: string }) {
   const [isPending, startTransition] = useTransition();

@@ -5,7 +5,35 @@ import { createClient } from '@/utils/supabase/server';
 import { createServiceRoleClient } from '@/utils/supabase/service';
 import { recordAuditLog } from '@/utils/audit';
 import { requireCapability } from '@/lib/auth/permissions';
-import { syncVendor } from '@/lib/node-status/sync';
+import { syncProjectLinkedVendors, syncVendor } from '@/lib/node-status/sync';
+
+export async function syncAllNow() {
+  const supabase = await createClient();
+  const { user, error: authError } = await requireCapability('project_status.read', supabase);
+  if (authError || !user) return { error: authError || 'Unauthorized' };
+
+  const summary = await syncProjectLinkedVendors(createServiceRoleClient());
+
+  await recordAuditLog({
+    entity_type: 'vendor',
+    entity_id: 'all',
+    action: 'UPDATE',
+    changes: {
+      after: {
+        node_status_sync: {
+          synced: summary.synced,
+          unmatched: summary.unmatched,
+          failed: summary.failed,
+        },
+      },
+    },
+    performed_by: user.id,
+  });
+
+  revalidatePath('/dashboard/project-status');
+  revalidatePath('/dashboard/projects');
+  return { success: true, summary };
+}
 
 export async function syncVendorNow(vendorId: string) {
   const supabase = await createClient();

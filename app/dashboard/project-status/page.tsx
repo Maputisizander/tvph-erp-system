@@ -8,7 +8,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
-import { SyncNowButton } from "@/components/dashboard/project-status/sync-now-button";
+import { SyncNowButton, SyncAllButton } from "@/components/dashboard/project-status/sync-now-button";
+import { ProjectStatusRollup, type ProjectRollup, type Rollup } from "@/components/dashboard/project-status/rollup";
 import { Pagination } from "@/components/ui/pagination";
 import { LIST_PAGE_SIZE, parsePage, pageRange } from "@/components/ui/pagination-utils";
 
@@ -34,10 +35,13 @@ export default function ProjectStatusPage(props: {
             Work-node status synced from twinbackend, grouped by vendor.
           </p>
         </div>
-        <p className="inline-flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/50 px-3 py-2 rounded-xl">
-          <RefreshCw className="h-3.5 w-3.5" />
-          Auto-syncs every 15 minutes
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="inline-flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/50 px-3 py-2 rounded-xl">
+            <RefreshCw className="h-3.5 w-3.5" />
+            Auto-syncs every 15 minutes
+          </p>
+          <SyncAllButton />
+        </div>
       </div>
 
       <Suspense fallback={<ProjectStatusSkeleton />}>
@@ -71,21 +75,58 @@ async function ProjectStatusContent({
   if (projectFilter) query = query.eq("project_id", projectFilter);
   query = query.order("last_synced_at", { ascending: false }).range(from, to);
 
-  const [{ data: nodes, count }, { data: projects }, { data: syncStates }] = await Promise.all([
-    query,
-    supabase
-      .from("projects")
-      .select("id, name")
-      .is("deleted_at", null)
-      .order("name"),
-    supabase
-      .from("vendor_sync_state")
-      .select("vendor_id, last_status, last_error, last_synced_at, last_ok_at, vendors(id, name)")
-      .in("last_status", ["unmatched", "failed"]),
-  ]);
+  const [{ data: nodes, count }, { data: projects }, { data: syncStates }, { data: allNodes }] =
+    await Promise.all([
+      query,
+      supabase
+        .from("projects")
+        .select("id, name")
+        .is("deleted_at", null)
+        .order("name"),
+      supabase
+        .from("vendor_sync_state")
+        .select("vendor_id, last_status, last_error, last_synced_at, last_ok_at, vendors(id, name)")
+        .in("last_status", ["unmatched", "failed"]),
+      supabase
+        .from("node_status")
+        .select("status, poles_collected, poles_total, project_id, vendor_id, vendors(id, name), projects(id, name)"),
+    ]);
 
   const problemVendors = (syncStates || []) as any[];
   const nodesList = (nodes || []) as any[];
+  // ponytail: rollup re-fetches every node row and reduces in JS. Fine at this
+  // scale; swap for a Postgres RPC (count/sum group-by) if node counts grow.
+  const rollupNodes = (allNodes || []) as any[];
+  const rollup: Rollup = {
+    collectedPoles: rollupNodes.reduce((s, n) => s + (n.poles_collected || 0), 0),
+    totalPoles: rollupNodes.reduce((s, n) => s + (n.poles_total || 0), 0),
+    statusCounts: rollupNodes.reduce((acc, n) => {
+      acc[n.status] = (acc[n.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>),
+    vendorCount: new Set(rollupNodes.map((n) => n.vendor_id)).size,
+    projects: Array.from(
+      rollupNodes
+        .reduce((acc, n) => {
+          const id = (n.project_id as string | null) ?? null;
+          if (!acc.has(id)) {
+            acc.set(id, {
+              id,
+              name: n.projects?.name ?? "Unassigned",
+              nodes: 0,
+              collected: 0,
+              total: 0,
+            });
+          }
+          const p = acc.get(id);
+          p.nodes += 1;
+          p.collected += n.poles_collected || 0;
+          p.total += n.poles_total || 0;
+          return acc;
+        }, new Map<string | null, ProjectRollup>())
+        .values(),
+    ),
+  };
   // eslint-disable-next-line react-hooks/purity -- staleness is inherently relative to wall-clock time; this server component re-renders per request
   const anyStale = nodesList.some((n) => Date.now() - new Date(n.last_synced_at).getTime() > STALE_MS);
 
@@ -140,6 +181,8 @@ async function ProjectStatusContent({
           ))}
         </div>
       )}
+
+      {rollupNodes.length > 0 && <ProjectStatusRollup rollup={rollup} />}
 
       <form method="get" className="flex flex-wrap items-end gap-3 bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
         <div>
