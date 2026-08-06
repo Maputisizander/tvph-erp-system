@@ -981,17 +981,72 @@ export async function assignProjectToPO(poId: string, projectId: string | null) 
   return { success: true };
 }
 
+/** Delete every row referencing this PO (child-first so FKs don't block). Returns an error message or null. */
+async function deletePurchaseOrderDependents(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  poId: string,
+): Promise<string | null> {
+  const { data: invoices } = await supabase
+    .from('service_invoices')
+    .select('id')
+    .eq('po_id', poId);
+  const invoiceIds = (invoices ?? []).map((i: { id: string }) => i.id);
+
+  if (invoiceIds.length > 0) {
+    const { data: payments } = await supabase
+      .from('payments')
+      .select('id')
+      .in('invoice_id', invoiceIds);
+    const paymentIds = (payments ?? []).map((p: { id: string }) => p.id);
+
+    if (paymentIds.length > 0) {
+      const { error } = await supabase
+        .from('payment_documents')
+        .delete()
+        .in('payment_id', paymentIds);
+      if (error) return error.message;
+    }
+
+    const { error } = await supabase.from('payments').delete().in('invoice_id', invoiceIds);
+    if (error) return error.message;
+
+    const { error: invoiceError } = await supabase
+      .from('service_invoices')
+      .delete()
+      .eq('po_id', poId);
+    if (invoiceError) return invoiceError.message;
+  }
+
+  for (const table of [
+    'payment_requests',
+    'po_completion_certificates',
+    'po_line_items',
+    'po_site_details',
+    'purchase_order_artifacts',
+    'payment_reservations',
+    'po_penalties',
+  ]) {
+    const { error } = await supabase.from(table).delete().eq('po_id', poId);
+    if (error) return error.message;
+  }
+
+  return null;
+}
+
 export async function deletePurchaseOrder(poId: string) {
   const supabase = await createClient();
   const { user, error: authError } = await requireCapability('po.delete', supabase);
   if (authError || !user) return { error: authError || 'Unauthorized.' };
 
-  const { error } = await supabase
+  const error = await deletePurchaseOrderDependents(supabase, poId);
+  if (error) return { error };
+
+  const { error: deleteError } = await supabase
     .from('purchase_orders')
     .delete()
     .eq('id', poId);
 
-  if (error) return { error: error.message };
+  if (deleteError) return { error: deleteError.message };
 
   await recordAuditLog({
     entity_type: 'purchase_order',
