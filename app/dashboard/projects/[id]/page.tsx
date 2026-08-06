@@ -23,7 +23,7 @@ async function ProjectDetailLoader({ paramsPromise }: { paramsPromise: Promise<{
   const params = await paramsPromise;
   const supabase = await createClient();
 
-  const [{ data: project }, { data: pos }, { data: projectVendors }, { data: allVendors }, { data: allAccounts }] = await Promise.all([
+  const [{ data: project }, { data: pos }, { data: projectVendors }, { data: allVendors }, { data: allAccounts }, { data: projectNodes }] = await Promise.all([
     supabase
       .from('projects')
       .select('*')
@@ -50,6 +50,11 @@ async function ProjectDetailLoader({ paramsPromise }: { paramsPromise: Promise<{
       .select('id, company_name')
       .is('deleted_at', null)
       .order('company_name'),
+    supabase
+      .from('node_status')
+      .select('id, node_id, status, progress_percentage, poles_collected, poles_total')
+      .eq('project_id', params.id)
+      .order('last_synced_at', { ascending: false }),
   ]);
 
   if (!project) notFound();
@@ -177,6 +182,7 @@ async function ProjectDetailLoader({ paramsPromise }: { paramsPromise: Promise<{
       availableVendors={availableVendors}
       allAccounts={allAccounts || []}
       billingSummary={billingSummary}
+      nodeStatus={projectNodes || []}
     />
   );
 }

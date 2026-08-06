@@ -89,6 +89,7 @@ __tests__/             # Jest tests (business logic focus)
 | Client Invoices | `/dashboard/client-invoices` | AR billing |
 | Client POs | `/dashboard/client-pos` | Client purchase orders |
 | Projects | `/dashboard/projects` | Vendor/customer linking, completion tracking |
+| Project Status | `/dashboard/project-status` | twinbackend node-status sync (cron + per-vendor), node detail |
 | Documents | `/dashboard/documents` | 3-tier vault (Company/Vendor/Customer), versioning |
 | HR | `/dashboard/hr` | Employee directory, 201 File Vault |
 | Assets | `/dashboard/assets` | Asset registry, maintenance logs |

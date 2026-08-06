@@ -19,6 +19,9 @@ const envSchema = z.object({
   CRON_SECRET: z.string().min(1).optional(),
   // Shared secret guarding the partner vendor-list API (Bearer token).
   PARTNER_API_KEY: z.string().min(1).optional(),
+  // API key for twinbackend Node Status (custom X-ERP-Key header). Optional so
+  // the app boots without it; sync calls fail loudly when unset.
+  TWINBACKEND_ERP_KEY: z.string().min(1).optional(),
   // Telegram bot (new-user / existing-user role assignment). Feature no-ops if
   // these are unset.
   TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
@@ -39,6 +42,7 @@ export const env = envSchema.parse({
   EMAIL_CC_INTERNAL: process.env.EMAIL_CC_INTERNAL,
   CRON_SECRET: process.env.CRON_SECRET,
   PARTNER_API_KEY: process.env.PARTNER_API_KEY,
+  TWINBACKEND_ERP_KEY: process.env.TWINBACKEND_ERP_KEY,
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
   TELEGRAM_ADMIN_CHAT_ID: process.env.TELEGRAM_ADMIN_CHAT_ID,
   TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET,

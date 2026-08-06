@@ -73,8 +73,11 @@ const MODULE_CONFIG: ModuleItem[] = [
     id: "projects",
     label: "Projects",
     icon: FolderOpen,
-    href: "/dashboard/projects",
-    roles: ["superadmin", "admin", "operations"],
+    roles: ["superadmin", "admin", "operations", "finance"],
+    subModules: [
+      { id: "projects-list", label: "All Projects", href: "/dashboard/projects", roles: ["superadmin", "admin", "operations", "finance"] },
+      { id: "project-status", label: "Project Status", href: "/dashboard/project-status", roles: ["superadmin", "admin", "operations", "finance"] },
+    ],
   },
   {
     id: "assets",

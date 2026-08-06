@@ -1,0 +1,174 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createServiceRoleClient } from "@/utils/supabase/service";
+import { fetchVendorNodes } from "@/lib/node-status/client";
+
+export type SyncOutcome = {
+  vendorId: string;
+  vendorName: string;
+  status: "ok" | "unmatched" | "failed";
+  nodesSynced: number;
+  error?: string;
+};
+
+export type SyncSummary = {
+  synced: number;
+  unmatched: number;
+  failed: number;
+  outcomes: SyncOutcome[];
+};
+
+function formatError(
+  e: { kind: string; status?: number; message?: string },
+): string {
+  if (e.kind === "unauthorized") return "Unauthorized — check TWINBACKEND_ERP_KEY";
+  if (e.kind === "invalid_request") return "Invalid request sent to twinbackend";
+  return e.message || e.kind;
+}
+
+async function setSyncState(
+  supabase: SupabaseClient,
+  vendorId: string,
+  fields: {
+    last_status: "ok" | "unmatched" | "failed";
+    last_error?: string | null;
+    last_synced_at?: string;
+    last_ok_at?: string;
+  },
+) {
+  await supabase.from("vendor_sync_state").upsert(
+    { vendor_id: vendorId, ...fields, updated_at: new Date().toISOString() },
+    { onConflict: "vendor_id" },
+  );
+}
+
+/**
+ * Pull one vendor's nodes from twinbackend and upsert the latest snapshot into
+ * node_status. `project_id` is deliberately NOT written during the upsert and
+ * only auto-filled where it is still NULL (vendor with exactly one
+ * project_vendors link) — so manual node→project assignments survive re-syncs.
+ */
+export async function syncVendor(
+  vendorId: string,
+  supabase: SupabaseClient = createServiceRoleClient(),
+): Promise<SyncOutcome> {
+  const { data: vendor, error: vendorErr } = await supabase
+    .from("vendors")
+    .select("id, name")
+    .eq("id", vendorId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (vendorErr || !vendor?.name) {
+    return {
+      vendorId,
+      vendorName: vendor?.name ?? "",
+      status: "failed",
+      nodesSynced: 0,
+      error: vendorErr?.message ?? "Vendor not found",
+    };
+  }
+
+  const result = await fetchVendorNodes(vendor.name);
+
+  if (!result.ok) {
+    if (result.error.kind === "not_found") {
+      await setSyncState(supabase, vendorId, {
+        last_status: "unmatched",
+        last_error: "Vendor name not found on twinbackend",
+      });
+      return { vendorId, vendorName: vendor.name, status: "unmatched", nodesSynced: 0 };
+    }
+    await setSyncState(supabase, vendorId, {
+      last_status: "failed",
+      last_error: formatError(result.error),
+    });
+    return {
+      vendorId,
+      vendorName: vendor.name,
+      status: "failed",
+      nodesSynced: 0,
+      error: formatError(result.error),
+    };
+  }
+
+  const { data: links } = await supabase
+    .from("project_vendors")
+    .select("project_id")
+    .eq("vendor_id", vendorId);
+  const projectId =
+    links && links.length === 1 ? (links[0].project_id as string | null) : null;
+
+  const now = new Date().toISOString();
+  const rows = (result.data.nodes ?? []).map((n) => ({
+    vendor_id: vendorId,
+    node_id: n.node_id,
+    site: n.site,
+    status: n.status,
+    date_start: n.date_start,
+    due_date: n.due_date,
+    date_finished: n.date_finished,
+    progress_percentage: n.progress_percentage,
+    poles_collected: n.poles_collected,
+    poles_total: n.poles_total,
+    last_synced_at: now,
+    updated_at: now,
+  }));
+
+  if (rows.length > 0) {
+    const { error: upsertErr } = await supabase
+      .from("node_status")
+      .upsert(rows, { onConflict: "vendor_id,node_id" });
+    if (upsertErr) {
+      await setSyncState(supabase, vendorId, {
+        last_status: "failed",
+        last_error: upsertErr.message,
+      });
+      return { vendorId, vendorName: vendor.name, status: "failed", nodesSynced: 0, error: upsertErr.message };
+    }
+  }
+
+  // Auto-fill project_id only where unassigned, so manual overrides persist.
+  if (projectId) {
+    const { error: assignErr } = await supabase
+      .from("node_status")
+      .update({ project_id: projectId, updated_at: now })
+      .eq("vendor_id", vendorId)
+      .is("project_id", null);
+    if (assignErr) {
+      await setSyncState(supabase, vendorId, {
+        last_status: "failed",
+        last_error: assignErr.message,
+      });
+      return { vendorId, vendorName: vendor.name, status: "failed", nodesSynced: 0, error: assignErr.message };
+    }
+  }
+
+  await setSyncState(supabase, vendorId, {
+    last_status: "ok",
+    last_error: null,
+    last_synced_at: now,
+    last_ok_at: now,
+  });
+
+  return { vendorId, vendorName: vendor.name, status: "ok", nodesSynced: rows.length };
+}
+
+/** Sync every vendor that is linked to at least one project (the cron entry). */
+export async function syncProjectLinkedVendors(
+  supabase: SupabaseClient = createServiceRoleClient(),
+): Promise<SyncSummary> {
+  const { data: pv } = await supabase.from("project_vendors").select("vendor_id");
+  const vendorIds = [...new Set((pv ?? []).map((r) => r.vendor_id as string))];
+
+  const outcomes: SyncOutcome[] = [];
+  for (const vendorId of vendorIds) {
+    outcomes.push(await syncVendor(vendorId, supabase));
+  }
+
+  return {
+    synced: outcomes.filter((o) => o.status === "ok").length,
+    unmatched: outcomes.filter((o) => o.status === "unmatched").length,
+    failed: outcomes.filter((o) => o.status === "failed").length,
+    outcomes,
+  };
+}
