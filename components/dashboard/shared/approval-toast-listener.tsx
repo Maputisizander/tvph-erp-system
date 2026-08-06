@@ -130,9 +130,12 @@ export function ApprovalToastListener() {
             : row.projects?.name;
 
         toast.info(
-          <>
-            <b>{submitterProfile?.full_name ?? "Someone"}</b> submitted {code} for approval
-          </>,
+          <span className="font-medium text-slate-600">
+            <span className="font-semibold text-primary">
+              {submitterProfile?.full_name ?? "Someone"}
+            </span>{" "}
+            submitted {code} for approval
+          </span>,
           {
             icon: <Avatar name={submitterProfile?.full_name} src={submitterProfile?.avatar_url} />,
             description: detail
