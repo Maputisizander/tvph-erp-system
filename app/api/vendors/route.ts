@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   const supabase = createServiceRoleClient();
   const { data: vendors, error } = await supabase
     .from("vendors")
-    .select("id, vendor_code, name, status")
+    .select("id, vendor_code, name, status, address, contact_person, contact_phone, contact_email")
     .is("deleted_at", null)
     .order("name", { ascending: true });
 
