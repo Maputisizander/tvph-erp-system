@@ -7,7 +7,9 @@
 import { renderPoDocument } from '@/lib/pdf/renderPoDocument';
 import { fetchPoData } from '@/lib/pdf/fetchPoData';
 import { createClient } from '@/utils/supabase/server';
-import { writeFileSync } from 'fs';
+import { writeFileSync, readFileSync } from 'fs';
+import { inflateSync } from 'zlib';
+import PDFDocument from 'pdfkit';
 
 jest.mock('@/lib/pdf/fetchPoData');
 jest.mock('@/utils/supabase/server');
@@ -88,4 +90,77 @@ describe('renderPoDocument', () => {
 
     writeFileSync('scripts/tmp-rendered.pdf', buffer);
   }, 30000);
+
+  it('keeps long amounts inside the AMOUNT column', async () => {
+    const po = {
+      ...mockPo,
+      line_items: [{ ...mockPo.line_items[0], unit_price: 14483.7, amount: 12345678.9 }],
+    };
+    (fetchPoData as jest.Mock).mockResolvedValue(po);
+
+    const { buffer } = await renderPoDocument('test-po-id');
+    // AMOUNT column is c6=482.75..c7=581.9. First item row: top=186.89,
+    // header h=24.91, baseline=rowTop+9.06 → page y 220.86 → Tm y 792-220.86.
+    // The description's first line sits at the same baseline (x≈154.9), and
+    // unit price is drawn before amount — so the amount is the LAST op at
+    // this baseline with x inside the numeric columns.
+    const amountOp = contentStreams(buffer)
+      .flatMap(textOpPositions)
+      .filter((p) => Math.abs(p.y - (792 - 220.86)) < 3 && p.x >= 400)
+      .at(-1);
+    expect(amountOp).toBeDefined();
+
+    const textWidth = measuredWidth('12,345,678.9 PHP');
+    expect(amountOp!.x).toBeGreaterThanOrEqual(482.75 - 1);
+    expect(amountOp!.x + textWidth).toBeLessThanOrEqual(581.9 + 1);
+    // centered (≈493 for this string), not left-anchored at the old fixed 529.9
+    expect(amountOp!.x).toBeLessThan(529.9);
+  }, 30000);
 });
+
+// FlateDecode content streams (pdfkit does not compress by default, but the
+// embedded logo JPEG forces streams into the file; only the text streams
+// matter here, and only those inflate cleanly).
+function contentStreams(buffer: Buffer): string[] {
+  const s = buffer.toString('latin1');
+  const out: string[] = [];
+  const re = /stream\r?\n/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s))) {
+    const start = m.index + m[0].length;
+    const end = s.indexOf('endstream', start);
+    const raw = s.slice(start, end).replace(/\r?\n$/, '');
+    try {
+      out.push(inflateSync(Buffer.from(raw, 'latin1')).toString('latin1'));
+    } catch {
+      // not a compressed stream (image data etc.)
+    }
+  }
+  return out;
+}
+
+// Each text() call emits "x y Tm ... [glyphs] TJ"; pair every TJ with the
+// most recent Tm to get the absolute x/y of each line of text.
+function textOpPositions(content: string): { x: number; y: number }[] {
+  const out: { x: number; y: number }[] = [];
+  const re = /([\d.]+) ([\d.]+) Tm|\[[^\]]*\] TJ/g;
+  let pos = { x: 0, y: 0 };
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content))) {
+    if (m[1] !== undefined) {
+      pos = { x: parseFloat(m[1]), y: parseFloat(m[2]) };
+    } else {
+      out.push(pos);
+    }
+  }
+  return out;
+}
+
+// Measure with the same engine + font the renderer uses (9pt Carlito).
+// The renderer passes Uint8Array buffers to pdfkit, not paths (jest realm).
+const FONT_REGULAR_BUF = new Uint8Array(readFileSync('public/fonts/Carlito-Regular.ttf').buffer);
+function measuredWidth(text: string): number {
+  const doc = new PDFDocument();
+  doc.font(FONT_REGULAR_BUF).fontSize(9);
+  return doc.widthOfString(text);
+}
