@@ -362,8 +362,8 @@ function drawLineItems(doc: Doc, data: PoData): number {
     doc.text(li.line_no, c0, rowTop + 9.06, { width: c1 - c0, align: "center", baseline: "alphabetic", pageBreaks: false });
     doc.text(fmtMoney(li.quantity), 325.9, rowTop + 9.06, { baseline: "alphabetic", pageBreaks: false });
     doc.text(li.uom, 376.5, rowTop + 9.06, { baseline: "alphabetic", pageBreaks: false });
-  doc.text(`${nfMoney.format(li.unit_price)} ${data.currency}`, 430.8, rowTop + 9.06, { baseline: "alphabetic", pageBreaks: false });
-  doc.text(`${nfMoney.format(li.amount)} ${data.currency}`, 529.9, rowTop + 9.06, { baseline: "alphabetic", pageBreaks: false });
+  doc.text(`${nfMoney.format(li.unit_price)} ${data.currency}`, c5, rowTop + 9.06, { width: c6 - c5, align: "center", baseline: "alphabetic", pageBreaks: false });
+  doc.text(`${nfMoney.format(li.amount)} ${data.currency}`, c6, rowTop + 9.06, { width: c7 - c6, align: "center", baseline: "alphabetic", pageBreaks: false });
 
     const rowBottom = lastDescBaseline + 2.44;
     y = rowBottom;
