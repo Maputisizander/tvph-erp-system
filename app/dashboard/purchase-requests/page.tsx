@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/server';
-import { Plus, FileText, Clock, CheckCircle2, XCircle, RefreshCw, type LucideIcon } from 'lucide-react';
+import { Plus, FileText, Clock, CheckCircle2, XCircle, RefreshCw, Wallet, type LucideIcon } from 'lucide-react';
 import { Suspense } from 'react';
 import { SearchInput } from '@/components/ui/search-input';
 import { StatusSelect } from '@/components/ui/status-select';
@@ -22,6 +22,7 @@ export const unstable_instant = {
 const STATUS_BADGE: Record<string, string> = {
   draft: 'bg-slate-400 text-center text-white border-slate-200 dark:bg-slate-800 dark:text-slate-400',
   pending_approval: 'bg-amber-400 text-white text-center border-none dark:bg-amber-900/20 dark:text-amber-400',
+  pending_finance: 'bg-violet-400 text-white border-none dark:bg-violet-900/20 dark:text-violet-400',
   approved: 'bg-blue-400 text-white border-none dark:bg-blue-900/20 dark:text-blue-400',
   converted: 'bg-emerald-400 text-white border-none dark:bg-emerald-900/20 dark:text-emerald-400',
   cancelled: 'bg-red-400 text-white border-none dark:bg-slate-800 dark:text-slate-500',
@@ -30,6 +31,7 @@ const STATUS_BADGE: Record<string, string> = {
 const STATUS_ICON: Record<string, LucideIcon> = {
   draft: FileText,
   pending_approval: Clock,
+  pending_finance: Wallet,
   approved: CheckCircle2,
   converted: RefreshCw,
   cancelled: XCircle,
@@ -117,7 +119,8 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
             options={[
               { value: 'all', label: 'All Statuses' },
               { value: 'draft', label: 'Draft' },
-              { value: 'pending_approval', label: 'Pending Approval' },
+              { value: 'pending_approval', label: 'Pending Admin Approval' },
+              { value: 'pending_finance', label: 'Pending Finance Approval' },
               { value: 'approved', label: 'Approved (Ready to Convert)' },
               { value: 'converted', label: 'Converted' },
               { value: 'cancelled', label: 'Cancelled' },
@@ -169,23 +172,23 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
                     </div>
                   </td>
                   <td className="px-3 py-3.5 text-slate-700 dark:text-slate-300 max-w-40 truncate">
-                    {pr.description || '—'}
+                    {pr.description || 'ΓÇö'}
                   </td>
                   <td className="px-3 py-3.5 text-slate-600 dark:text-slate-400 truncate max-w-[10rem]">
-                    {pr.projects?.name || '—'}
+                    {pr.projects?.name || 'ΓÇö'}
                   </td>
                   <td className="px-3 py-3.5 text-slate-600 dark:text-slate-400 truncate max-w-[10rem]">
-                    {pr.vendors?.name || '—'}
+                    {pr.vendors?.name || 'ΓÇö'}
                   </td>
                   <td className="px-3 py-3.5 text-slate-900 dark:text-white">
                     <div className="font-medium">
-                      {pr.currency === 'USD' ? '$' : '₱'}{Number(pr.amount).toLocaleString()}
+                      {pr.currency === 'USD' ? '$' : 'Γé▒'}{Number(pr.amount).toLocaleString()}
                     </div>
                     {Number(pr.dp_amount) > 0 && (
                       <span
                         className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700"
                       >
-                        DP {pr.currency === 'USD' ? '$' : '₱'}{Number(pr.dp_amount).toLocaleString()}
+                        DP {pr.currency === 'USD' ? '$' : 'Γé▒'}{Number(pr.dp_amount).toLocaleString()}
                       </span>
                     )}
                   </td>
