@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, Loader2, Trash2 } from "lucide-react";
-import { cancelPurchaseRequest, deletePurchaseRequest } from "@/app/dashboard/purchase-requests/actions";
+import { Ban, Loader2, Trash2, Undo2 } from "lucide-react";
+import { cancelPurchaseRequest, deletePurchaseRequest, revivePurchaseRequest } from "@/app/dashboard/purchase-requests/actions";
 
 export function PrCancelButton({ prId }: { prId: string }) {
   const [error, setError] = useState<string | null>(null);
@@ -36,13 +36,44 @@ export function PrCancelButton({ prId }: { prId: string }) {
   );
 }
 
+export function PrReviveButton({ prId }: { prId: string }) {
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
+  function handleRevive() {
+    if (!window.confirm("Revive this cancelled purchase request back to draft?")) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await revivePurchaseRequest(prId);
+      if (result?.error) setError(result.error);
+      else router.refresh();
+    });
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        onClick={handleRevive}
+        disabled={isPending}
+        className="inline-flex items-center gap-2 bg-white dark:bg-[#0a0a0a] border border-emerald-200 dark:border-emerald-900/50 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95 disabled:opacity-60"
+      >
+        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}
+        Revive to Draft
+      </button>
+      {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
+    </div>
+  );
+}
+
 export function PrDeleteButton({ prId }: { prId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   function handleDelete() {
-    if (!window.confirm("Permanently delete this draft purchase request?")) return;
+    if (!window.confirm("Permanently delete this purchase request?")) return;
     setError(null);
     startTransition(async () => {
       const result = await deletePurchaseRequest(prId);
@@ -68,5 +99,39 @@ export function PrDeleteButton({ prId }: { prId: string }) {
       </button>
       {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
     </div>
+  );
+}
+
+export function PrDeleteRowButton({ prId }: { prId: string }) {
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
+  function handleDelete() {
+    if (!window.confirm("Permanently delete this purchase request?")) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await deletePurchaseRequest(prId);
+      if (result?.error) {
+        setError(result.error);
+      } else {
+        router.refresh();
+      }
+    });
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={handleDelete}
+        disabled={isPending}
+        title="Delete draft"
+        className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all active:scale-95 disabled:opacity-60"
+      >
+        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+      </button>
+      {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
+    </span>
   );
 }

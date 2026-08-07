@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>TelcoVantage ERP — Soft Launch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f3f4f6;
+    --ink:#0d1420;
+    --muted:#5c6672;
+    --green:#15794b;
+    --green-deep:#0d4a2f;
+    --green-soft:#e7f4ec;
+    --line:#e7e9ee;
+    --card:#ffffff;
+    --head:"Inter Tight","Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,sans-serif;
+    --body:"Inter","Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  html,body{margin:0;padding:0;background:#d8dade;}
+  @page{size:1280px 720px;margin:0;}
+
+  .slide{
+    position:relative;width:1280px;height:720px;overflow:hidden;
+    background:var(--bg);color:var(--ink);
+    font-family:var(--body);
+    page-break-after:always;break-after:page;
+  }
+  .slide:last-child{page-break-after:auto;break-after:auto;}
+
+  /* ambient corner blobs */
+  .blob{position:absolute;border-radius:50%;filter:blur(48px);pointer-events:none;}
+  .blob-g{width:540px;height:540px;top:-200px;right:-160px;
+    background:radial-gradient(circle at 40% 40%, rgba(76,201,140,.32), rgba(76,201,140,.04) 68%);}
+  .blob-p{width:470px;height:470px;bottom:-220px;left:-180px;
+    background:radial-gradient(circle at 60% 40%, rgba(122,132,236,.22), rgba(122,132,236,.02) 68%);}
+
+  /* type */
+  .eyebrow{font-family:var(--head);font-weight:700;font-size:14px;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--green);margin:0 0 24px;}
+  h1{font-family:var(--head);font-weight:800;letter-spacing:-.035em;
+    line-height:1.0;color:var(--ink);margin:0;}
+  .sub{font-family:var(--body);color:var(--muted);font-weight:400;line-height:1.5;margin:24px 0 0;}
+  .accent{color:var(--green);}
+
+  /* footer */
+  .foot{position:absolute;left:88px;bottom:46px;display:flex;align-items:center;gap:12px;
+    font-family:var(--head);font-weight:700;font-size:14px;color:var(--ink);}
+  .mono{width:26px;height:26px;border-radius:7px;background:var(--ink);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-family:var(--head);
+    font-weight:800;font-size:14px;opacity:.92;}
+  .pageno{position:absolute;right:64px;bottom:46px;font-family:var(--head);font-weight:800;
+    font-size:14px;color:var(--green);letter-spacing:.04em;}
+
+  /* cards */
+  .card{background:var(--card);border-radius:24px;
+    box-shadow:0 22px 50px rgba(14,22,38,.08),0 4px 12px rgba(14,22,38,.04);}
+
+  .pill{display:inline-flex;align-items:center;gap:9px;background:#fff;border:1px solid var(--line);
+    border-radius:999px;padding:12px 20px;font-family:var(--head);font-weight:700;font-size:15px;
+    color:var(--ink);box-shadow:0 8px 20px rgba(14,22,38,.06);}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--green);display:inline-block;}
+
+  /* ---------- Slide 1 : hero ---------- */
+  .hero .left{position:absolute;left:88px;top:168px;width:620px;z-index:2;}
+  .hero h1{font-size:80px;}
+  .hero .sub{font-size:21px;max-width:496px;}
+  .hero .cta-row{margin-top:38px;display:flex;align-items:center;gap:22px;}
+  .hero .link{font-family:var(--head);font-weight:700;font-size:15px;color:var(--green-deep);}
+  .hero .shot{position:absolute;top:150px;right:-72px;width:798px;z-index:1;
+    border-radius:14px;filter:drop-shadow(0 44px 76px rgba(14,22,38,.17));}
+
+  /* ---------- centered header (slides 2,5,6) ---------- */
+  .center-head{position:absolute;top:60px;left:0;right:0;text-align:center;z-index:2;}
+  .center-head .eyebrow{margin-bottom:18px;}
+  .center-head h1{font-size:62px;}
+  .center-head .sub{font-size:19px;max-width:760px;margin:18px auto 0;}
+
+  /* ---------- Slide 2 : nine modules ---------- */
+  .modules{position:absolute;top:250px;left:88px;right:88px;
+    display:grid;grid-template-columns:repeat(3,1fr);gap:20px;z-index:2;}
+  .mod{padding:22px 24px;display:flex;align-items:center;gap:17px;min-height:108px;}
+  .mod .emoji{flex:0 0 auto;width:50px;height:50px;border-radius:14px;background:#eef4f0;
+    display:inline-flex;align-items:center;justify-content:center;font-size:25px;line-height:1;}
+  .mod .name{font-family:var(--head);font-weight:800;font-size:20px;color:var(--ink);
+    letter-spacing:-.02em;margin-bottom:4px;}
+  .mod .desc{font-size:14px;color:var(--muted);line-height:1.35;}
+
+  /* ---------- Slides 3,4 : spotlights ---------- */
+  .spot .col{position:absolute;top:172px;width:530px;z-index:2;}
+  .spot .col.l{left:88px;}
+  .spot .col.r{right:88px;}
+  .spot h1{font-size:60px;}
+  .spot .points{margin-top:46px;display:flex;flex-direction:column;gap:24px;}
+  .point{display:flex;align-items:center;gap:18px;}
+  .point .n{flex:0 0 auto;width:36px;height:36px;border-radius:50%;background:var(--green-soft);
+    color:var(--green);font-family:var(--head);font-weight:800;font-size:13px;
+    display:flex;align-items:center;justify-content:center;letter-spacing:.02em;}
+  .point .t{font-family:var(--head);font-weight:700;font-size:20px;color:var(--ink);letter-spacing:-.01em;}
+  .spot .shot{position:absolute;top:118px;z-index:1;filter:drop-shadow(0 44px 76px rgba(14,22,38,.16));}
+  .spot .shot.right{right:-34px;width:864px;}
+  .spot .shot.left{left:-34px;width:720px;}
+
+  /* ---------- Slide 5 : getting in ---------- */
+  .options{position:absolute;top:300px;left:88px;right:88px;display:grid;
+    grid-template-columns:1fr 1fr;gap:30px;z-index:2;}
+  .opt{padding:44px 44px 48px;min-height:236px;display:flex;flex-direction:column;}
+  .opt .tag{font-family:var(--head);font-weight:800;font-size:14px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--green);}
+  .opt .otitle{font-family:var(--head);font-weight:800;font-size:34px;letter-spacing:-.025em;
+    color:var(--ink);margin:26px 0 16px;}
+  .opt .obody{font-size:17px;color:var(--muted);line-height:1.55;}
+
+  /* ---------- Slide 6 : note ---------- */
+  .notes{position:absolute;top:274px;left:88px;right:88px;display:grid;
+    grid-template-columns:repeat(3,1fr);gap:24px;z-index:2;}
+  .note{padding:34px 32px 36px;min-height:228px;display:flex;flex-direction:column;}
+  .note .nn{font-family:var(--head);font-weight:800;font-size:15px;color:var(--green);
+    letter-spacing:.06em;margin-bottom:44px;}
+  .note .nt{font-family:var(--head);font-weight:800;font-size:23px;letter-spacing:-.02em;
+    color:var(--ink);margin-bottom:12px;}
+  .note .nb{font-size:15px;color:var(--muted);line-height:1.5;}
+  .note-tag{position:absolute;left:0;right:0;bottom:112px;text-align:center;z-index:2;
+    font-family:var(--head);font-weight:800;font-size:19px;color:var(--green);letter-spacing:-.01em;}
+
+  /* ---------- Slide 7 : closing ---------- */
+  .close{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    height:100%;text-align:center;z-index:2;position:relative;}
+  .close .eyebrow{margin-bottom:20px;}
+  .close h1{font-size:66px;max-width:920px;}
+  .close .sub{font-size:19px;max-width:640px;}
+  .close .btn{margin-top:44px;background:var(--green-deep);color:#fff;font-family:var(--head);
+    font-weight:800;font-size:23px;letter-spacing:-.015em;padding:22px 46px;border-radius:999px;
+    box-shadow:0 20px 44px rgba(13,74,47,.32);}
+  .close .below{margin-top:24px;font-family:var(--head);font-weight:600;font-size:15px;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<!-- 1 · HERO -->
+<section class="slide hero">
+  <div class="blob blob-g"></div>
+  <div class="blob blob-p"></div>
+  <img class="shot" src="assets/hero.png" alt="Command Center">
+  <div class="left">
+    <p class="eyebrow">Soft Launch · Staff Access</p>
+    <h1>The network is<br>going live.</h1>
+    <p class="sub">TelcoVantage ERP — one system for vendors, purchase orders, invoices, clients, and projects — is switching on for a first wave of staff.</p>
+    <div class="cta-row">
+      <span class="pill"><span class="dot"></span>Ed. 1.0</span>
+      <span class="link">erp.telcovantage.com&nbsp;→</span>
+    </div>
+  </div>
+  <div class="foot"><span class="mono">T</span>TelcoVantage Philippines</div>
+  <div class="pageno">01</div>
+</section>
+
+<!-- 2 · NINE MODULES -->
+<section class="slide">
+  <div class="blob blob-g"></div>
+  <div class="blob blob-p"></div>
+  <div class="center-head">
+    <p class="eyebrow">What's live in this release</p>
+    <h1>Nine modules, one dashboard.</h1>
+    <p class="sub">Everything a first-wave user needs — vendors to reports — behind one sign-in, shown by role.</p>
+  </div>
+  <div class="modules">
+    <div class="card mod"><span class="emoji">🏢</span><div class="mod-txt"><div class="name">Vendors</div><div class="desc">14-point accreditation &amp; contracts</div></div></div>
+    <div class="card mod"><span class="emoji">📋</span><div class="mod-txt"><div class="name">Procurement</div><div class="desc">Draft, approve &amp; issue POs</div></div></div>
+    <div class="card mod"><span class="emoji">💰</span><div class="mod-txt"><div class="name">Finance</div><div class="desc">Invoices, payments &amp; AP aging</div></div></div>
+    <div class="card mod"><span class="emoji">👥</span><div class="mod-txt"><div class="name">CRM</div><div class="desc">Client POs &amp; invoices</div></div></div>
+    <div class="card mod"><span class="emoji">📁</span><div class="mod-txt"><div class="name">Projects</div><div class="desc">Customer, vendor &amp; contract in one place</div></div></div>
+    <div class="card mod"><span class="emoji">💼</span><div class="mod-txt"><div class="name">HR</div><div class="desc">Directory &amp; 201 file vault</div></div></div>
+    <div class="card mod"><span class="emoji">🔧</span><div class="mod-txt"><div class="name">Assets</div><div class="desc">Registry &amp; maintenance logs</div></div></div>
+    <div class="card mod"><span class="emoji">📄</span><div class="mod-txt"><div class="name">Documents</div><div class="desc">Company, vendor &amp; customer vaults</div></div></div>
+    <div class="card mod"><span class="emoji">📊</span><div class="mod-txt"><div class="name">Reports</div><div class="desc">Four PDF reports on demand</div></div></div>
+  </div>
+  <div class="foot">TelcoVantage ERP</div>
+  <div class="pageno">02</div>
+</section>
+
+<!-- 3 · PROCUREMENT SPOTLIGHT -->
+<section class="slide spot">
+  <div class="blob blob-g"></div>
+  <img class="shot right" src="assets/po.png" alt="Purchase Orders">
+  <div class="col l">
+    <p class="eyebrow">Procurement</p>
+    <h1>Draft, approve<br>&amp; issue POs.</h1>
+    <div class="points">
+      <div class="point"><span class="n">01</span><span class="t">Approval status is visible</span></div>
+      <div class="point"><span class="n">02</span><span class="t">Vendor, project &amp; terms stay connected</span></div>
+      <div class="point"><span class="n">03</span><span class="t">Documents and history live with the PO</span></div>
+    </div>
+  </div>
+  <div class="foot">TelcoVantage ERP</div>
+  <div class="pageno">03</div>
+</section>
+
+<!-- 4 · FINANCE SPOTLIGHT -->
+<section class="slide spot">
+  <div class="blob blob-g"></div>
+  <img class="shot left" src="assets/invoice.png" alt="Service Invoices">
+  <div class="col r">
+    <p class="eyebrow">Finance</p>
+    <h1>Invoices, payments<br>&amp; AP aging.</h1>
+    <div class="points">
+      <div class="point"><span class="n">01</span><span class="t">Invoices link to the right PO</span></div>
+      <div class="point"><span class="n">02</span><span class="t">Amount guards catch overbilling</span></div>
+      <div class="point"><span class="n">03</span><span class="t">Due dates &amp; payment status stay visible</span></div>
+    </div>
+  </div>
+  <div class="foot">TelcoVantage ERP</div>
+  <div class="pageno">04</div>
+</section>
+
+<!-- 5 · GETTING IN -->
+<section class="slide">
+  <div class="blob blob-g"></div>
+  <div class="blob blob-p"></div>
+  <div class="center-head">
+    <p class="eyebrow">Getting in</p>
+    <h1>Two ways in.</h1>
+    <p class="sub">Sign in with your TVPH email. What you can do inside depends on the role you're given.</p>
+  </div>
+  <div class="options">
+    <div class="card opt">
+      <div class="tag">Option A</div>
+      <div class="otitle">Email &amp; password</div>
+      <div class="obody">Sign in with your TVPH email. New hires set a password on first login.</div>
+    </div>
+    <div class="card opt">
+      <div class="tag">Option B</div>
+      <div class="otitle">Microsoft sign-in</div>
+      <div class="obody">One click. New accounts start as Viewer until an admin sets your role.</div>
+    </div>
+  </div>
+  <div class="foot">TelcoVantage ERP</div>
+  <div class="pageno">05</div>
+</section>
+
+<!-- 6 · A NOTE ON THIS RELEASE -->
+<section class="slide">
+  <div class="blob blob-g"></div>
+  <div class="blob blob-p"></div>
+  <div class="center-head">
+    <p class="eyebrow">A note on this release</p>
+    <h1>Built around your role.</h1>
+  </div>
+  <div class="notes">
+    <div class="card note">
+      <div class="nn">01</div>
+      <div class="nt">Role-based by design</div>
+      <div class="nb">What you see depends on your role — the app hides what you're not permitted to use.</div>
+    </div>
+    <div class="card note">
+      <div class="nn">02</div>
+      <div class="nt">A guide for every screen</div>
+      <div class="nb">The full user guide, Edition 1.0, covers every screen task by task.</div>
+    </div>
+    <div class="card note">
+      <div class="nn">03</div>
+      <div class="nt">Your feedback shapes v2</div>
+      <div class="nb">Spot something off? Flag it — early feedback shapes the next round.</div>
+    </div>
+  </div>
+  <div class="note-tag">This is a soft launch — start with the workflow you already know.</div>
+  <div class="foot">TelcoVantage ERP</div>
+  <div class="pageno">06</div>
+</section>
+
+<!-- 7 · CLOSING -->
+<section class="slide">
+  <div class="blob blob-g"></div>
+  <div class="blob blob-p"></div>
+  <div class="close">
+    <p class="eyebrow">The ERP is live</p>
+    <h1>Sign in and<br>look around.</h1>
+    <p class="sub">Bring vendors, POs, invoices, clients, and projects into one visible, controlled system.</p>
+    <div class="btn">erp.telcovantage.com</div>
+    <div class="below">Sign in with your TVPH email</div>
+  </div>
+  <div class="foot"><span class="mono">T</span>TelcoVantage Philippines</div>
+  <div class="pageno">07</div>
+</section>
+
+</body>
+</html>

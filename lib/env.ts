@@ -17,6 +17,11 @@ const envSchema = z.object({
   EMAIL_CC_INTERNAL: z.enum(["true", "false"]).optional(),
   // Shared secret guarding the scheduled reminder route (pg_cron Bearer token).
   CRON_SECRET: z.string().min(1).optional(),
+  // Shared secret guarding the partner vendor-list API (Bearer token).
+  PARTNER_API_KEY: z.string().min(1).optional(),
+  // API key for twinbackend Node Status (custom X-ERP-Key header). Optional so
+  // the app boots without it; sync calls fail loudly when unset.
+  TWINBACKEND_ERP_KEY: z.string().min(1).optional(),
   // Telegram bot (new-user / existing-user role assignment). Feature no-ops if
   // these are unset.
   TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
@@ -26,7 +31,7 @@ const envSchema = z.object({
   RESEND_WEBHOOK_SECRET: z.string().min(1).optional(),
 });
 
-export const env = envSchema.parse({
+const rawEnv = {
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -36,8 +41,16 @@ export const env = envSchema.parse({
   EMAIL_REPLY_TO: process.env.EMAIL_REPLY_TO,
   EMAIL_CC_INTERNAL: process.env.EMAIL_CC_INTERNAL,
   CRON_SECRET: process.env.CRON_SECRET,
+  PARTNER_API_KEY: process.env.PARTNER_API_KEY,
+  TWINBACKEND_ERP_KEY: process.env.TWINBACKEND_ERP_KEY,
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
   TELEGRAM_ADMIN_CHAT_ID: process.env.TELEGRAM_ADMIN_CHAT_ID,
   TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET,
   RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET,
-});
+};
+
+// A `.env` file left as `KEY=` yields an empty string, which would fail
+// `z.string().min(1)` on optional fields. Treat empty as unset.
+export const env = envSchema.parse(
+  Object.fromEntries(Object.entries(rawEnv).filter(([, v]) => v !== "")),
+);

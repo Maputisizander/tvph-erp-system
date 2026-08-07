@@ -6,6 +6,7 @@ import { Building2, ChevronRight } from 'lucide-react'
 import { isVendorProfileComplete, getVendorMissingFields } from '@/utils/completeness'
 import { Tooltip } from '@/components/ui/tooltip'
 import { TOTAL_REQUIRED_DOCS } from '@/lib/reports/compliance'
+import { statusBadgeClasses } from '@/lib/ui/status-badge'
 
 export function VendorsTableBody({ vendors, error }: { vendors: any[] | null; error: any }) {
   const router = useRouter()
@@ -116,13 +117,7 @@ export function VendorsTableBody({ vendors, error }: { vendors: any[] | null; er
             </td>
             <td className="px-4 py-3">
               <span
-                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${
-                  vendor.status === "active"
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800/50"
-                    : vendor.status === "pending"
-                      ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/50"
-                      : "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
-                }`}
+                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadgeClasses(vendor.status)}`}
               >
                 {vendor.status.charAt(0).toUpperCase() +
                   vendor.status.slice(1)}
@@ -141,16 +136,9 @@ export function VendorsTableBody({ vendors, error }: { vendors: any[] | null; er
                     : nda.status === "expired"
                       ? "Expired"
                       : "Pending";
-                const tone = !nda
-                  ? "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
-                  : nda.status === "approved"
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800/50"
-                    : nda.status === "expired"
-                      ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/50"
-                      : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/50";
                 return (
                   <span
-                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${tone}`}
+className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadgeClasses(nda?.status)}`}
                   >
                     {label}
                   </span>

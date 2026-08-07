@@ -5,6 +5,7 @@ import { ArrowLeft, Clock, ExternalLink } from 'lucide-react';
 import { Suspense } from 'react';
 import { RecordClientPaymentModal } from '@/components/dashboard/client-invoices/record-payment-modal';
 import { updateClientInvoiceStatus } from '../actions';
+import { statusBadgeClasses } from '@/lib/ui/status-badge';
 
 export const unstable_instant = {
   prefetch: 'static',
@@ -46,14 +47,6 @@ async function Content({ paramsPromise }: { paramsPromise: Promise<{ id: string 
   const totalPaid = (payments || []).reduce((sum, p) => sum + Number(p.amount_paid), 0);
   const remaining = Number(invoice.amount) - totalPaid;
 
-  const statusColor: Record<string, string> = {
-    draft: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-400',
-    sent: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400',
-    partially_paid: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400',
-    paid: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400',
-    cancelled: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400',
-  };
-
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-start justify-between gap-4">
@@ -64,7 +57,7 @@ async function Content({ paramsPromise }: { paramsPromise: Promise<{ id: string 
           <div>
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold text-slate-900 dark:text-white font-plus-jakarta tracking-tight">{invoice.invoice_number}</h1>
-              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${statusColor[invoice.status] || ''}`}>
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${statusBadgeClasses(invoice.status)}`}>
                 {invoice.status.replace(/_/g, ' ').toUpperCase()}
               </span>
             </div>

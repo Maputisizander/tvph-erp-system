@@ -37,7 +37,7 @@ function getToolInvocations(message: { toolInvocations?: unknown }) {
     : [];
 }
 
-export function AIChatBubble() {
+export function AIChatBubble({ onDismiss }: { onDismiss?: () => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
@@ -128,6 +128,7 @@ export function AIChatBubble() {
   const handleDismiss = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsDismissed(true);
+    onDismiss?.();
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {

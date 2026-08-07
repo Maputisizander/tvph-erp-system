@@ -64,7 +64,7 @@ export async function fetchPoData(id: string): Promise<PoData | null> {
     po_number: po.po_number ?? '',
     po_date: fmtDate(po.issued_date || po.created_at),
     vendor_name: vendor.name ?? '',
-    vendor_no: shortId(vendor.id ?? ''),
+    vendor_no: vendor.vendor_code?.trim() ? vendor.vendor_code : shortId(vendor.id ?? ''),
     vendor_contact: vendor.contact_person ?? '',
     vendor_address: vendor.address ?? '',
     vendor_tel: vendor.contact_phone ?? '',

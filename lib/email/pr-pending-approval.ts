@@ -32,7 +32,8 @@ export async function sendPrPendingApprovalEmail(
   const { data: pr, error } = await supabase
     .from("purchase_requests")
     .select(
-      `pr_number, amount, dp_amount, dp_percent, currency, approval_requested_from, submitted_for_approval_by`,
+      `pr_number, amount, dp_amount, dp_percent, currency, description, approval_requested_from,
+       vendors ( name )`,
     )
     .eq("id", prId)
     .single();
@@ -59,32 +60,23 @@ export async function sendPrPendingApprovalEmail(
     return { status: "failed", error: "No approver email addresses found." };
   }
 
-  const submitterId = opts.actorId ?? (pr.submitted_for_approval_by as string | null);
-  let submittedByName: string | null = null;
-  if (submitterId) {
-    const { data: submitter } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", submitterId)
-      .single();
-    submittedByName = (submitter?.full_name as string | null) ?? null;
-  }
-
   const currency = (pr.currency as string) || "PHP";
   const downpayment = Number(pr.dp_amount) || 0;
   const dpPercent = Number(pr.dp_percent) || 0;
+  const vendor = (pr.vendors ?? {}) as { name?: string };
 
   return sendEmail({
     kind: "pr_pending_approval",
     refId: prId,
     to,
-    subject: `PR ${pr.pr_number} is pending your approval`,
+    subject: `TelcoVantage ERP Gateway - Purchase Request (${pr.pr_number})`,
     react: PrPendingApprovalEmail({
       prNumber: pr.pr_number as string,
+      vendorName: vendor.name || "—",
+      purpose: (pr.description as string | null) || "—",
       amountLabel: formatAmount(pr.amount as number, currency),
       downpaymentLabel: downpayment > 0 ? formatAmount(downpayment, currency) : null,
       downpaymentPercent: dpPercent > 0 ? dpPercent : null,
-      submittedByName,
       reviewUrl: `${BASE_URL}/dashboard/purchase-requests/${prId}`,
     }),
     createdBy: opts.actorId ?? null,

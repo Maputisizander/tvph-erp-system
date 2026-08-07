@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { DashboardShell } from '@/components/dashboard/shell'
+import { ApprovalToastListener } from '@/components/dashboard/shared/approval-toast-listener'
 import { Suspense } from 'react'
 
 export const unstable_instant = { prefetch: 'static' };
@@ -38,13 +39,16 @@ async function DashboardWithAuth({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <DashboardShell
-      userEmail={user?.email || 'Admin'}
-      userName={profile?.full_name || 'User'}
-      avatarUrl={profile?.avatar_url}
-      userRole={profile?.role || 'user'}
-    >
-      {children}
-    </DashboardShell>
+    <>
+      <DashboardShell
+        userEmail={user?.email || 'Admin'}
+        userName={profile?.full_name || 'User'}
+        avatarUrl={profile?.avatar_url}
+        userRole={profile?.role || 'user'}
+      >
+        {children}
+      </DashboardShell>
+      <ApprovalToastListener />
+    </>
   )
 }

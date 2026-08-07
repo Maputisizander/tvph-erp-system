@@ -47,11 +47,11 @@ const MODULE_CONFIG: ModuleItem[] = [
     id: "vendor",
     label: "Vendors",
     icon: Building2,
-    roles: ["superadmin", "admin", "operations"],
+    roles: ["superadmin", "admin", "operations", "finance"],
     subModules: [
       { id: "vendor-list", label: "All Vendors", href: "/dashboard/vendors", roles: ["superadmin", "admin", "operations"] },
-      { id: "purchase-requests", label: "Purchase Requests", href: "/dashboard/purchase-requests", roles: ["superadmin", "admin", "operations"] },
-      { id: "purchase-orders", label: "Purchase Orders", href: "/dashboard/purchase-orders", roles: ["superadmin", "admin", "operations"] },
+      { id: "purchase-requests", label: "Purchase Requests", href: "/dashboard/purchase-requests", roles: ["superadmin", "admin", "operations", "finance"] },
+      { id: "purchase-orders", label: "Purchase Orders", href: "/dashboard/purchase-orders", roles: ["superadmin", "admin", "operations", "finance"] },
       { id: "vendor-contracts", label: "Contracts", href: "/dashboard/vendors/contracts", roles: ["superadmin", "admin", "operations"] },
       { id: "vendor-performance", label: "Performance", href: "/dashboard/vendors/performance", roles: ["superadmin", "admin", "operations"] },
     ],
@@ -73,8 +73,11 @@ const MODULE_CONFIG: ModuleItem[] = [
     id: "projects",
     label: "Projects",
     icon: FolderOpen,
-    href: "/dashboard/projects",
-    roles: ["superadmin", "admin", "operations"],
+    roles: ["superadmin", "admin", "operations", "finance"],
+    subModules: [
+      { id: "projects-list", label: "All Projects", href: "/dashboard/projects", roles: ["superadmin", "admin", "operations", "finance"] },
+      { id: "project-status", label: "Project Status", href: "/dashboard/project-status", roles: ["superadmin", "admin", "operations", "finance"] },
+    ],
   },
   {
     id: "assets",

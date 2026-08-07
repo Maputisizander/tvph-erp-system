@@ -2,8 +2,9 @@
 
 import React, { useState } from "react";
 import { generateMagicLink } from "@/app/dashboard/portal/actions";
-import { Link2, Copy, Check, Loader2, Sparkles } from "lucide-react";
+import { Link2, Copy, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { ActorAvatar, useActor } from "@/components/dashboard/shared/actor";
 
 interface GenerateLinkButtonProps {
   entityId: string;
@@ -17,21 +18,37 @@ export default function GenerateLinkButton({
   const [isGenerating, setIsGenerating] = useState(false);
   const [portalUrl, setPortalUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const actor = useActor();
 
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
       const result = await generateMagicLink(entityId, entityType);
       if (result.error) {
-        toast.error(`Failed to generate portal link: ${result.error}`);
+        toast.error(
+          <>
+            <b>{actor?.full_name ?? "You"}</b> failed to generate portal link: {result.error}
+          </>,
+          { icon: <ActorAvatar /> },
+        );
       } else if (result.portalUrl) {
         setPortalUrl(result.portalUrl);
-        toast.success("Portal link generated successfully!", {
-          icon: <Sparkles className="h-5 w-5 text-amber-500 animate-pulse" />
-        });
+        toast.success(
+          <>
+            <b>{actor?.full_name ?? "You"}</b> generated portal link successfully!
+          </>,
+          {
+            icon: <ActorAvatar />,
+          },
+        );
       }
     } catch (err: any) {
-      toast.error(err.message || "An unexpected error occurred.");
+      toast.error(
+        <>
+          <b>{actor?.full_name ?? "You"}</b> ran into an unexpected error: {err.message || "An unexpected error occurred."}
+        </>,
+        { icon: <ActorAvatar /> },
+      );
     } finally {
       setIsGenerating(false);
     }
@@ -41,7 +58,12 @@ export default function GenerateLinkButton({
     if (!portalUrl) return;
     navigator.clipboard.writeText(portalUrl);
     setCopied(true);
-    toast.success("Copied to clipboard!");
+    toast.success(
+      <>
+        <b>{actor?.full_name ?? "You"}</b> copied to clipboard!
+      </>,
+      { icon: <ActorAvatar /> },
+    );
     setTimeout(() => setCopied(false), 2000);
   };
 

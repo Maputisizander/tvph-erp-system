@@ -402,6 +402,59 @@ describe('fetchPoData', () => {
     });
   });
 
+  describe('vendor_no', () => {
+    const baseVendor = { id: 'a1b2c3d4-1234-5678-9abc-def012345678', name: 'ACEUP' };
+
+    function mockFetch(vendors: object) {
+      const mockPo = {
+        id: 'po-123',
+        po_number: 'PO-2026000042',
+        issued_date: '2026-01-15T10:00:00Z',
+        created_at: '2026-01-15T10:00:00Z',
+        vendors,
+        projects: { name: 'Project' },
+        po_line_items: [],
+        po_site_details: [],
+        profiles: null,
+        currency: 'PHP',
+        terms_and_conditions: '',
+        mobilization_date: null,
+        delivery_date: null,
+        pr_number: '',
+        dp_amount: 0,
+        agreement_ref_no: '',
+        approved_by: null,
+      };
+      const mockSupabase = {
+        from: jest.fn().mockReturnValue({
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue({ data: mockPo, error: null }),
+            }),
+          }),
+        }),
+      };
+      (createClient as jest.Mock).mockResolvedValue(mockSupabase);
+      return mockSupabase;
+    }
+
+    it('uses the vendor_code when present', async () => {
+      mockFetch({ ...baseVendor, vendor_code: 'ACEUP-01' });
+      const result = await fetchPoData('po-123');
+      expect(result?.vendor_no).toBe('ACEUP-01');
+    });
+
+    it('falls back to the short id when vendor_code is missing or blank', async () => {
+      mockFetch({ ...baseVendor, vendor_code: null });
+      let result = await fetchPoData('po-123');
+      expect(result?.vendor_no).toBe('A1B2C3D4');
+
+      mockFetch({ ...baseVendor, vendor_code: '   ' });
+      result = await fetchPoData('po-123');
+      expect(result?.vendor_no).toBe('A1B2C3D4');
+    });
+  });
+
   describe('query parameters', () => {
     it('calls from("purchase_orders")', async () => {
       const mockSupabase = {

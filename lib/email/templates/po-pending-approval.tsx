@@ -6,6 +6,7 @@ export interface PoPendingApprovalEmailProps {
   poNumber: string;
   vendorName: string;
   amountLabel?: string | null;
+  downpaymentLabel?: string | null;
   submittedByName?: string | null;
   reviewUrl: string;
 }
@@ -19,6 +20,7 @@ export function PoPendingApprovalEmail({
   poNumber,
   vendorName,
   amountLabel,
+  downpaymentLabel,
   submittedByName,
   reviewUrl,
 }: PoPendingApprovalEmailProps) {
@@ -37,6 +39,9 @@ export function PoPendingApprovalEmail({
         <Text style={styles.meta}>PO Number: {poNumber}</Text>
         <Text style={styles.meta}>Vendor: {vendorName}</Text>
         {amountLabel ? <Text style={styles.meta}>Total Amount: {amountLabel}</Text> : null}
+        {downpaymentLabel ? (
+          <Text style={styles.meta}>Downpayment: {downpaymentLabel}</Text>
+        ) : null}
         {submittedByName ? (
           <Text style={styles.meta}>Submitted by: {submittedByName}</Text>
         ) : null}

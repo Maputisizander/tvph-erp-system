@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/server';
-import { ArrowLeft, Building2, MapPin, Phone, Mail, FileText, CreditCard, Clock, FileCheck, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Phone, Mail, FileText, CreditCard, Clock, FileCheck, CheckCircle2, XCircle, Edit2 } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { DocumentList } from '@/components/dashboard/vendors/document-list';
 import { VendorProfileDetails } from '@/components/dashboard/vendors/vendor-profile-details';
@@ -162,6 +162,13 @@ async function VendorDetailContent({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-3 md:ml-auto">
+          <Link
+            href={`/dashboard/vendors/${vendor.id}/edit`}
+            className="inline-flex items-center gap-2 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95"
+          >
+            <Edit2 className="h-4 w-4" />
+            Edit Vendor
+          </Link>
           <GenerateLinkButton entityId={vendor.id} entityType="vendor" />
           <form action={async () => {
             'use server';

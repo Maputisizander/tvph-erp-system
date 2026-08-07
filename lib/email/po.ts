@@ -42,7 +42,9 @@ export async function sendPoIssuedEmail(
     .select(
       `po_number, amount, currency, issued_date, created_by, vendor_id, cc_emails,
        vendors ( name, contact_person, contact_email ),
-       creator:profiles!created_by ( full_name, email, phone )`,
+       creator:profiles!created_by ( full_name, email, phone ),
+       projects ( name ),
+       po_site_details ( area_city )`,
     )
     .eq("id", poId)
     .single();
@@ -69,12 +71,20 @@ export async function sendPoIssuedEmail(
 
   const currency = (po.currency as string) || "PHP";
 
+  const areas = [...new Set(
+    ((po.po_site_details as { area_city?: string }[] | null) || [])
+      .map((s) => s.area_city)
+      .filter((a): a is string => !!a),
+  )].join(", ");
+  const project = (po.projects ?? {}) as { name?: string };
+  const subjectParts = [areas || "—", po.po_number as string, project.name || "—"];
+
   return sendEmail({
     kind: "po_issued",
     refId: poId,
     to: [vendor.contact_email || ""],
     cc: [...internalCc(creator.email), ...((po.cc_emails as string[] | null) || [])],
-    subject: `Purchase Order ${po.po_number} from TVPH`,
+    subject: `Purchase Order ${subjectParts.join(" - ")}`,
     react: PoIssuedEmail({
       vendorName: vendor.name || "Vendor",
       vendorContact: vendor.contact_person,

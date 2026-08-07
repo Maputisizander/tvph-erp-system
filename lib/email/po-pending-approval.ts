@@ -34,7 +34,7 @@ export async function sendPoPendingApprovalEmail(
   const { data: po, error } = await supabase
     .from("purchase_orders")
     .select(
-      `po_number, amount, currency, approval_requested_from, submitted_for_approval_by,
+      `po_number, amount, currency, dp_amount, dp_percent, approval_requested_from, submitted_for_approval_by,
        vendors ( name )`,
     )
     .eq("id", poId)
@@ -76,6 +76,13 @@ export async function sendPoPendingApprovalEmail(
   const vendor = (po.vendors ?? {}) as { name?: string };
   const currency = (po.currency as string) || "PHP";
 
+  const dpAmount = Number(po.dp_amount || 0);
+  const dpPercent = Number(po.dp_percent || 0);
+  const downpaymentLabel =
+    dpAmount > 0
+      ? `${formatAmount(dpAmount, currency) ?? ""}${dpPercent > 0 ? ` (${dpPercent}%)` : ""}`
+      : null;
+
   return sendEmail({
     kind: "po_pending_approval",
     refId: poId,
@@ -85,6 +92,7 @@ export async function sendPoPendingApprovalEmail(
       poNumber: po.po_number as string,
       vendorName: vendor.name || "Vendor",
       amountLabel: formatAmount(po.amount as number, currency),
+      downpaymentLabel,
       submittedByName,
       reviewUrl: `${BASE_URL}/dashboard/purchase-orders/${poId}`,
     }),

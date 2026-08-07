@@ -2,8 +2,8 @@ import { createClient } from "@/utils/supabase/server";
 import { getCurrentProfile, hasCapability } from "@/lib/auth/permissions";
 import { computeComplianceSummary } from "@/lib/reports/compliance";
 import { EMPTY_DASHBOARD_FINANCIALS, getDashboardFinancials, getProjectProgress } from "@/lib/dashboard/queries";
-import { TrendsChart } from "@/components/dashboard/trends-chart";
 import { ProjectProgressList } from "@/components/dashboard/project-progress-list";
+import { TrendsChartLazy } from "@/components/dashboard/trends-chart-lazy";
 import {
   Building2,
   FileText,
@@ -75,14 +75,14 @@ function StatChip({
   label: string; value: number; color: "emerald" | "amber" | "red";
 }) {
   const styles = {
-    emerald: "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800",
-    amber: "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800",
-    red: "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800",
+    emerald: "bg-emerald-400 dark:bg-emerald-950/30 text-white dark:text-emerald-400 border-emerald-200 dark:border-emerald-800",
+    amber: "bg-amber-400 dark:bg-amber-950/30 text-white dark:text-amber-400 border-amber-200 dark:border-amber-800",
+    red: "bg-red-400 dark:bg-red-950/30 text-white dark:text-red-400 border-red-200 dark:border-red-800",
   };
   return (
     <div className={`rounded-xl border px-3 py-2.5 ${styles[color]} flex flex-col gap-0.5`}>
-      <span className="text-[10px] font-medium opacity-70 leading-tight">{label}</span>
-      <span className="text-sm font-bold tabular-nums leading-tight">₱{value.toLocaleString()}</span>
+      <span className="text-[10px] font-black text-white opacity-70 leading-tight">{label}</span>
+      <span className="text-sm font-black tabular-nums leading-tight">₱{value.toLocaleString()}</span>
     </div>
   );
 }
@@ -435,7 +435,7 @@ export async function DashboardContent() {
             subtitle="Last 6 months — AP paid vs AR collected"
           />
           <div className="p-5">
-            <TrendsChart data={monthlyTrends} />
+            <TrendsChartLazy data={monthlyTrends} />
           </div>
         </SectionCard>
       )}
@@ -559,17 +559,17 @@ export async function DashboardContent() {
 
               {/* Stats row */}
               <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/20 px-3 py-2.5 flex flex-col gap-0.5">
-                  <span className="text-[10px] font-medium text-red-600 dark:text-red-400 opacity-80">Non-compliant</span>
-                  <span className="text-lg font-bold text-red-700 dark:text-red-400 tabular-nums">{compliance.nonCompliant}</span>
+                <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-400 dark:bg-red-950/20 px-3 py-2.5 flex flex-col gap-0.5">
+                  <span className="text-[10px] font-medium text-white dark:text-red-400 opacity-80">Non-compliant</span>
+                  <span className="text-lg font-bold text-white dark:text-red-400 tabular-nums">{compliance.nonCompliant}</span>
                 </div>
-                <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/20 px-3 py-2.5 flex flex-col gap-0.5">
-                  <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400 opacity-80">Pending review</span>
-                  <span className="text-lg font-bold text-amber-700 dark:text-amber-400 tabular-nums">{compliance.pendingReviews}</span>
+                <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-400 dark:bg-amber-950/20 px-3 py-2.5 flex flex-col gap-0.5">
+                  <span className="text-[10px] font-medium text-white dark:text-amber-400 opacity-80">Pending review</span>
+                  <span className="text-lg font-bold text-white dark:text-amber-400 tabular-nums">{compliance.pendingReviews}</span>
                 </div>
-                <div className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-2.5 flex flex-col gap-0.5">
-                  <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 opacity-80">Fully compliant</span>
-                  <span className="text-lg font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
+                <div className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-400 dark:bg-emerald-950/20 px-3 py-2.5 flex flex-col gap-0.5">
+                  <span className="text-[10px] font-medium text-white dark:text-emerald-400 opacity-80">Fully compliant</span>
+                  <span className="text-lg font-bold text-white dark:text-emerald-400 tabular-nums">
                     {compliance.totalVendors - compliance.nonCompliant}
                   </span>
                 </div>

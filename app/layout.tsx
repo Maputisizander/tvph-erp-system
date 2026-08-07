@@ -48,7 +48,12 @@ export default function RootLayout({
           <AccentProvider>
             {children}
           </AccentProvider>
-          <Toaster position="top-right" richColors toastOptions={{ style: { zIndex: 9999 } }} />
+          <Toaster
+            position="top-right"
+            closeButton
+            theme="light"
+            toastOptions={{ style: { zIndex: "var(--z-toast)" } }}
+          />
         </ThemeProvider>
       </body>
     </html>
