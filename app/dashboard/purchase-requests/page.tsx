@@ -172,23 +172,23 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
                     </div>
                   </td>
                   <td className="px-3 py-3.5 text-slate-700 dark:text-slate-300 max-w-40 truncate">
-                    {pr.description || 'ΓÇö'}
+                    {pr.description || ''}
                   </td>
                   <td className="px-3 py-3.5 text-slate-600 dark:text-slate-400 truncate max-w-[10rem]">
-                    {pr.projects?.name || 'ΓÇö'}
+                    {pr.projects?.name || ' '}
                   </td>
                   <td className="px-3 py-3.5 text-slate-600 dark:text-slate-400 truncate max-w-[10rem]">
-                    {pr.vendors?.name || 'ΓÇö'}
+                    {pr.vendors?.name || ' '}
                   </td>
                   <td className="px-3 py-3.5 text-slate-900 dark:text-white">
                     <div className="font-medium">
-                      {pr.currency === 'USD' ? '$' : 'Γé▒'}{Number(pr.amount).toLocaleString()}
+                      {pr.currency === 'USD' ? '$' : '₱'}{Number(pr.amount).toLocaleString()}
                     </div>
                     {Number(pr.dp_amount) > 0 && (
                       <span
                         className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700"
                       >
-                        DP {pr.currency === 'USD' ? '$' : 'Γé▒'}{Number(pr.dp_amount).toLocaleString()}
+                        DP {pr.currency === 'USD' ? '$' : '₱'}{Number(pr.dp_amount).toLocaleString()}
                       </span>
                     )}
                   </td>
