@@ -6,6 +6,7 @@ import { SearchInput } from '@/components/ui/search-input';
 import { StatusSelect } from '@/components/ui/status-select';
 import { Pagination } from '@/components/ui/pagination';
 import { LIST_PAGE_SIZE, parsePage, pageRange } from '@/components/ui/pagination-utils';
+import { statusBadgeClasses } from '@/lib/ui/status-badge';
 
 export const unstable_instant = {
   prefetch: 'static',
@@ -40,13 +41,6 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
   if (statusFilter !== 'all') query = query.eq('status', statusFilter);
 
   const { data: pos, error, count } = await query.range(from, to);
-
-  const statusColor: Record<string, string> = {
-    received: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400',
-    partially_billed: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400',
-    fully_billed: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400',
-    cancelled: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-400',
-  };
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -125,7 +119,7 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold border ${statusColor[po.status] || ''}`}>
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold border ${statusBadgeClasses(po.status)}`}>
                         {po.status.replace(/_/g, ' ').toUpperCase()}
                       </span>
                     </td>

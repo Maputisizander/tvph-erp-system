@@ -1,11 +1,14 @@
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/server';
-import { Plus, FileText } from 'lucide-react';
+import { Plus, FileText, Clock, CheckCircle2, XCircle, RefreshCw, type LucideIcon } from 'lucide-react';
 import { Suspense } from 'react';
 import { SearchInput } from '@/components/ui/search-input';
 import { StatusSelect } from '@/components/ui/status-select';
 import { Pagination } from '@/components/ui/pagination';
-import { LIST_PAGE_SIZE, parsePage, pageRange } from '@/components/ui/pagination-utils';
+import { parsePage, pageRange } from '@/components/ui/pagination-utils';
+import { ExportDropdown } from '@/components/dashboard/export-dropdown';
+
+const PR_PAGE_SIZE = 8;
 import { LiveListRefresh } from '@/components/dashboard/shared/live-list-refresh';
 import { PrTableRow } from '@/components/dashboard/purchase-requests/pr-table-row';
 import { PrDeleteRowButton } from '@/components/dashboard/purchase-requests/pr-cancel-button';
@@ -13,19 +16,27 @@ import { getCurrentProfile, hasCapability } from '@/lib/auth/permissions';
 
 export const unstable_instant = {
   prefetch: 'static',
-  samples: [{ searchParams: { q: null, status: null, page: null } }]
+  samples: [{ searchParams: { q: null, status: null, vendor: null, project: null, page: null } }]
 };
 
 const STATUS_BADGE: Record<string, string> = {
-  draft: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400',
-  pending_approval: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400',
-  approved: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400',
-  converted: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400',
-  cancelled: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-500',
+  draft: 'bg-slate-400 text-center text-white border-slate-200 dark:bg-slate-800 dark:text-slate-400',
+  pending_approval: 'bg-amber-400 text-white text-center border-none dark:bg-amber-900/20 dark:text-amber-400',
+  approved: 'bg-blue-400 text-white border-none dark:bg-blue-900/20 dark:text-blue-400',
+  converted: 'bg-emerald-400 text-white border-none dark:bg-emerald-900/20 dark:text-emerald-400',
+  cancelled: 'bg-red-400 text-white border-none dark:bg-slate-800 dark:text-slate-500',
+};
+
+const STATUS_ICON: Record<string, LucideIcon> = {
+  draft: FileText,
+  pending_approval: Clock,
+  approved: CheckCircle2,
+  converted: RefreshCw,
+  cancelled: XCircle,
 };
 
 export default function PurchaseRequestsPage(props: {
-  searchParams?: Promise<{ q?: string; status?: string; page?: string }>
+  searchParams?: Promise<{ q?: string; status?: string; vendor?: string; project?: string; page?: string }>
 }) {
   return (
     <Suspense fallback={<PurchaseRequestsSkeleton />}>
@@ -39,11 +50,28 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
   const supabase = await createClient();
   const q = searchParams?.q || '';
   const statusFilter = searchParams?.status || 'all';
+  const vendorFilter = searchParams?.vendor || 'all';
+  const projectFilter = searchParams?.project || 'all';
   const page = parsePage(searchParams?.page);
-  const [from, to] = pageRange(page, LIST_PAGE_SIZE);
+  const [from, to] = pageRange(page, PR_PAGE_SIZE);
 
   const { role: currentRole } = await getCurrentProfile(supabase);
   const canDelete = hasCapability(currentRole, 'pr.delete');
+
+  const [projectsResponse, vendorsResponse] = await Promise.all([
+    supabase.from('projects').select('id, name').is('deleted_at', null).order('name'),
+    supabase.from('vendors').select('id, name').is('deleted_at', null).order('name')
+  ]);
+
+  const projectsOptions = [
+    { value: 'all', label: 'All Projects' },
+    ...(projectsResponse.data?.map(p => ({ value: p.id, label: p.name })) || [])
+  ];
+
+  const vendorsOptions = [
+    { value: 'all', label: 'All Vendors' },
+    ...(vendorsResponse.data?.map(v => ({ value: v.id, label: v.name })) || [])
+  ];
 
   let listQuery = supabase
     .from('purchase_requests')
@@ -53,24 +81,29 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
 
   if (q) listQuery = listQuery.ilike('pr_number', `%${q}%`);
   if (statusFilter !== 'all') listQuery = listQuery.eq('status', statusFilter);
+  if (vendorFilter !== 'all') listQuery = listQuery.eq('vendor_id', vendorFilter);
+  if (projectFilter !== 'all') listQuery = listQuery.eq('project_id', projectFilter);
 
   const { data: prs, error, count } = await listQuery.range(from, to);
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="p-4 lg:p-6 max-w-7xl mx-auto space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white font-plus-jakarta tracking-tight">Purchase Requests</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Request purchases and route them for approval before they become POs.</p>
         </div>
-        <Link
-          href="/dashboard/purchase-requests/new"
-          className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2.5 rounded-xl font-medium transition-all hover:shadow-lg hover:shadow-primary/20 active:scale-95"
-        >
-          <Plus className="h-5 w-5" />
-          New Request
-        </Link>
+        <div className="flex items-center gap-2">
+          <ExportDropdown exportBaseUrl="/api/export/purchase-requests" />
+          <Link
+            href="/dashboard/purchase-requests/new"
+            className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2.5 rounded-xl font-medium transition-all hover:shadow-lg hover:shadow-primary/20 active:scale-95"
+          >
+            <Plus className="h-5 w-5" />
+            New Request
+          </Link>
+        </div>
       </div>
 
       {/* Filters and List */}
@@ -90,19 +123,27 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
               { value: 'cancelled', label: 'Cancelled' },
             ]}
           />
+          <StatusSelect
+            paramName="vendor"
+            options={vendorsOptions}
+          />
+          <StatusSelect
+            paramName="project"
+            options={projectsOptions}
+          />
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/20 border-b border-slate-200 dark:border-slate-800">
               <tr>
-                <th className="px-6 py-4 font-semibold">PR</th>
-                <th className="px-6 py-4 font-semibold">Description</th>
-                <th className="px-6 py-4 font-semibold">Project</th>
-                <th className="px-6 py-4 font-semibold">Preferred Vendor</th>
-                <th className="px-6 py-4 font-semibold">Est. Amount</th>
-                <th className="px-6 py-4 font-semibold">Status</th>
-                <th className="px-6 py-4 font-semibold text-right">Actions</th>
+                <th className="px-3 py-3 font-semibold">PR</th>
+                <th className="px-3 py-3 font-semibold">Description</th>
+                <th className="px-3 py-3 font-semibold">Project</th>
+                <th className="px-3 py-3 font-semibold">Preferred Vendor</th>
+                <th className="px-3 py-3 font-semibold">Est. Amount</th>
+                <th className="px-3 py-3 font-semibold">Status</th>
+                <th className="px-3 py-3 font-semibold text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -119,7 +160,7 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
               )}
               {(prs || []).map((pr: any) => (
                 <PrTableRow key={pr.id} href={`/dashboard/purchase-requests/${pr.id}`}>
-                  <td className="px-6 py-5">
+                  <td className="px-3 py-3.5">
                     <Link href={`/dashboard/purchase-requests/${pr.id}`} className="font-semibold text-primary hover:underline">
                       {pr.pr_number}
                     </Link>
@@ -127,16 +168,16 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
                       {new Date(pr.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
                     </div>
                   </td>
-                  <td className="px-6 py-5 text-slate-700 dark:text-slate-300 max-w-xs truncate">
+                  <td className="px-3 py-3.5 text-slate-700 dark:text-slate-300 max-w-40 truncate">
                     {pr.description || '—'}
                   </td>
-                  <td className="px-6 py-5 text-slate-600 dark:text-slate-400">
+                  <td className="px-3 py-3.5 text-slate-600 dark:text-slate-400 truncate max-w-[10rem]">
                     {pr.projects?.name || '—'}
                   </td>
-                  <td className="px-6 py-5 text-slate-600 dark:text-slate-400">
+                  <td className="px-3 py-3.5 text-slate-600 dark:text-slate-400 truncate max-w-[10rem]">
                     {pr.vendors?.name || '—'}
                   </td>
-                  <td className="px-6 py-5 font-medium text-slate-900 dark:text-white">
+                  <td className="px-3 py-3.5 font-medium text-slate-900 dark:text-white">
                     <span className="inline-flex items-center gap-2">
                       {pr.currency === 'USD' ? '$' : '₱'}{Number(pr.amount).toLocaleString()}
                       {Number(pr.dp_amount) > 0 && (
@@ -149,12 +190,16 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
                       )}
                     </span>
                   </td>
-                  <td className="px-6 py-5">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${STATUS_BADGE[pr.status] || STATUS_BADGE.draft}`}>
+                  <td className="px-3 py-3.5 text-center">
+                    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1 rounded-lg text-xs font-bold border ${STATUS_BADGE[pr.status] || STATUS_BADGE.draft}`}>
+                      {(() => {
+                        const Icon = STATUS_ICON[pr.status] || FileText;
+                        return <Icon className="h-3.5 w-3.5 shrink-0" />;
+                      })()}
                       {pr.status.replace(/_/g, ' ').toUpperCase()}
                     </span>
                   </td>
-                  <td className="px-6 py-5 text-right">
+                  <td className="px-3 py-3.5 text-right">
                     <span className="inline-flex items-center justify-end gap-2">
                       {['draft', 'cancelled'].includes(pr.status) && canDelete && (
                         <PrDeleteRowButton prId={pr.id} />
@@ -175,7 +220,7 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
           </table>
         </div>
 
-        <Pagination page={page} totalCount={count ?? 0} pageSize={LIST_PAGE_SIZE} />
+        <Pagination page={page} totalCount={count ?? 0} pageSize={PR_PAGE_SIZE} />
       </div>
       <LiveListRefresh />
     </div>

@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import { FileText, Plus, Search, Filter, Calendar, Building2, ExternalLink, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { CreateContractModal } from '@/components/dashboard/vendors/contracts/create-contract-modal';
+import { statusBadgeClasses } from '@/lib/ui/status-badge';
 
 export default async function VendorContractsPage() {
   const supabase = await createClient();
@@ -30,15 +31,9 @@ export default async function VendorContractsPage() {
     .is('deleted_at', null)
     .order('name');
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400';
-      case 'expired': return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400';
-      case 'draft': return 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800/50 dark:text-slate-400';
-      case 'terminated': return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400';
-      default: return 'bg-slate-50 text-slate-700 border-slate-200';
-    }
-  };
+const getStatusColor = (status: string) => {
+      return statusBadgeClasses(status);
+    };
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">

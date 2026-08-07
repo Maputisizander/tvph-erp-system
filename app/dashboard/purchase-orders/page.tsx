@@ -8,7 +8,9 @@ import { PurchaseOrdersTableBody } from '@/components/dashboard/purchase-orders/
 import { LiveListRefresh } from '@/components/dashboard/shared/live-list-refresh';
 import { ExportDropdown } from '@/components/dashboard/export-dropdown';
 import { Pagination } from '@/components/ui/pagination';
-import { LIST_PAGE_SIZE, parsePage, pageRange } from '@/components/ui/pagination-utils';
+import { parsePage, pageRange } from '@/components/ui/pagination-utils';
+
+const PO_PAGE_SIZE = 8;
 
 export const unstable_instant = {
   prefetch: 'static',
@@ -33,7 +35,7 @@ async function PurchaseOrdersContent({ searchParams: searchParamsPromise }: { se
   const vendorFilter = searchParams?.vendor || 'all';
   const projectFilter = searchParams?.project || 'all';
   const page = parsePage(searchParams?.page);
-  const [from, to] = pageRange(page, LIST_PAGE_SIZE);
+  const [from, to] = pageRange(page, PO_PAGE_SIZE);
 
   // Fetch projects and vendors for filters
   const [projectsResponse, vendorsResponse] = await Promise.all([
@@ -185,7 +187,7 @@ async function PurchaseOrdersContent({ searchParams: searchParamsPromise }: { se
           </table>
         </div>
 
-        <Pagination page={page} totalCount={count ?? 0} pageSize={LIST_PAGE_SIZE} />
+        <Pagination page={page} totalCount={count ?? 0} pageSize={PO_PAGE_SIZE} />
       </div>
       <LiveListRefresh />
     </div>

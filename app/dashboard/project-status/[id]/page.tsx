@@ -14,6 +14,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { fetchNodeDetail } from "@/lib/node-status/client";
 import { NodeAssign } from "@/components/dashboard/project-status/node-assign";
+import { statusBadgeClasses } from "@/lib/ui/status-badge";
 
 export const unstable_instant = {
   prefetch: "static",
@@ -57,14 +58,7 @@ async function NodeDetailLoader({ paramsPromise }: { paramsPromise: Promise<{ id
   }
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400";
-      case "in_progress":
-        return "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400";
-      default:
-        return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400";
-    }
+    return statusBadgeClasses(status);
   };
 
   const fmtDate = (d: string | null) =>

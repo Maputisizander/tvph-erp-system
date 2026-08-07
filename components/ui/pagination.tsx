@@ -23,7 +23,6 @@ export function Pagination({
   const searchParams = useSearchParams();
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-  if (totalCount <= pageSize) return null;
 
   const buildUrl = (next: number) => {
     const params = new URLSearchParams(searchParams);

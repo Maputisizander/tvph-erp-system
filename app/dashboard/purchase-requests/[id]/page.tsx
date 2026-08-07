@@ -15,6 +15,7 @@ import {
   MapPin,
   Wallet,
   Building2,
+  type LucideIcon,
 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -39,11 +40,19 @@ export default function PurchaseRequestDetailPage(props: {
 }
 
 const STATUS_BADGE: Record<string, string> = {
-  draft: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400",
-  pending_approval: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400",
-  approved: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400",
-  converted: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400",
-  cancelled: "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-500",
+  draft: "bg-slate-400 text-white border-none dark:bg-slate-800 dark:text-slate-400",
+  pending_approval: "bg-amber-400 text-white border-none dark:bg-amber-900/20 dark:text-amber-400",
+  approved: "bg-blue-400 text-white border-none dark:bg-blue-900/20 dark:text-blue-400",
+  converted: "bg-emerald-400 text-white border-none dark:bg-emerald-900/20 dark:text-emerald-400",
+  cancelled: "bg-red-400 text-white border-none dark:bg-red-900/20 dark:text-red-400",
+};
+
+const STATUS_ICON: Record<string, LucideIcon> = {
+  draft: FileText,
+  pending_approval: Clock,
+  approved: CheckCircle2,
+  converted: ArrowRight,
+  cancelled: XCircle,
 };
 
 async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id: string }> }) {
@@ -130,7 +139,11 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               <h1 className="text-2xl font-bold text-slate-900 dark:text-white font-plus-jakarta tracking-tight">
                 {pr.pr_number}
               </h1>
-              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${STATUS_BADGE[pr.status] || STATUS_BADGE.draft}`}>
+              <span className={`inline-flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-bold border ${STATUS_BADGE[pr.status] || STATUS_BADGE.draft}`}>
+                {(() => {
+                  const Icon = STATUS_ICON[pr.status] || FileText;
+                  return <Icon className="h-3.5 w-3.5 shrink-0" />;
+                })()}
                 {pr.status.replace(/_/g, " ").toUpperCase()}
               </span>
             </div>

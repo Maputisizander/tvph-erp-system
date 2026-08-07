@@ -12,6 +12,7 @@ import { SyncNowButton, SyncAllButton } from "@/components/dashboard/project-sta
 import { ProjectStatusRollup, type ProjectRollup, type Rollup } from "@/components/dashboard/project-status/rollup";
 import { Pagination } from "@/components/ui/pagination";
 import { LIST_PAGE_SIZE, parsePage, pageRange } from "@/components/ui/pagination-utils";
+import { statusBadgeClasses } from "@/lib/ui/status-badge";
 
 export const unstable_instant = {
   prefetch: "static",
@@ -130,16 +131,9 @@ async function ProjectStatusContent({
   // eslint-disable-next-line react-hooks/purity -- staleness is inherently relative to wall-clock time; this server component re-renders per request
   const anyStale = nodesList.some((n) => Date.now() - new Date(n.last_synced_at).getTime() > STALE_MS);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400";
-      case "in_progress":
-        return "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400";
-      default:
-        return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400";
-    }
-  };
+const getStatusColor = (status: string) => {
+      return statusBadgeClasses(status);
+    };
 
   return (
     <>
