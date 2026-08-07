@@ -54,6 +54,22 @@ describe("twinbackend client", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("retries a transient 403 then succeeds", async () => {
+    jest.useFakeTimers();
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({ status: 403, text: async () => "forbidden" })
+      .mockResolvedValueOnce({ status: 200, json: async () => ({ nodes: [] }) });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const pending = mod.fetchVendorNodes("X");
+    await jest.advanceTimersByTimeAsync(2000);
+    const result = await pending;
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.ok).toBe(true);
+  });
+
   it("does not retry 401", async () => {
     const fetchMock = jest.fn().mockResolvedValue({
       status: 401,
