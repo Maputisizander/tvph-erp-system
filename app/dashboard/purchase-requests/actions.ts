@@ -509,6 +509,55 @@ export async function cancelPurchaseRequest(prId: string) {
   return { success: true };
 }
 
+export async function revivePurchaseRequest(prId: string) {
+  const supabase = await createClient();
+  const {
+    user,
+    role,
+    error: authError,
+  } = await requireCapability('pr.create', supabase);
+  if (authError || !user || !role) return { error: authError || 'Unauthorized' };
+
+  const { data: pr } = await supabase
+    .from('purchase_requests')
+    .select('status, created_by')
+    .eq('id', prId)
+    .single();
+
+  if (!pr) return { error: 'Purchase request not found.' };
+  if (pr.status !== 'cancelled') return { error: 'Only cancelled PRs can be revived.' };
+  if (pr.created_by !== user.id && !['superadmin', 'admin'].includes(role)) {
+    return { error: 'Only the requester or an admin can revive this PR.' };
+  }
+
+  const { error } = await supabase
+    .from('purchase_requests')
+    .update({
+      status: 'draft',
+      rejection_reason: null,
+      submitted_for_approval_by: null,
+      submitted_for_approval_at: null,
+      approved_by_user_id: null,
+      approved_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', prId);
+
+  if (error) return { error: error.message };
+
+  await recordAuditLog({
+    entity_type: 'purchase_request',
+    entity_id: prId,
+    action: 'UPDATE',
+    changes: { after: { status: 'draft', revived_from: 'cancelled' } },
+    performed_by: user.id,
+  });
+
+  revalidatePath(`/dashboard/purchase-requests/${prId}`);
+  revalidatePath('/dashboard/purchase-requests');
+  return { success: true };
+}
+
 export async function deletePurchaseRequest(prId: string) {
   const supabase = await createClient();
   const { user, error: authError } = await requireCapability('pr.delete', supabase);

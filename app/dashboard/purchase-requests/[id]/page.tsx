@@ -21,7 +21,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { PrSubmitButton } from "@/components/dashboard/purchase-requests/pr-submit-button";
 import { PrApprovalActions } from "@/components/dashboard/purchase-requests/pr-approval-actions";
-import { PrCancelButton, PrDeleteButton } from "@/components/dashboard/purchase-requests/pr-cancel-button";
+import { PrCancelButton, PrDeleteButton, PrReviveButton } from "@/components/dashboard/purchase-requests/pr-cancel-button";
 import { getCurrentProfile, hasCapability } from "@/lib/auth/permissions";
 
 export const unstable_instant = {
@@ -118,6 +118,8 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
   const canSubmit = hasCapability(currentRole, "pr.status");
   const canApprove = hasCapability(currentRole, "pr.approve");
   const canCancel = hasCapability(currentRole, "pr.create") && pr.created_by === currentUser?.id;
+  const canRevive =
+    canCancel || (hasCapability(currentRole, "pr.create") && ["superadmin", "admin"].includes(currentRole ?? ""));
   const canDelete = hasCapability(currentRole, "pr.delete");
   const canConvert = hasCapability(currentRole, "po.create");
 
@@ -177,6 +179,9 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
           )}
           {["draft", "pending_approval", "approved"].includes(pr.status) && canCancel && (
             <PrCancelButton prId={pr.id} />
+          )}
+          {pr.status === "cancelled" && canRevive && (
+            <PrReviveButton prId={pr.id} />
           )}
           {["draft", "cancelled"].includes(pr.status) && canDelete && (
             <PrDeleteButton prId={pr.id} />
