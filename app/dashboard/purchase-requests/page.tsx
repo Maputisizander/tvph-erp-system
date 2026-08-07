@@ -177,18 +177,17 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
                   <td className="px-3 py-3.5 text-slate-600 dark:text-slate-400 truncate max-w-[10rem]">
                     {pr.vendors?.name || '—'}
                   </td>
-                  <td className="px-3 py-3.5 font-medium text-slate-900 dark:text-white">
-                    <span className="inline-flex items-center gap-2">
+                  <td className="px-3 py-3.5 text-slate-900 dark:text-white">
+                    <div className="font-medium">
                       {pr.currency === 'USD' ? '$' : '₱'}{Number(pr.amount).toLocaleString()}
-                      {Number(pr.dp_amount) > 0 && (
-                        <span
-                          title={`Downpayment: ${pr.currency === 'USD' ? '$' : '₱'}${Number(pr.dp_amount).toLocaleString()}`}
-                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700"
-                        >
-                          DP
-                        </span>
-                      )}
-                    </span>
+                    </div>
+                    {Number(pr.dp_amount) > 0 && (
+                      <span
+                        className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700"
+                      >
+                        DP {pr.currency === 'USD' ? '$' : '₱'}{Number(pr.dp_amount).toLocaleString()}
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-3.5 text-center">
                     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1 rounded-lg text-xs font-bold border ${STATUS_BADGE[pr.status] || STATUS_BADGE.draft}`}>
