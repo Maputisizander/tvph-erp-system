@@ -62,7 +62,7 @@ async function NodeDetailLoader({ paramsPromise }: { paramsPromise: Promise<{ id
   };
 
   const fmtDate = (d: string | null) =>
-    d ? new Date(d).toLocaleDateString() : "—";
+    d ? new Date(d).toLocaleString() : "—";
 
   return (
     <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
