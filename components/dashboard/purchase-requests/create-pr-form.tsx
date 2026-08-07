@@ -200,14 +200,14 @@ export function CreatePRForm({
             <label htmlFor="description" className="text-sm font-medium text-slate-700 dark:text-slate-300">
               What do you need? <span className="text-red-500">*</span>
             </label>
-            <input
+            <textarea
               id="description"
               name="description"
-              type="text"
               required
+              rows={3}
               defaultValue={initialData?.description || ""}
-              className="w-full px-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-              placeholder="e.g. 50km fiber optic cable for Cebu expansion"
+              className="w-full px-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all resize-y"
+              placeholder="Describe what you need freely — e.g. 50km fiber optic cable for Cebu expansion, including any specifications or notes"
             />
           </div>
 
