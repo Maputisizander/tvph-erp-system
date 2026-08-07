@@ -277,7 +277,8 @@ describe("syncVendor", () => {
     await syncVendor("v1", supabase as any);
 
     // Only row kept is the one returned; anything else for v1 is removed.
-    expect(supabase.calls.deleted).toEqual([{ notIn: ["MR1034"] }]);
+    // Single-value NOT IN is repeated for PostgREST (not.in.(X,X)).
+    expect(supabase.calls.deleted).toEqual([{ notIn: ["MR1034", "MR1034"] }]);
   });
 
   it("records a failed sync when the upsert errors", async () => {

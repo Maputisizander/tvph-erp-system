@@ -53,7 +53,10 @@ async function reconcileNodes(
 ) {
   const query = supabase.from("node_status").delete().eq("vendor_id", vendorId);
   if (keepIds && keepIds.length > 0) {
-    return query.not("node_id", "in", keepIds);
+    // PostgREST cannot parse a single-element `not.in.(X)` list — repeat the
+    // value so the filter becomes `not.in.(X,X)`.
+    const list = keepIds.length === 1 ? [keepIds[0], keepIds[0]] : keepIds;
+    return query.not("node_id", "in", list);
   }
   return query;
 }
