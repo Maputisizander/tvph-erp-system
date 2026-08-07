@@ -45,20 +45,34 @@ async function setSyncState(
  * Reconcile a vendor's local snapshot with twinbackend: delete any node_status
  * row the vendor no longer has upstream. `keepIds` holds the current node ids;
  * pass `null` when the vendor is gone entirely (404) to drop every local row.
+ *
+ * Uses a read + `in` delete rather than `not.in`: supabase-js emits unquoted
+ * values for `not("node_id", "in", …)` which PostgREST cannot parse, while the
+ * plain `in` filter quotes correctly.
  */
 async function reconcileNodes(
   supabase: SupabaseClient,
   vendorId: string,
   keepIds: string[] | null,
 ) {
-  const query = supabase.from("node_status").delete().eq("vendor_id", vendorId);
-  if (keepIds && keepIds.length > 0) {
-    // PostgREST cannot parse a single-element `not.in.(X)` list — repeat the
-    // value so the filter becomes `not.in.(X,X)`.
-    const list = keepIds.length === 1 ? [keepIds[0], keepIds[0]] : keepIds;
-    return query.not("node_id", "in", list);
+  if (!keepIds || keepIds.length === 0) {
+    return supabase.from("node_status").delete().eq("vendor_id", vendorId);
   }
-  return query;
+  const { data: local } = await supabase
+    .from("node_status")
+    .select("node_id")
+    .eq("vendor_id", vendorId);
+  const staleIds = (local ?? [])
+    .map((r) => r.node_id as string)
+    .filter((id) => !keepIds.includes(id));
+  if (staleIds.length === 0) {
+    return { error: null };
+  }
+  return supabase
+    .from("node_status")
+    .delete()
+    .eq("vendor_id", vendorId)
+    .in("node_id", staleIds);
 }
 
 /**

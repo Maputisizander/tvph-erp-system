@@ -13,6 +13,7 @@ type Row = Record<string, unknown>;
 function createMockSupabase(overrides: {
   vendors?: { data: Row | null; error?: { message: string } | null };
   projectVendors?: { data: Row[] };
+  localNodes?: string[];
   upsertErrors?: Record<string, { message: string }>;
   updateErrors?: Record<string, { message: string }>;
 } = {}) {
@@ -52,24 +53,40 @@ function createMockSupabase(overrides: {
         return chain;
       }
       if (table === "node_status") {
-        const chain: {
+        const deleteChain: {
           eq: jest.Mock;
-          not: jest.Mock;
+          in: jest.Mock;
           then: (resolve: (v: { error: { message: string } | null }) => void) => void;
         } = {
           eq: jest.fn(),
-          not: jest.fn(),
+          in: jest.fn(),
           then: () => undefined,
         };
-        chain.eq.mockReturnValue(chain);
-        chain.then = (resolve) => {
+        deleteChain.eq.mockReturnValue(deleteChain);
+        deleteChain.then = (resolve) => {
           calls.deleted.push({ notIn: undefined });
           resolve({ error: null });
         };
-        chain.not.mockImplementation((_col: string, _op: string, vals: unknown[]) => {
+        deleteChain.in.mockImplementation((_col: string, vals: unknown[]) => {
           calls.deleted.push({ notIn: vals });
           return Promise.resolve({ error: null });
         });
+        const selectChain: {
+          select: jest.Mock;
+          eq: jest.Mock;
+          then: (resolve: (v: { data: Row[]; error: null }) => void) => void;
+        } = {
+          select: jest.fn(),
+          eq: jest.fn(),
+          then: () => undefined,
+        };
+        selectChain.select.mockReturnValue(selectChain);
+        selectChain.eq.mockReturnValue(selectChain);
+        selectChain.then = (resolve) =>
+          resolve({
+            data: (overrides.localNodes ?? []).map((id) => ({ node_id: id })),
+            error: null,
+          });
         return {
           upsert: (rows: Row[], opts: unknown) => {
             calls.upsert.push({ table: "node_status", rows, opts });
@@ -77,6 +94,7 @@ function createMockSupabase(overrides: {
               error: overrides.upsertErrors?.node_status ?? null,
             });
           },
+          select: selectChain.select,
           update: (fields: Row) => {
             calls.update.push({ table: "node_status", fields });
             return {
@@ -89,7 +107,7 @@ function createMockSupabase(overrides: {
               }),
             };
           },
-          delete: () => chain,
+          delete: () => deleteChain,
         };
       }
       if (table === "vendor_sync_state") {
@@ -272,13 +290,25 @@ describe("syncVendor", () => {
     mockFetchVendorNodes.mockResolvedValue(okNodes([NODE_A]));
     const supabase = createMockSupabase({
       vendors: { data: { id: "v1", name: "Innoverge, Inc." }, error: null },
+      localNodes: ["MR1034", "LP1709"],
     });
 
     await syncVendor("v1", supabase as any);
 
-    // Only row kept is the one returned; anything else for v1 is removed.
-    // Single-value NOT IN is repeated for PostgREST (not.in.(X,X)).
-    expect(supabase.calls.deleted).toEqual([{ notIn: ["MR1034", "MR1034"] }]);
+    // Only the stale local row is deleted, via a quoted `in` filter.
+    expect(supabase.calls.deleted).toEqual([{ notIn: ["LP1709"] }]);
+  });
+
+  it("skips the delete when no local rows are stale", async () => {
+    mockFetchVendorNodes.mockResolvedValue(okNodes([NODE_A]));
+    const supabase = createMockSupabase({
+      vendors: { data: { id: "v1", name: "Innoverge, Inc." }, error: null },
+      localNodes: ["MR1034"],
+    });
+
+    await syncVendor("v1", supabase as any);
+
+    expect(supabase.calls.deleted).toEqual([]);
   });
 
   it("records a failed sync when the upsert errors", async () => {
