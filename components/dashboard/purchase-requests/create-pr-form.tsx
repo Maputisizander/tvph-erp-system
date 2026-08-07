@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState, useState, useCallback, useMemo } from "react";
+import { toast } from "sonner";
+import { parseSiteDetailClipboard } from "@/utils/site-detail-parser";
 import {
   Save,
   Building2,
@@ -59,8 +61,8 @@ const EMPTY_SITE: SiteDetail = {
   region: "",
   area_city: "",
   node_id: "",
-  phase: "",
-  no_of_nodes: 0,
+  phase: "1",
+  no_of_nodes: 1,
   cable_length_km: 0,
 };
 
@@ -134,11 +136,18 @@ export function CreatePRForm({
   );
 
   // ── Site detail helpers ──
+  // Region and Area/City are usually the same for every row, so editing them on
+  // row 1 propagates to the rest. Phase and node count stay per-row.
   const updateSite = useCallback(
     (index: number, field: keyof SiteDetail, value: string | number) => {
       setSiteDetails((prev) => {
         const next = [...prev];
         next[index] = { ...next[index], [field]: value };
+        if (index === 0 && (field === "region" || field === "area_city")) {
+          for (let i = 1; i < next.length; i++) {
+            next[i] = { ...next[i], [field]: value };
+          }
+        }
         return next;
       });
     },
@@ -156,6 +165,30 @@ export function CreatePRForm({
     },
     [siteDetails.length]
   );
+
+  const handleNodeIdPaste = useCallback((e: React.ClipboardEvent<HTMLInputElement>) => {
+    const { rows, warnings } = parseSiteDetailClipboard(e.clipboardData.getData("text/plain"));
+    if (rows.length === 0) return;
+    e.preventDefault();
+    setSiteDetails((prev) => {
+      // If the table has no Node IDs yet, the current rows are just a pre-fill
+      // template (e.g. region/area set on row 1) — replace them and inherit
+      // those values. Otherwise append.
+      const isTemplate = prev.every((s) => !s.node_id);
+      const t = isTemplate ? prev[0] : undefined;
+      const newRows = rows.map((r) => ({
+        region: t?.region || "",
+        area_city: t?.area_city || "",
+        node_id: r.node_id,
+        phase: t?.phase || "1",
+        no_of_nodes: t?.no_of_nodes || 1,
+        cable_length_km: r.cable_length_km,
+      }));
+      return isTemplate ? newRows : [...prev, ...newRows];
+    });
+    const skipped = warnings.length ? ` — skipped ${warnings.length}: ${warnings.join("; ")}` : "";
+    toast.success(`Added ${rows.length} site${rows.length === 1 ? "" : "s"}.${skipped}`);
+  }, []);
 
   const totalAmount = lineItems.reduce(
     (sum, li) => sum + (Number(li.qty) || 0) * (Number(li.unit_price) || 0),
@@ -504,8 +537,10 @@ export function CreatePRForm({
       {/* ════════════════════════════════════════════════════
           SECTION 3: Sites & Details (inherited by the PO at conversion)
          ════════════════════════════════════════════════════ */}
-      <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
+      <div
+        className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm"
+      >
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <MapPin className="h-5 w-5 text-primary" />
             <h2 className="font-semibold text-slate-900 dark:text-white">Sites &amp; Details</h2>
@@ -570,6 +605,7 @@ export function CreatePRForm({
                       type="text"
                       value={site.node_id}
                       onChange={(e) => updateSite(idx, "node_id", e.target.value)}
+                      onPaste={handleNodeIdPaste}
                       className={inputClass}
                       placeholder="e.g. MN113"
                     />
