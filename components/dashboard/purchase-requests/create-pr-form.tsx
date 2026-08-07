@@ -43,7 +43,7 @@ interface PRInitialData {
   dp_percent?: number;
 }
 
-const UOM_OPTIONS = ["LOT", "PCS", "SET", "HRS", "DAYS", "MOS", "SQM", "LM", "KG"];
+const UOM_OPTIONS = ["LOT", "PCS", "SET", "HRS", "DAYS", "MOS", "SQM", "LM", "KG", "KM"];
 
 const DP_PRESETS = [30, 40, 50, 60, 70, 80, 90, 100];
 
@@ -280,7 +280,7 @@ export function CreatePRForm({
                   className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
                 />
                 <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                  {hasDp ? "Has downpayment" : "No downpayment"}
+                  {hasDp ? "No downpayment" : "Has downpayment"}
                 </span>
               </label>
             </div>
