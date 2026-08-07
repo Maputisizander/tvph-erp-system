@@ -20,7 +20,8 @@ function createMockSupabase(overrides: {
     upsert: { table: string; rows: Row[]; opts: unknown }[];
     update: { table: string; fields: Row }[];
     updateConditions: { col: string; val: unknown }[];
-  } = { upsert: [], update: [], updateConditions: [] };
+    deleted: { notIn?: unknown[] }[];
+  } = { upsert: [], update: [], updateConditions: [], deleted: [] };
 
   const supabase = {
     calls,
@@ -51,6 +52,24 @@ function createMockSupabase(overrides: {
         return chain;
       }
       if (table === "node_status") {
+        const chain: {
+          eq: jest.Mock;
+          not: jest.Mock;
+          then: (resolve: (v: { error: { message: string } | null }) => void) => void;
+        } = {
+          eq: jest.fn(),
+          not: jest.fn(),
+          then: () => undefined,
+        };
+        chain.eq.mockReturnValue(chain);
+        chain.then = (resolve) => {
+          calls.deleted.push({ notIn: undefined });
+          resolve({ error: null });
+        };
+        chain.not.mockImplementation((_col: string, _op: string, vals: unknown[]) => {
+          calls.deleted.push({ notIn: vals });
+          return Promise.resolve({ error: null });
+        });
         return {
           upsert: (rows: Row[], opts: unknown) => {
             calls.upsert.push({ table: "node_status", rows, opts });
@@ -70,6 +89,7 @@ function createMockSupabase(overrides: {
               }),
             };
           },
+          delete: () => chain,
         };
       }
       if (table === "vendor_sync_state") {
@@ -185,7 +205,7 @@ describe("syncVendor", () => {
     expect(supabase.calls.updateConditions).toContainEqual({ col: "project_id", val: null });
   });
 
-  it("treats a 404 as unmatched, not a crash", async () => {
+  it("treats a 404 as unmatched and drops the vendor's local snapshot", async () => {
     mockFetchVendorNodes.mockResolvedValue({
       ok: false,
       error: { kind: "not_found" },
@@ -199,6 +219,8 @@ describe("syncVendor", () => {
     expect(outcome.status).toBe("unmatched");
     expect(outcome.nodesSynced).toBe(0);
     expect(supabase.calls.upsert.filter((c) => c.table === "node_status")).toHaveLength(0);
+    // Vendor gone upstream -> every local row for it is deleted.
+    expect(supabase.calls.deleted).toEqual([{ notIn: undefined }]);
     const state = supabase.calls.upsert.find((c) => c.table === "vendor_sync_state");
     expect(state!.rows[0]).toMatchObject({ last_status: "unmatched" });
   });
@@ -242,6 +264,20 @@ describe("syncVendor", () => {
     expect(outcome.status).toBe("ok");
     expect(outcome.nodesSynced).toBe(0);
     expect(supabase.calls.upsert.filter((c) => c.table === "node_status")).toHaveLength(0);
+    // Empty upstream list -> all local rows for the vendor are dropped.
+    expect(supabase.calls.deleted).toEqual([{ notIn: undefined }]);
+  });
+
+  it("deletes local rows whose node_id no longer returned upstream", async () => {
+    mockFetchVendorNodes.mockResolvedValue(okNodes([NODE_A]));
+    const supabase = createMockSupabase({
+      vendors: { data: { id: "v1", name: "Innoverge, Inc." }, error: null },
+    });
+
+    await syncVendor("v1", supabase as any);
+
+    // Only row kept is the one returned; anything else for v1 is removed.
+    expect(supabase.calls.deleted).toEqual([{ notIn: ["MR1034"] }]);
   });
 
   it("records a failed sync when the upsert errors", async () => {

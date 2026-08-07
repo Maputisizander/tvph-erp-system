@@ -42,6 +42,23 @@ async function setSyncState(
 }
 
 /**
+ * Reconcile a vendor's local snapshot with twinbackend: delete any node_status
+ * row the vendor no longer has upstream. `keepIds` holds the current node ids;
+ * pass `null` when the vendor is gone entirely (404) to drop every local row.
+ */
+async function reconcileNodes(
+  supabase: SupabaseClient,
+  vendorId: string,
+  keepIds: string[] | null,
+) {
+  const query = supabase.from("node_status").delete().eq("vendor_id", vendorId);
+  if (keepIds && keepIds.length > 0) {
+    return query.not("node_id", "in", keepIds);
+  }
+  return query;
+}
+
+/**
  * Pull one vendor's nodes from twinbackend and upsert the latest snapshot into
  * node_status. `project_id` is deliberately NOT written during the upsert and
  * only auto-filled where it is still NULL (vendor with exactly one
@@ -76,6 +93,21 @@ export async function syncVendor(
         last_status: "unmatched",
         last_error: "Vendor name not found on twinbackend",
       });
+      // Vendor no longer exists upstream — drop its whole local snapshot.
+      const { error: delErr } = await reconcileNodes(supabase, vendorId, null);
+      if (delErr) {
+        await setSyncState(supabase, vendorId, {
+          last_status: "failed",
+          last_error: delErr.message,
+        });
+        return {
+          vendorId,
+          vendorName: vendor.name,
+          status: "failed",
+          nodesSynced: 0,
+          error: delErr.message,
+        };
+      }
       return { vendorId, vendorName: vendor.name, status: "unmatched", nodesSynced: 0 };
     }
     await setSyncState(supabase, vendorId, {
@@ -125,6 +157,22 @@ export async function syncVendor(
       });
       return { vendorId, vendorName: vendor.name, status: "failed", nodesSynced: 0, error: upsertErr.message };
     }
+  }
+
+  // Drop node_status rows the vendor no longer has upstream (including all rows
+  // when the API returned an empty list). Run before auto-fill so removed nodes
+  // don't receive a fresh project_id.
+  const { error: delErr } = await reconcileNodes(
+    supabase,
+    vendorId,
+    rows.map((r) => r.node_id),
+  );
+  if (delErr) {
+    await setSyncState(supabase, vendorId, {
+      last_status: "failed",
+      last_error: delErr.message,
+    });
+    return { vendorId, vendorName: vendor.name, status: "failed", nodesSynced: 0, error: delErr.message };
   }
 
   // Auto-fill project_id only where unassigned, so manual overrides persist.
