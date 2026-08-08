@@ -8,6 +8,7 @@ import { updateOrganizationSettings, updateFinancialSettings, updateReminderSett
 import { AddUserButton } from "@/components/dashboard/hr/add-user-button";
 import { RemoveTeamMemberButton } from "@/components/dashboard/settings/remove-team-member-button";
 import { AppearanceSettings } from "@/components/dashboard/settings/appearance-settings";
+import { Avatar } from "@/components/ui/avatar";
 
 export function SettingsTabs({ initialSettings, reminderDays = [30, 14, 7, 1], team, userRole }: { initialSettings: any, reminderDays?: number[], team: any[], userRole: string }) {
   const isAdmin = isAdminOrAbove(userRole);
@@ -132,11 +133,9 @@ export function SettingsTabs({ initialSettings, reminderDays = [30, 14, 7, 1], t
                       {team.map((user) => (
                         <tr key={user.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
                            <td className="px-8 py-4">
-                              <div className="flex items-center gap-3">
-                                 <div className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-primary">
-                                    {user.full_name?.charAt(0)}
-                                 </div>
-                                 <div>
+<div className="flex items-center gap-3">
+                                     <Avatar name={user.full_name} src={user.avatar_url} />
+                                     <div>
                                     <div className="font-bold text-slate-900 dark:text-white">{user.full_name}</div>
                                     <div className="text-[10px] text-slate-500">{user.email}</div>
                                  </div>
