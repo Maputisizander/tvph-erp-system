@@ -44,6 +44,7 @@ import { POSiteDetailsEditor } from "@/components/dashboard/purchase-orders/po-s
 import { POEditHistory } from "@/components/dashboard/purchase-orders/po-edit-history";
 import { getCurrentProfile, hasCapability } from "@/lib/auth/permissions";
 import { signDocUrls } from "@/utils/storage";
+import { LiveListRefresh } from "@/components/dashboard/shared/live-list-refresh";
 
 const menuItemClass = "flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors";
 const DRAFT_OR_PENDING = ["draft", "pending_approval", "pending_finance"];
@@ -1107,6 +1108,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
           </div>
         </div>
       </div>
+        <LiveListRefresh />
     </div>
   );
 }

@@ -23,6 +23,7 @@ import { PrSubmitButton } from "@/components/dashboard/purchase-requests/pr-subm
 import { PrApprovalActions } from "@/components/dashboard/purchase-requests/pr-approval-actions";
 import { PrCancelButton, PrDeleteButton, PrReviveButton } from "@/components/dashboard/purchase-requests/pr-cancel-button";
 import { getCurrentProfile, hasCapability } from "@/lib/auth/permissions";
+import { LiveListRefresh } from "@/components/dashboard/shared/live-list-refresh";
 
 export const unstable_instant = {
   prefetch: 'static',
@@ -509,6 +510,7 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
           </div>
         </div>
       )}
+      <LiveListRefresh />
     </div>
   );
 }
