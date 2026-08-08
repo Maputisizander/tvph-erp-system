@@ -107,6 +107,7 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
 
   // Eligible approvers for the submit picker (4-eyes: exclude current user).
   let eligibleApprovers: { id: string; full_name: string; email: string }[] = [];
+  let eligibleFinanceApprovers: { id: string; full_name: string; email: string }[] = [];
   if (pr.status === "draft" && currentUser) {
     const { data: admins } = await supabase
       .from("profiles")
@@ -115,6 +116,14 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
       .neq("id", currentUser.id)
       .order("full_name");
     eligibleApprovers = admins || [];
+
+    const { data: financeUsers } = await supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .in("role", ["superadmin", "finance"])
+      .neq("id", currentUser.id)
+      .order("full_name");
+    eligibleFinanceApprovers = financeUsers || [];
   }
 
   const canSubmit = hasCapability(currentRole, "pr.status");
@@ -160,7 +169,7 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
 
         <div className="flex items-center gap-3 md:ml-auto">
           {pr.status === "draft" && canSubmit && (
-            <PrSubmitButton prId={pr.id} eligibleApprovers={eligibleApprovers} />
+            <PrSubmitButton prId={pr.id} eligibleApprovers={eligibleApprovers} eligibleFinanceApprovers={eligibleFinanceApprovers} />
           )}
           {pr.status === "draft" && canCancel && (
             <Link

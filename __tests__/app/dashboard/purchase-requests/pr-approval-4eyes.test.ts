@@ -63,7 +63,13 @@ const mockRevalidatePath = revalidatePath as jest.MockedFunction<typeof revalida
 function makeMockSupabase() {
   const selectChain = {
     eq: jest.fn().mockReturnThis(),
-    in: jest.fn().mockResolvedValue({ data: [], error: null }),
+    in: jest.fn().mockImplementation((_col: string, ids: string[]) => {
+      const isFinance = (ids[0] ?? '').startsWith('finance');
+      return Promise.resolve({
+        data: ids.map((id) => ({ id, role: isFinance ? 'finance' : 'admin' })),
+        error: null,
+      });
+    }),
     single: jest.fn().mockResolvedValue({ data: null, error: null }),
   };
 
@@ -104,14 +110,10 @@ describe('submitPRForApproval — 4-eyes', () => {
       data: { status: 'draft' },
       error: null,
     });
-    mockSupabase.selectChain.in.mockResolvedValue({
-      data: [{ id: 'approver-1', role: 'admin' }],
-      error: null,
-    });
   });
 
   it('submits a draft PR for approval', async () => {
-    const result = await submitPRForApproval('pr-123', ['approver-1']);
+    const result = await submitPRForApproval('pr-123', ['approver-1'], ['finance-1']);
     expect(result).toEqual({ success: true });
 
     const updateFn = mockSupabase.from('purchase_requests').update;
@@ -120,10 +122,33 @@ describe('submitPRForApproval — 4-eyes', () => {
         status: 'pending_approval',
         submitted_for_approval_by: 'requester-1',
         approval_requested_from: ['approver-1'],
+        finance_approval_requested_from: ['finance-1'],
         rejection_reason: null,
       }),
       { count: 'exact' }
     );
+  });
+
+  it('requires at least one finance approver', async () => {
+    const result = await submitPRForApproval('pr-x', ['approver-1']);
+    expect(result).toEqual({ error: 'Select at least one finance or superadmin to approve this PR.' });
+  });
+
+  it('blocks selecting yourself as finance approver', async () => {
+    const result = await submitPRForApproval('pr-x', ['approver-1'], ['requester-1']);
+    expect(result).toEqual({ error: 'You cannot select yourself as a finance approver.' });
+  });
+
+  it('rejects non-finance finance approvers', async () => {
+    mockSupabase.selectChain.in.mockImplementation((_col: string, ids: string[]) =>
+      Promise.resolve({
+        data: ids.map((id) => ({ id, role: id === 'finance-1' ? 'operations' : 'admin' })),
+        error: null,
+      })
+    );
+
+    const result = await submitPRForApproval('pr-x', ['approver-1'], ['finance-1']);
+    expect(result).toEqual({ error: 'Every selected finance approver must be a finance or superadmin user.' });
   });
 
   it('blocks submitting a non-draft PR', async () => {
@@ -171,7 +196,7 @@ describe('submitPRForApproval — 4-eyes', () => {
   it('still succeeds when the approver email fails', async () => {
     mockSendPrPendingApprovalEmail.mockResolvedValue({ status: 'failed', error: 'SMTP down' });
 
-    const result = await submitPRForApproval('pr-email', ['approver-1']);
+    const result = await submitPRForApproval('pr-email', ['approver-1'], ['finance-1']);
     expect(result).toEqual({ success: true });
   });
 });
