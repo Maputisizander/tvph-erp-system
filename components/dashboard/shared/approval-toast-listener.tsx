@@ -12,6 +12,7 @@ type ApprovalTable = "purchase_orders" | "purchase_requests";
 type ApprovalAudienceRow = {
   submitted_for_approval_by?: string | null;
   approval_requested_from?: string[] | null;
+  finance_approval_requested_from?: string[] | null;
 };
 
 type DetailRow = ApprovalAudienceRow & {
@@ -22,24 +23,81 @@ type DetailRow = ApprovalAudienceRow & {
   amount?: number | null;
   vendors?: { name?: string | null } | null;
   projects?: { name?: string | null } | null;
+  approved_by_user_id?: string | null;
+  finance_approved_by_user_id?: string | null;
+  rejected_by?: string | null;
+  rejection_reason?: string | null;
 };
 
-// Pure audience gate: superadmins see everything; others only their own
-// submissions or rows where they were picked as an approver.
+// Pure audience gate. Superadmins and the submitter see every status change
+// on a row; approvers only see their own stage. Defaults to the submission
+// status so callers that only care about pending_approval stay unchanged.
 export function shouldShowApprovalToast(
   currentUserId: string,
   currentRole: string,
   row: ApprovalAudienceRow,
+  status: string = "pending_approval",
 ): boolean {
   if (currentRole === "superadmin") return true;
   if (row.submitted_for_approval_by === currentUserId) return true;
-  return row.approval_requested_from?.includes(currentUserId) ?? false;
+  switch (status) {
+    case "pending_approval":
+      return row.approval_requested_from?.includes(currentUserId) ?? false;
+    case "pending_finance":
+      if (row.finance_approval_requested_from?.includes(currentUserId)) return true;
+      return currentRole === "finance";
+    default:
+      // Admin-approve, finance-approve, issue, reject, cancel, paid… only the
+      // submitter and superadmins need the toast; the actor already acted.
+      return false;
+  }
 }
 
-// Toasts when a PO/PR flips to pending_approval (submit or resubmit), but only
-// to the submitter, the requested approvers, and superadmins. Renders nothing.
-// Withdraw/reject-to-draft transitions change status away from pending_approval
-// and are ignored. Offline users are covered by the existing bell + email.
+type StatusMeta = {
+  actor?: keyof DetailRow;
+  verb: string;
+  hint?: (isSubmitter: boolean) => string;
+};
+
+const STATUS_META: Record<string, StatusMeta> = {
+  pending_approval: {
+    actor: "submitted_for_approval_by",
+    verb: "submitted {code} for approval",
+    hint: (isSubmitter) => (isSubmitter ? "Awaiting your approvers" : "Requires your approval"),
+  },
+  pending_finance: {
+    actor: "approved_by_user_id",
+    verb: "passed the admin stage for {code} — pending finance review",
+    hint: (isSubmitter) => (isSubmitter ? "Admin approval done — awaiting finance" : "Finance review required"),
+  },
+  approved: {
+    actor: "finance_approved_by_user_id",
+    verb: "approved {code} at the finance stage",
+  },
+  issued: {
+    actor: "finance_approved_by_user_id",
+    verb: "approved {code} at the finance stage — PO issued",
+  },
+  draft: {
+    actor: "rejected_by",
+    verb: "rejected {code} — back to draft",
+  },
+  converted: { verb: "{code} was converted into a PO" },
+  cancelled: { verb: "{code} was cancelled" },
+  partially_paid: { verb: "{code} was marked partially paid" },
+  paid: { verb: "{code} was marked paid" },
+  overpaid: { verb: "{code} was marked overpaid" },
+};
+
+const pendingKeys = new Set(["pending_approval", "pending_finance"]);
+const actorColumns = new Set(
+  Object.keys(STATUS_META).flatMap((k) => (STATUS_META[k].actor ? [STATUS_META[k].actor as string] : [])),
+);
+
+// Toasts whenever a PO/PR leaves its previous status, to the people who need
+// to know: the submitter, the approver(s) whose stage just opened, finance for
+// the budget check, and superadmins. Renders nothing. Offline users are covered
+// by the existing bell + email.
 export function ApprovalToastListener() {
   const router = useRouter();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -83,7 +141,10 @@ export function ApprovalToastListener() {
         table: ApprovalTable,
       ) {
         const record = payload.new as Record<string, unknown>;
-        if (record.status !== "pending_approval") return;
+        const prev = payload.old as Record<string, unknown> | null;
+        const status = String(record.status ?? "");
+        // Only real status transitions toast, not ordinary row edits.
+        if (prev?.status === status) return;
         const key = `${table}-${String(record.id)}`;
         if (pendingRef.current[key]) return;
         pendingRef.current[key] = { table, id: String(record.id) };
@@ -101,25 +162,18 @@ export function ApprovalToastListener() {
           .from(table)
           .select(
             table === "purchase_orders"
-              ? "po_number, amount, status, submitted_for_approval_by, approval_requested_from, vendors(name)"
-              : "pr_number, status, projects(name), submitted_for_approval_by, approval_requested_from",
+              ? "po_number, amount, status, submitted_for_approval_by, approval_requested_from, finance_approval_requested_from, approved_by_user_id, finance_approved_by_user_id, rejected_by, rejection_reason, vendors(name)"
+              : "pr_number, status, projects(name), submitted_for_approval_by, approval_requested_from, finance_approval_requested_from, approved_by_user_id, finance_approved_by_user_id, rejected_by, rejection_reason",
           )
           .eq("id", id)
           .maybeSingle<DetailRow>();
 
-        // Stale: approved/rejected inside the debounce window.
-        if (!row || row.status !== "pending_approval") return;
-        if (!shouldShowApprovalToast(uid, role, row)) return;
+        const status = row?.status ?? "";
+        // A withdrawal back to draft has no rejection_reason; skip the noise.
+        if (!row || status === "draft" && !row.rejection_reason) return;
+        if (!shouldShowApprovalToast(uid, role, row, status)) return;
 
-        const submitter = row.submitted_for_approval_by
-          ? await supabase
-              .from("profiles")
-              .select("full_name, avatar_url")
-              .eq("id", row.submitted_for_approval_by)
-              .maybeSingle<{ full_name: string; avatar_url: string | null }>()
-          : null;
-        const submitterProfile = submitter?.data ?? null;
-
+        const meta = STATUS_META[status] ?? { verb: `${status} changed the status of {code}` };
         const isSubmitter = row.submitted_for_approval_by === uid;
         const number = table === "purchase_orders" ? row.po_number : row.pr_number;
         const code = `#${number ?? id.slice(0, 8)}`;
@@ -129,22 +183,37 @@ export function ApprovalToastListener() {
             ? `${row.vendors.name} · ₱${Number(row.amount ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
             : row.projects?.name;
 
+        let actorProfile: { full_name: string; avatar_url: string | null } | null = null;
+        const actorId = meta.actor && actorColumns.has(meta.actor as string) ? row[meta.actor as keyof DetailRow] : undefined;
+        if (actorId) {
+          const { data } = await supabase
+            .from("profiles")
+            .select("full_name, avatar_url")
+            .eq("id", actorId)
+            .maybeSingle<{ full_name: string; avatar_url: string | null }>();
+          actorProfile = data ?? null;
+        }
+
+        const verb = meta.verb.replace("{code}", code);
+        const label = pendingKeys.has(status) ? "Review" : "View";
+        const description =
+          (pendingKeys.has(status) && meta.hint?.(isSubmitter)) || undefined;
+        const fullDescription = [description, detail].filter(Boolean).join(" · ");
+
         toast.info(
           <span className="font-medium text-slate-600">
             <span className="font-semibold text-primary">
-              {submitterProfile?.full_name ?? "Someone"}
+              {actorProfile ? actorProfile.full_name : "Item"}
             </span>{" "}
-            submitted {code} for approval
+            {verb}
           </span>,
           {
-            icon: <Avatar name={submitterProfile?.full_name} src={submitterProfile?.avatar_url} />,
-            description: detail
-              ? `${isSubmitter ? "Awaiting your approvers" : "Requires your approval"} · ${detail}`
-              : isSubmitter
-                ? "Awaiting your approvers"
-                : "Requires your approval",
+            icon: actorProfile ? (
+              <Avatar name={actorProfile.full_name} src={actorProfile.avatar_url} />
+            ) : undefined,
+            description: fullDescription || undefined,
             action: {
-              label: "Review",
+              label,
               onClick: () => router.push(`/dashboard/${route}/${id}`),
             },
           },
