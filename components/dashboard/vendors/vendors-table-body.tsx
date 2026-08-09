@@ -45,13 +45,13 @@ export function VendorsTableBody({ vendors, error }: { vendors: any[] | null; er
             tabIndex={0}
             className="cursor-pointer group hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
           >
-            <td className="px-4 py-3">
+            <td className="px-4 py-3 truncate">
               <Tooltip content={
                 isVendorProfileComplete(vendor)
                   ? "Profile complete"
                   : <>Missing: <span className="font-normal">{getVendorMissingFields(vendor).join(", ")}</span></>
               }>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 truncate">
                   <span className={`inline-block h-2.5 w-2.5 rounded-full flex-shrink-0 ${isVendorProfileComplete(vendor) ? 'bg-emerald-500' : 'bg-red-500'}`} />
                   <span className="font-semibold text-slate-900 dark:text-white truncate">{vendor.name}</span>
                 </div>
@@ -88,14 +88,14 @@ export function VendorsTableBody({ vendors, error }: { vendors: any[] | null; er
                 const pct = Math.round((submitted / TOTAL) * 100);
                 const color =
                   pct === 100
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800/50"
+                    ? "bg-emerald-400 text-white border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800/50"
                     : pct >= 50
-                      ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/50"
-                      : "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/50";
+                      ? "bg-amber-400 text-white border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/50"
+                      : "bg-red-400 text-white border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/50";
                 return (
                   <div className="flex items-center gap-2">
                     <span
-                      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}
+                      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${color}`}
                     >
                       {submitted}/{TOTAL}
                     </span>
@@ -123,7 +123,7 @@ export function VendorsTableBody({ vendors, error }: { vendors: any[] | null; er
                   vendor.status.slice(1)}
               </span>
             </td>
-            <td className="px-4 py-3">
+            <td className="px-4 py-3 text-center">
               {(() => {
                 const nda = vendor.vendor_documents?.find(
                   (d: { doc_type: string; status: string }) =>
@@ -138,7 +138,7 @@ export function VendorsTableBody({ vendors, error }: { vendors: any[] | null; er
                       : "Pending";
                 return (
                   <span
-className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadgeClasses(nda?.status)}`}
+className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium border ${statusBadgeClasses(nda?.status)}`}
                   >
                     {label}
                   </span>
