@@ -1,7 +1,7 @@
 import React, { Suspense } from "react";
 import { validatePoPortalToken } from "@/app/portal/actions";
 import { PoSignForm } from "@/components/portal/po-sign-form";
-import { ShieldAlert, LogIn, ArrowRight, CheckCircle2 } from "lucide-react";
+import { ShieldAlert, LogIn, ArrowRight, CheckCircle2, FileText } from "lucide-react";
 import Link from "next/link";
 
 export const unstable_instant = {
@@ -114,9 +114,19 @@ async function PortalPoSignContent({ params }: { params: Promise<{ token: string
                   {result.signature?.signed_at
                     ? ` on ${new Date(result.signature.signed_at).toLocaleDateString("en-PH", { day: "numeric", month: "long", year: "numeric" })}`
                     : ""}.
-                  {po.status === "signed" ? " You may sign again to re-confirm." : ""}
+                  {po.status === "pending_signature" ? " You may sign again to re-confirm." : ""}
                 </p>
-                {po.status === "signed" && <PoSignForm token={token} className="mt-6" />}
+                {result.signature?.signed_file_url && (
+                  <a
+                    href={result.signature.signed_file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 mt-6 bg-emerald-700 hover:bg-emerald-600 text-white rounded-2xl px-6 py-3 font-semibold transition-all active:scale-95"
+                  >
+                    <FileText className="h-5 w-5" /> Download Signed PO
+                  </a>
+                )}
+                {po.status === "pending_signature" && <PoSignForm token={token} className="mt-6" />}
               </div>
             ) : (
               <PoSignForm token={token} />

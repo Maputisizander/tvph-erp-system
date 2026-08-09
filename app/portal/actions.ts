@@ -51,6 +51,18 @@ export async function validatePoPortalToken(token: string) {
     .limit(1)
     .maybeSingle();
 
+  if (signature?.signed_file_url) {
+    const path = signature.signed_file_url.split("/object/public/po-artifacts/")[1];
+    if (path) {
+      const { data: signed } = await supabase.storage
+        .from("po-artifacts")
+        .createSignedUrls([path], 3600);
+      if (signed?.[0]?.signedUrl) {
+        (signature as any).signed_file_url = signed[0].signedUrl;
+      }
+    }
+  }
+
   return {
     success: true,
     po,
