@@ -917,8 +917,8 @@ export async function updatePOStatus(poId: string, status: string) {
   // approval flow (submitPOForApproval -> approvePO -> approvePOFinance). This
   // generic status updater must NOT be able to move a PO to 'issued' or
   // 'pending_finance' directly, otherwise a po.status holder could bypass
-  // approval. 'signed' likewise only via sendPOForSignature, so a signature
-  // request is always accompanied by the magic-link email.
+  // approval. 'pending_signature' likewise only via sendPOForSignature, so a
+  // signature request is always accompanied by the magic-link email.
   if (status === 'issued' || status === 'pending_finance' || status === 'pending_signature') {
     const { data: po } = await supabase
       .from('purchase_orders')
