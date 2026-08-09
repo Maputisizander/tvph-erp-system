@@ -966,7 +966,25 @@ export async function resendPurchaseOrderEmail(poId: string) {
   const { user, error: authError } = await requireCapability('email.send', supabase);
   if (authError || !user) return { error: authError || 'Unauthorized' };
 
-  const result = await sendPoIssuedEmail(poId, { actorId: user.id });
+  const { data: po } = await supabase
+    .from('purchase_orders')
+    .select('status')
+    .eq('id', poId)
+    .single();
+
+  let result;
+  if (po?.status === 'pending_signature') {
+    const linkResult = await createPortalLink('po', poId, 7, 'po');
+    if ('error' in linkResult) {
+      return { error: linkResult.error };
+    }
+    result = await sendPoForSignatureEmail(poId, {
+      signUrl: linkResult.portalUrl,
+      actorId: user.id,
+    });
+  } else {
+    result = await sendPoIssuedEmail(poId, { actorId: user.id });
+  }
 
   await recordAuditLog({
     entity_type: 'purchase_order',

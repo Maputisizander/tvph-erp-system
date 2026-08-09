@@ -9,6 +9,7 @@
  */
 
 import { updatePOStatus } from '@/app/dashboard/purchase-orders/actions';
+import { resendPurchaseOrderEmail } from '@/app/dashboard/purchase-orders/actions';
 
 // Mock Supabase client
 jest.mock('@/utils/supabase/server', () => ({
@@ -33,6 +34,12 @@ jest.mock('@/utils/notifications', () => ({
 // Mock email sending
 jest.mock('@/lib/email/po', () => ({
   sendPoIssuedEmail: jest.fn(),
+  sendPoForSignatureEmail: jest.fn(),
+}));
+
+// Mock portal link minting
+jest.mock('@/lib/portal/links', () => ({
+  createPortalLink: jest.fn(),
 }));
 
 // Mock Next.js cache utilities
@@ -45,6 +52,8 @@ import { requireCapability } from '@/lib/auth/permissions';
 import { recordAuditLog } from '@/utils/audit';
 import { createNotification } from '@/utils/notifications';
 import { sendPoIssuedEmail } from '@/lib/email/po';
+import { sendPoForSignatureEmail } from '@/lib/email/po';
+import { createPortalLink } from '@/lib/portal/links';
 import { revalidatePath } from 'next/cache';
 
 const mockCreateClient = createClient as jest.MockedFunction<typeof createClient>;
@@ -59,6 +68,12 @@ const mockCreateNotification = createNotification as jest.MockedFunction<
 >;
 const mockSendPoIssuedEmail = sendPoIssuedEmail as jest.MockedFunction<
   typeof sendPoIssuedEmail
+>;
+const mockSendPoForSignatureEmail = sendPoForSignatureEmail as jest.MockedFunction<
+  typeof sendPoForSignatureEmail
+>;
+const mockCreatePortalLink = createPortalLink as jest.MockedFunction<
+  typeof createPortalLink
 >;
 const mockRevalidatePath = revalidatePath as jest.MockedFunction<
   typeof revalidatePath
@@ -103,6 +118,12 @@ describe('updatePOStatus', () => {
     mockRecordAuditLog.mockResolvedValue(undefined);
     mockCreateNotification.mockResolvedValue(undefined);
     mockSendPoIssuedEmail.mockResolvedValue({ status: 'sent' });
+    mockSendPoForSignatureEmail.mockResolvedValue({ status: 'sent' });
+    mockCreatePortalLink.mockResolvedValue({
+      portalUrl: 'http://localhost/portal/po/tok123',
+      token: 'tok123',
+      expiresAt: new Date().toISOString(),
+    });
     mockRevalidatePath.mockReturnValue(undefined);
   });
 
@@ -207,5 +228,73 @@ describe('updatePOStatus', () => {
       expect(mockSupabase.updateChain.eq).toHaveBeenCalledWith('id', 'po-draft-to-cancelled');
       expect(result).toEqual({ success: true });
     });
+  });
+});
+
+describe('resendPurchaseOrderEmail', () => {
+  let mockSupabase: any;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    const selectChain = {
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: null, error: null }),
+    };
+
+    mockSupabase = {
+      from: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnValue(selectChain),
+      }),
+    };
+    mockSupabase.selectChain = selectChain;
+
+    mockCreateClient.mockResolvedValue(mockSupabase);
+    mockRequireCapability.mockResolvedValue({
+      user: { id: 'user-123' },
+      role: 'admin',
+      error: null,
+    } as any);
+    mockRecordAuditLog.mockResolvedValue(undefined);
+    mockSendPoIssuedEmail.mockResolvedValue({ status: 'sent' });
+    mockSendPoForSignatureEmail.mockResolvedValue({ status: 'sent' });
+    mockCreatePortalLink.mockResolvedValue({
+      portalUrl: 'http://localhost/portal/po/tok123',
+      token: 'tok123',
+      expiresAt: new Date().toISOString(),
+    });
+    mockRevalidatePath.mockReturnValue(undefined);
+  });
+
+  it('sends the signature email again for a pending_signature PO', async () => {
+    mockSupabase.selectChain.single.mockResolvedValue({
+      data: { status: 'pending_signature' },
+      error: null,
+    });
+
+    const result = await resendPurchaseOrderEmail('po-123');
+
+    expect(result).toEqual({ success: true });
+    expect(mockCreatePortalLink).toHaveBeenCalledWith('po', 'po-123', 7, 'po');
+    expect(mockSendPoForSignatureEmail).toHaveBeenCalledWith('po-123', {
+      signUrl: 'http://localhost/portal/po/tok123',
+      actorId: 'user-123',
+    });
+    expect(mockSendPoIssuedEmail).not.toHaveBeenCalled();
+  });
+
+  it('sends the issued email for a non-pending_signature PO', async () => {
+    mockSupabase.selectChain.single.mockResolvedValue({
+      data: { status: 'issued' },
+      error: null,
+    });
+
+    const result = await resendPurchaseOrderEmail('po-456');
+
+    expect(result).toEqual({ success: true });
+    expect(mockSendPoIssuedEmail).toHaveBeenCalledWith('po-456', {
+      actorId: 'user-123',
+    });
+    expect(mockSendPoForSignatureEmail).not.toHaveBeenCalled();
   });
 });
