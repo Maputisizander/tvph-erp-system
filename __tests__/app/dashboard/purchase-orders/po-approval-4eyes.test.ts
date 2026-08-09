@@ -25,6 +25,7 @@ jest.mock('@/utils/notifications', () => ({
 
 jest.mock('@/lib/email/po', () => ({
   sendPoIssuedEmail: jest.fn(),
+  sendPoForSignatureEmail: jest.fn(),
 }));
 
 jest.mock('@/lib/email/po-pending-approval', () => ({
@@ -33,6 +34,10 @@ jest.mock('@/lib/email/po-pending-approval', () => ({
 
 jest.mock('@/lib/email/po-pending-finance', () => ({
   sendPoPendingFinanceEmail: jest.fn(),
+}));
+
+jest.mock('@/lib/portal/links', () => ({
+  createPortalLink: jest.fn(),
 }));
 
 jest.mock('next/cache', () => ({
@@ -44,8 +49,10 @@ import { requireCapability, getCurrentProfile, hasCapability } from '@/lib/auth/
 import { recordAuditLog } from '@/utils/audit';
 import { createNotification } from '@/utils/notifications';
 import { sendPoIssuedEmail } from '@/lib/email/po';
+import { sendPoForSignatureEmail } from '@/lib/email/po';
 import { sendPoPendingApprovalEmail } from '@/lib/email/po-pending-approval';
 import { sendPoPendingFinanceEmail } from '@/lib/email/po-pending-finance';
+import { createPortalLink } from '@/lib/portal/links';
 import { revalidatePath } from 'next/cache';
 
 const mockCreateClient = createClient as jest.MockedFunction<typeof createClient>;
@@ -55,8 +62,10 @@ const mockHasCapability = hasCapability as jest.MockedFunction<typeof hasCapabil
 const mockRecordAuditLog = recordAuditLog as jest.MockedFunction<typeof recordAuditLog>;
 const mockCreateNotification = createNotification as jest.MockedFunction<typeof createNotification>;
 const mockSendPoIssuedEmail = sendPoIssuedEmail as jest.MockedFunction<typeof sendPoIssuedEmail>;
+const mockSendPoForSignatureEmail = sendPoForSignatureEmail as jest.MockedFunction<typeof sendPoForSignatureEmail>;
 const mockSendPoPendingApprovalEmail = sendPoPendingApprovalEmail as jest.MockedFunction<typeof sendPoPendingApprovalEmail>;
 const mockSendPoPendingFinanceEmail = sendPoPendingFinanceEmail as jest.MockedFunction<typeof sendPoPendingFinanceEmail>;
+const mockCreatePortalLink = createPortalLink as jest.MockedFunction<typeof createPortalLink>;
 const mockRevalidatePath = revalidatePath as jest.MockedFunction<typeof revalidatePath>;
 
 function makeMockSupabase() {
@@ -343,6 +352,12 @@ describe('approvePOFinance', () => {
     mockRecordAuditLog.mockResolvedValue(undefined);
     mockCreateNotification.mockResolvedValue(undefined);
     mockSendPoIssuedEmail.mockResolvedValue({ status: 'sent' });
+    mockSendPoForSignatureEmail.mockResolvedValue({ status: 'sent' });
+    mockCreatePortalLink.mockResolvedValue({
+      portalUrl: 'http://localhost/portal/po/tok123',
+      token: 'tok123',
+      expiresAt: new Date().toISOString(),
+    });
     mockRevalidatePath.mockReturnValue(undefined);
 
     mockSupabase.selectChain.single.mockResolvedValue({
@@ -356,21 +371,27 @@ describe('approvePOFinance', () => {
     });
   });
 
-  it('issues a pending_finance PO when the finance user did not approve at the admin stage', async () => {
+  it('issues a pending_finance PO straight to pending_signature with the e-sign link email', async () => {
     const result = await approvePOFinance('po-123');
     expect(result).toEqual({ success: true });
 
     const updateFn = mockSupabase.from('purchase_orders').update;
     expect(updateFn).toHaveBeenCalledWith(
       expect.objectContaining({
-        status: 'issued',
+        status: 'pending_signature',
         finance_approved_by_user_id: 'finance-user',
         finance_approved_at: expect.any(String),
+        sent_at: expect.any(String),
       }),
       { count: 'exact' }
     );
+    expect(mockCreatePortalLink).toHaveBeenCalledWith('po', 'po-123', 7, 'po');
     expect(mockRecordAuditLog).toHaveBeenCalled();
-    expect(mockSendPoIssuedEmail).toHaveBeenCalledWith('po-123', { actorId: 'finance-user' });
+    expect(mockSendPoForSignatureEmail).toHaveBeenCalledWith('po-123', {
+      signUrl: 'http://localhost/portal/po/tok123',
+      actorId: 'finance-user',
+    });
+    expect(mockSendPoIssuedEmail).not.toHaveBeenCalled();
   });
 
   it('blocks the admin-stage approver from doing the finance check (4-eyes across stages)', async () => {

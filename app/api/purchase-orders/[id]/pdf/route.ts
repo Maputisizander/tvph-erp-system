@@ -14,6 +14,46 @@ export async function GET(
 
     const { id } = await params
 
+    const { createServiceRoleClient } = await import('@/utils/supabase/service')
+
+    const supabase = createServiceRoleClient()
+    const { data: po } = await supabase
+      .from('purchase_orders')
+      .select('signed_doc_status')
+      .eq('id', id)
+      .single()
+
+    if (po?.signed_doc_status === 'approved') {
+      const { data: signature } = await supabase
+        .from('po_signatures')
+        .select('signed_file_url')
+        .eq('po_id', id)
+        .order('signed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (signature?.signed_file_url) {
+        const path = signature.signed_file_url.split('/object/public/po-artifacts/')[1]
+        if (path) {
+          const { data: file, error: downloadError } = await supabase.storage
+            .from('po-artifacts')
+            .download(path)
+          if (!downloadError && file) {
+            const buffer = Buffer.from(await file.arrayBuffer())
+            return new Response(buffer as unknown as BodyInit, {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': `inline; filename="signed-po-${id}.pdf"`,
+                'Content-Length': String(buffer.byteLength),
+                'Cache-Control': 'no-store',
+              },
+            })
+          }
+        }
+      }
+    }
+
     const { buffer, filename } = await renderPoDocument(id)
 
     return new Response(buffer as unknown as BodyInit, {

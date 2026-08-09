@@ -6,6 +6,170 @@ import { extractDocumentMetadata } from "@/app/actions/ocr";
 import { createNotification } from "@/utils/notifications";
 import { revalidatePath } from "next/cache";
 
+async function findValidMagicLink(supabase: Awaited<ReturnType<typeof createServiceRoleClient>>, token: string) {
+  return supabase
+    .from("magic_links")
+    .select("*")
+    .eq("token", token)
+    .gt("expires_at", new Date().toISOString())
+    .maybeSingle();
+}
+
+/**
+ * Validates a magic link minted for the PO signature portal (entity_type 'po')
+ * and returns the PO, vendor, and any prior signature. Vendors may come back
+ * to re-sign later, so this works regardless of the PO's current status.
+ */
+export async function validatePoPortalToken(token: string) {
+  const supabase = createServiceRoleClient();
+  const { data: magicLink, error } = await findValidMagicLink(supabase, token);
+
+  if (error || !magicLink) {
+    return { error: "Invalid or expired access token." };
+  }
+  if (magicLink.entity_type !== "po") {
+    return { error: "This link is not a purchase order signature link." };
+  }
+
+  const { data: po } = await supabase
+    .from("purchase_orders")
+    .select("id, po_number, amount, currency, status, issued_date, sent_at, signed_at, vendors ( name, contact_person )")
+    .eq("id", magicLink.entity_id)
+    .single();
+
+  if (!po) {
+    return { error: "Purchase order not found." };
+  }
+
+  const vendor = (po.vendors ?? {}) as { name?: string; contact_person?: string | null };
+
+  const { data: signature } = await supabase
+    .from("po_signatures")
+    .select("signer_name, signer_title, ip_address, signed_at, signed_file_url, signed_file_name")
+    .eq("po_id", po.id)
+    .order("signed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (signature?.signed_file_url) {
+    const path = signature.signed_file_url.split("/object/public/po-artifacts/")[1];
+    if (path) {
+      const { data: signed } = await supabase.storage
+        .from("po-artifacts")
+        .createSignedUrls([path], 3600);
+      if (signed?.[0]?.signedUrl) {
+        (signature as any).signed_file_url = signed[0].signedUrl;
+      }
+    }
+  }
+
+  return {
+    success: true,
+    po,
+    vendor,
+    alreadySigned: !!signature?.signed_at,
+    signature,
+  };
+}
+
+/**
+ * Records a vendor e-signature for a PO: uploads the executed PDF to
+ * po-artifacts, inserts a po_signatures row (with the file URL), and keeps
+ * the PO in 'pending_signature' awaiting requisitioner approval. Idempotent —
+ * re-signing replaces the latest signature. Anonymous portal access uses the
+ * service-role client, so recordAuditLog (user-scoped) is skipped here; the
+ * po_signatures row IS the audit trail.
+ */
+export async function signPortalPO(
+  token: string,
+  signerName: string,
+  signerTitle: string,
+  ipAddress: string,
+  file: File,
+) {
+  const name = signerName.trim();
+  if (!name) return { error: "Please enter your full name to sign." };
+
+  if (!file) {
+    return { error: "Please upload the signed purchase order PDF to complete signing." };
+  }
+  if (file.type !== "application/pdf") {
+    return { error: "Only PDF files are accepted for the signed purchase order." };
+  }
+
+  const supabase = createServiceRoleClient();
+  const { data: magicLink, error } = await findValidMagicLink(supabase, token);
+
+  if (error || !magicLink) {
+    return { error: "Invalid or expired access token." };
+  }
+  if (magicLink.entity_type !== "po") {
+    return { error: "This link is not a purchase order signature link." };
+  }
+
+  const { data: po } = await supabase
+    .from("purchase_orders")
+    .select("id, po_number, status, vendors ( name )")
+    .eq("id", magicLink.entity_id)
+    .single();
+
+  if (!po) {
+    return { error: "Purchase order not found." };
+  }
+
+  const vendor = (po.vendors ?? {}) as { name?: string };
+
+  const fileBuffer = Buffer.from(await file.arrayBuffer());
+  const filePath = `po/${po.id}/signed-${Date.now()}.pdf`;
+  const { error: uploadError } = await supabase.storage
+    .from("po-artifacts")
+    .upload(filePath, fileBuffer, { contentType: "application/pdf", upsert: false });
+
+  if (uploadError) return { error: uploadError.message };
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("po-artifacts").getPublicUrl(filePath);
+
+  const now = new Date().toISOString();
+  const { error: sigError } = await supabase.from("po_signatures").insert({
+    po_id: po.id,
+    signer_name: name,
+    signer_title: signerTitle.trim() || null,
+    ip_address: ipAddress,
+    signed_at: now,
+    signed_file_url: publicUrl,
+    signed_file_name: file.name,
+  });
+  if (sigError) return { error: sigError.message };
+
+  const { error: poError } = await supabase
+    .from("purchase_orders")
+    .update(
+      {
+        status: "pending_signature",
+        signed_doc_status: "pending_approval",
+        signed_at: now,
+        updated_at: now,
+      },
+      { count: "exact" },
+    )
+    .eq("id", po.id);
+  if (poError) return { error: poError.message };
+
+  await createNotification({
+    type: "po",
+    title: "✍️ PO Signed — Pending Review",
+    message: `${vendor.name || "Vendor"} submitted a signed copy of purchase order ${po.po_number || ""} (${name}). Awaiting requisitioner approval.`,
+    link: `/dashboard/purchase-orders/${po.id}`,
+    created_by: po.id,
+  });
+
+  revalidatePath(`/dashboard/purchase-orders/${po.id}`);
+  revalidatePath("/dashboard/purchase-orders");
+  return { success: true, signedAt: now };
+}
+
 export async function validatePortalToken(token: string) {
   const supabase = createServiceRoleClient();
   const { data: magicLink, error } = await supabase

@@ -4,7 +4,7 @@ import crypto from "crypto";
 import { headers } from "next/headers";
 import { createServiceRoleClient } from "@/utils/supabase/service";
 
-export type PortalEntityType = "vendor" | "customer";
+export type PortalEntityType = "vendor" | "customer" | "po";
 
 /**
  * Resolves the public base URL for building absolute links.
@@ -42,6 +42,7 @@ export async function createPortalLink(
   entityType: PortalEntityType,
   entityId: string,
   expiresInDays = 7,
+  path = "upload",
 ): Promise<{ portalUrl: string; token: string; expiresAt: string } | { error: string }> {
   const token = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date();
@@ -59,7 +60,7 @@ export async function createPortalLink(
 
   const baseUrl = await getBaseUrl();
   return {
-    portalUrl: `${baseUrl}/portal/upload/${token}`,
+    portalUrl: `${baseUrl}/portal/${path}/${token}`,
     token,
     expiresAt: expiresAt.toISOString(),
   };

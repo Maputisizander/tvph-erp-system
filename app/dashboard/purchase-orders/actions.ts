@@ -6,6 +6,8 @@ import { createNotification } from '@/utils/notifications';
 import { recordAuditLog } from '@/utils/audit';
 import { getCurrentProfile, requireCapability, hasCapability } from '@/lib/auth/permissions';
 import { sendPoIssuedEmail } from '@/lib/email/po';
+import { sendPoForSignatureEmail } from '@/lib/email/po';
+import { createPortalLink } from '@/lib/portal/links';
 import { sendPoPendingApprovalEmail } from '@/lib/email/po-pending-approval';
 import { sendPoPendingFinanceEmail } from '@/lib/email/po-pending-finance';
 
@@ -818,32 +820,55 @@ export async function approvePOFinance(poId: string) {
   const now = new Date().toISOString();
   const { error, count } = await supabase
     .from('purchase_orders')
-    .update({ status: 'issued', finance_approved_by_user_id: user.id, finance_approved_at: now, updated_at: now }, { count: 'exact' })
+    .update({ status: 'pending_signature', sent_at: now, finance_approved_by_user_id: user.id, finance_approved_at: now, updated_at: now }, { count: 'exact' })
     .eq('id', poId)
     .eq('status', 'pending_finance');
 
   if (error) return { error: error.message };
   if (count === 0) return { error: 'This PO is not pending the finance approval.' };
 
+  // Mint the e-sign link first so the email always has a working upload URL.
+  const linkResult = await createPortalLink('po', poId, 7, 'po');
+
   await recordAuditLog({
     entity_type: 'purchase_order',
     entity_id: poId,
     action: 'UPDATE',
-    changes: { after: { status: 'issued', finance_approved_by: user.id } },
+    changes: {
+      after: {
+        status: 'pending_signature',
+        finance_approved_by: user.id,
+        sent_at: now,
+      },
+    },
     performed_by: user.id,
   });
 
-  const emailResult = await sendPoIssuedEmail(poId, { actorId: user.id });
   let emailWarning: string | undefined;
-  if (emailResult.status === 'failed') {
-    emailWarning = emailResult.error || 'The PO was issued but the email could not be sent.';
+  if ('error' in linkResult) {
+    emailWarning = linkResult.error;
     await createNotification({
       type: 'po',
-      title: '⚠️ PO email not sent',
-      message: `${emailWarning} Open the PO to resend it to the vendor.`,
+      title: '⚠️ Signature link not created',
+      message: `${emailWarning} Open the PO to resend the signature request.`,
       link: `/dashboard/purchase-orders/${poId}`,
       created_by: user.id,
     });
+  } else {
+    const emailResult = await sendPoForSignatureEmail(poId, {
+      signUrl: linkResult.portalUrl,
+      actorId: user.id,
+    });
+    if (emailResult.status === 'failed') {
+      emailWarning = emailResult.error || 'The PO was issued but the email could not be sent.';
+      await createNotification({
+        type: 'po',
+        title: '⚠️ PO email not sent',
+        message: `${emailWarning} Open the PO to resend it to the vendor.`,
+        link: `/dashboard/purchase-orders/${poId}`,
+        created_by: user.id,
+      });
+    }
   }
 
   revalidatePath(`/dashboard/purchase-orders/${poId}`);
@@ -915,8 +940,9 @@ export async function updatePOStatus(poId: string, status: string) {
   // approval flow (submitPOForApproval -> approvePO -> approvePOFinance). This
   // generic status updater must NOT be able to move a PO to 'issued' or
   // 'pending_finance' directly, otherwise a po.status holder could bypass
-  // approval.
-  if (status === 'issued' || status === 'pending_finance') {
+  // approval. 'pending_signature' likewise only via approvePOFinance, so a
+  // signature request is always accompanied by the magic-link email.
+  if (status === 'issued' || status === 'pending_finance' || status === 'pending_signature') {
     const { data: po } = await supabase
       .from('purchase_orders')
       .select('status')
@@ -963,7 +989,25 @@ export async function resendPurchaseOrderEmail(poId: string) {
   const { user, error: authError } = await requireCapability('email.send', supabase);
   if (authError || !user) return { error: authError || 'Unauthorized' };
 
-  const result = await sendPoIssuedEmail(poId, { actorId: user.id });
+  const { data: po } = await supabase
+    .from('purchase_orders')
+    .select('status')
+    .eq('id', poId)
+    .single();
+
+  let result;
+  if (po?.status === 'pending_signature') {
+    const linkResult = await createPortalLink('po', poId, 7, 'po');
+    if ('error' in linkResult) {
+      return { error: linkResult.error };
+    }
+    result = await sendPoForSignatureEmail(poId, {
+      signUrl: linkResult.portalUrl,
+      actorId: user.id,
+    });
+  } else {
+    result = await sendPoIssuedEmail(poId, { actorId: user.id });
+  }
 
   await recordAuditLog({
     entity_type: 'purchase_order',
@@ -977,6 +1021,92 @@ export async function resendPurchaseOrderEmail(poId: string) {
   if (result.status === 'failed') {
     return { error: result.error || 'Failed to send email.' };
   }
+  return { success: true };
+}
+
+/**
+ * Requisitioner approves or rejects a vendor-signed PO: moves it to 'signed'
+ * (signed_doc_status 'approved') or back to 'pending_signature' with a reason
+ * (signed_doc_status 'rejected') so the vendor can re-sign.
+ */
+export async function reviewSignedPo(
+  poId: string,
+  decision: 'approve' | 'reject',
+  reason?: string,
+) {
+  const supabase = await createClient();
+  const { user, error: authError } = await requireCapability('po.write', supabase);
+  if (authError || !user) return { error: authError || 'Unauthorized' };
+
+  const { data: po } = await supabase
+    .from('purchase_orders')
+    .select('id, po_number, status, signed_doc_status, vendors ( name )')
+    .eq('id', poId)
+    .single();
+
+  if (!po) return { error: 'Purchase order not found.' };
+  if (po.status !== 'pending_signature' || po.signed_doc_status !== 'pending_approval') {
+    return { error: 'This purchase order has no signed document awaiting review.' };
+  }
+
+  const now = new Date().toISOString();
+
+  if (decision === 'approve') {
+    const { error } = await supabase
+      .from('purchase_orders')
+      .update({
+        status: 'signed',
+        signed_doc_status: 'approved',
+        signed_doc_approved_by: user.id,
+        signed_doc_approved_at: now,
+        signed_doc_rejection_reason: null,
+        updated_at: now,
+      })
+      .eq('id', poId);
+    if (error) return { error: error.message };
+
+    await recordAuditLog({
+      entity_type: 'purchase_order',
+      entity_id: poId,
+      action: 'UPDATE',
+      changes: { after: { status: 'signed', signed_doc_status: 'approved', signed_doc_approved_by: user.id } },
+      performed_by: user.id,
+    });
+  } else {
+    const rejectionReason = (reason ?? '').trim();
+    const { error } = await supabase
+      .from('purchase_orders')
+      .update({
+        status: 'pending_signature',
+        signed_doc_status: 'rejected',
+        signed_doc_rejection_reason: rejectionReason || 'No reason provided',
+        signed_doc_approved_by: null,
+        signed_doc_approved_at: null,
+        updated_at: now,
+      })
+      .eq('id', poId);
+    if (error) return { error: error.message };
+
+    await recordAuditLog({
+      entity_type: 'purchase_order',
+      entity_id: poId,
+      action: 'UPDATE',
+      changes: { after: { status: 'pending_signature', signed_doc_status: 'rejected', reason: rejectionReason } },
+      performed_by: user.id,
+    });
+  }
+
+  const vendor = (po.vendors ?? {}) as { name?: string };
+  await createNotification({
+    type: 'po',
+    title: decision === 'approve' ? '✅ Signed PO Approved' : '⚠️ Signed PO Rejected',
+    message: `${vendor.name || 'Vendor'}${decision === 'approve' ? "'s signed copy was approved" : "'s signed copy was rejected"} for ${po.po_number || 'the PO'}${decision === 'reject' && reason ? ` — ${reason}` : ''}.`,
+    link: `/dashboard/purchase-orders/${poId}`,
+    created_by: user.id,
+  });
+
+  revalidatePath(`/dashboard/purchase-orders/${poId}`);
+  revalidatePath('/dashboard/purchase-orders');
   return { success: true };
 }
 

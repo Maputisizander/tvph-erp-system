@@ -24,6 +24,7 @@ import {
   Pencil,
   Eye,
   Wallet,
+  PenLine,
 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -42,13 +43,14 @@ import { PODetailsEditor } from "@/components/dashboard/purchase-orders/po-detai
 import { POLineItemsEditor } from "@/components/dashboard/purchase-orders/po-line-items-editor";
 import { POSiteDetailsEditor } from "@/components/dashboard/purchase-orders/po-site-details-editor";
 import { POEditHistory } from "@/components/dashboard/purchase-orders/po-edit-history";
+import { PoSignedReview } from "@/components/dashboard/purchase-orders/po-signed-review";
 import { getCurrentProfile, hasCapability } from "@/lib/auth/permissions";
 import { signDocUrls } from "@/utils/storage";
 import { LiveListRefresh } from "@/components/dashboard/shared/live-list-refresh";
 
 const menuItemClass = "flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors";
 const DRAFT_OR_PENDING = ["draft", "pending_approval", "pending_finance"];
-const ISSUED_OR_LATER = ["issued", "paid", "overpaid"];
+const ISSUED_OR_LATER = ["issued", "pending_signature", "signed", "paid", "overpaid"];
 
 export const unstable_instant = {
   prefetch: 'static',
@@ -134,11 +136,27 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
     .limit(1)
     .maybeSingle();
 
+  // Latest e-signature record — drives the "awaiting signature" / "signed" banner.
+  const { data: poSignature } = await supabase
+    .from("po_signatures")
+    .select("signer_name, signer_title, ip_address, signed_at, signed_file_url, signed_file_name")
+    .eq("po_id", po.id)
+    .order("signed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   const canSendEmail = hasCapability(currentRole, "email.send");
   const canApprovePO = hasCapability(currentRole, "po.approve");
   const canApprovePOFinance = hasCapability(currentRole, "po.approve_finance");
   const canEditTerms = hasCapability(currentRole, "po.write");
   const canOverridePenalty = ["finance", "admin", "superadmin"].includes(currentRole || "");
+
+  // Sign the stored signed-PO URL for the dashboard user (private bucket).
+  const [signedSig] = await signDocUrls(
+    supabase,
+    "po-artifacts",
+    poSignature?.signed_file_url ? [{ file_url: poSignature.signed_file_url }] : [],
+  );
 
   // Originator-only draft editing: only the user who drafted the PO can fix it
   // while it is still a draft or pending approval. Editing happens on the
@@ -347,7 +365,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                 {po.po_number}
               </h1>
 <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${statusBadgeClasses(po.status)}`}>
-                {po.status.replace(/_/g, " ").toUpperCase()}
+                {po.status === "pending_signature" ? "AWAITING SIGNED PO" : po.status.replace(/_/g, " ").toUpperCase()}
               </span>
               {dpAmount > 0 && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/50 text-sm font-bold">
@@ -454,6 +472,46 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
             </p>
           </div>
         </div>
+      )}
+
+      {/* Signature status banner */}
+      {po.status === "pending_signature" && (
+        <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50">
+          <PenLine className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+              Awaiting Signed PO
+            </p>
+            <p className="text-xs text-amber-600/80 dark:text-amber-400/60 mt-1">
+              A signature request was sent{po.sent_at ? ` on ${new Date(po.sent_at).toLocaleDateString(undefined, { dateStyle: "long" })}` : ""} — awaiting the vendor's signed copy.
+              {canSendEmail ? " Use “Resend to Vendor” above to re-send the link." : ""}
+            </p>
+          </div>
+        </div>
+      )}
+      {po.status !== "pending_signature" && poSignature?.signed_at && (
+        <div className="flex items-start gap-3 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/50">
+          <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+              Signed by {poSignature.signer_name || "Vendor"}
+            </p>
+            <p className="text-xs text-emerald-600/80 dark:text-emerald-400/60 mt-1">
+              {[poSignature.signer_title, new Date(poSignature.signed_at).toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" }), poSignature.ip_address && poSignature.ip_address !== "Unknown" ? `IP ${poSignature.ip_address}` : null]
+                .filter(Boolean)
+                .join(" · ")}
+              {canSendEmail ? " Use “Resend to Vendor” to re-send if needed." : ""}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {po.status === "pending_signature" && poSignature?.signed_at && poSignature?.signed_file_url && (
+        <PoSignedReview
+          poId={po.id}
+          signedFileUrl={signedSig?.file_url ?? poSignature.signed_file_url}
+          canReview={hasCapability(currentRole, "po.write")}
+        />
       )}
 
       {/* PO Approval Banners */}
