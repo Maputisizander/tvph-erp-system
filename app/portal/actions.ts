@@ -45,7 +45,7 @@ export async function validatePoPortalToken(token: string) {
 
   const { data: signature } = await supabase
     .from("po_signatures")
-    .select("signer_name, signer_title, ip_address, signed_at")
+    .select("signer_name, signer_title, ip_address, signed_at, signed_file_url, signed_file_name")
     .eq("po_id", po.id)
     .order("signed_at", { ascending: false })
     .limit(1)
@@ -61,15 +61,29 @@ export async function validatePoPortalToken(token: string) {
 }
 
 /**
- * Records a vendor e-signature for a PO: inserts a po_signatures row, stamps
- * signed_at, and returns the PO from the transient 'signed' state back to
- * 'issued'. Idempotent — re-signing replaces the latest signature. Anonymous
- * portal access uses the service-role client, so recordAuditLog (user-scoped)
- * is skipped here; the po_signatures row IS the audit trail.
+ * Records a vendor e-signature for a PO: uploads the executed PDF to
+ * po-artifacts, inserts a po_signatures row (with the file URL), and keeps
+ * the PO in 'pending_signature' awaiting requisitioner approval. Idempotent —
+ * re-signing replaces the latest signature. Anonymous portal access uses the
+ * service-role client, so recordAuditLog (user-scoped) is skipped here; the
+ * po_signatures row IS the audit trail.
  */
-export async function signPortalPO(token: string, signerName: string, signerTitle: string, ipAddress: string) {
+export async function signPortalPO(
+  token: string,
+  signerName: string,
+  signerTitle: string,
+  ipAddress: string,
+  file: File,
+) {
   const name = signerName.trim();
   if (!name) return { error: "Please enter your full name to sign." };
+
+  if (!file) {
+    return { error: "Please upload the signed purchase order PDF to complete signing." };
+  }
+  if (file.type !== "application/pdf") {
+    return { error: "Only PDF files are accepted for the signed purchase order." };
+  }
 
   const supabase = createServiceRoleClient();
   const { data: magicLink, error } = await findValidMagicLink(supabase, token);
@@ -93,6 +107,18 @@ export async function signPortalPO(token: string, signerName: string, signerTitl
 
   const vendor = (po.vendors ?? {}) as { name?: string };
 
+  const fileBuffer = Buffer.from(await file.arrayBuffer());
+  const filePath = `po/${po.id}/signed-${Date.now()}.pdf`;
+  const { error: uploadError } = await supabase.storage
+    .from("po-artifacts")
+    .upload(filePath, fileBuffer, { contentType: "application/pdf", upsert: false });
+
+  if (uploadError) return { error: uploadError.message };
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("po-artifacts").getPublicUrl(filePath);
+
   const now = new Date().toISOString();
   const { error: sigError } = await supabase.from("po_signatures").insert({
     po_id: po.id,
@@ -100,29 +126,31 @@ export async function signPortalPO(token: string, signerName: string, signerTitl
     signer_title: signerTitle.trim() || null,
     ip_address: ipAddress,
     signed_at: now,
+    signed_file_url: publicUrl,
+    signed_file_name: file.name,
   });
   if (sigError) return { error: sigError.message };
 
-  // 'signed' is a transient awaiting-signature state; once signed the PO is
-  // operational again (issued). Cancelled POs keep their status.
-  if (po.status === "signed") {
-    await supabase
-      .from("purchase_orders")
-      .update({ status: "issued", signed_at: now, updated_at: now })
-      .eq("id", po.id);
-  } else {
-    await supabase
-      .from("purchase_orders")
-      .update({ signed_at: now, updated_at: now })
-      .eq("id", po.id);
-  }
+  const { error: poError } = await supabase
+    .from("purchase_orders")
+    .update(
+      {
+        status: "pending_signature",
+        signed_doc_status: "pending_approval",
+        signed_at: now,
+        updated_at: now,
+      },
+      { count: "exact" },
+    )
+    .eq("id", po.id);
+  if (poError) return { error: poError.message };
 
   await createNotification({
     type: "po",
-    title: "✍️ PO Signed",
-    message: `${vendor.name || "Vendor"} signed purchase order ${po.po_number || ""} (${name}).`,
+    title: "✍️ PO Signed — Pending Review",
+    message: `${vendor.name || "Vendor"} submitted a signed copy of purchase order ${po.po_number || ""} (${name}). Awaiting requisitioner approval.`,
     link: `/dashboard/purchase-orders/${po.id}`,
-    created_by: magicLink.entity_id,
+    created_by: po.id,
   });
 
   revalidatePath(`/dashboard/purchase-orders/${po.id}`);
