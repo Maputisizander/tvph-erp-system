@@ -244,7 +244,7 @@ export function POSiteDetailsEditor({
                   <td className="px-3 py-3 text-right font-bold text-slate-900 dark:text-white">
                     {totalCable(draft).toLocaleString("en-US", {
                       minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
+                      maximumFractionDigits: 4,
                     })}
                   </td>
                   <td></td>
@@ -305,7 +305,7 @@ export function POSiteDetailsEditor({
                     {Number(site.no_of_nodes).toLocaleString()}
                   </td>
                   <td className="px-4 py-3 text-right text-slate-900 dark:text-white">
-                    {Number(site.cable_length_km).toLocaleString()}
+                    {Number(site.cable_length_km).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                   </td>
                 </tr>
               ))}
@@ -319,7 +319,7 @@ export function POSiteDetailsEditor({
                   {totalNodes(sites).toLocaleString()}
                 </td>
                 <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-white">
-                  {totalCable(sites).toLocaleString()}
+                  {totalCable(sites).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                 </td>
               </tr>
             </tfoot>

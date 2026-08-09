@@ -351,7 +351,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               </span>
               {dpAmount > 0 && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/50 text-sm font-bold">
-                  DP — ₱{dpAmount.toLocaleString()}
+                  DP — ₱{dpAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                 </span>
               )}
             </div>
@@ -618,7 +618,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                 ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/50"
                 : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800/50"
             }`}>
-              {isOverpaid ? `Overpaid ₱${overpaidAmount.toLocaleString()}` : "On Track"}
+              {isOverpaid ? `Overpaid ₱${overpaidAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}` : "On Track"}
             </span>
           </div>
 
@@ -629,7 +629,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                 {isOverpaid ? "Overpaid Balance" : "Remaining to Pay"}
               </label>
               <div className={`text-3xl font-bold ${isOverpaid ? "text-red-600" : "text-slate-900 dark:text-white"}`}>
-                ₱{(isOverpaid ? overpaidAmount : remainingBalance).toLocaleString()}
+                ₱{(isOverpaid ? overpaidAmount : remainingBalance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
               </div>
               <p className="text-xs text-slate-400 mt-1">
                 {isOverpaid
@@ -698,7 +698,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
           <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 pt-5 border-t border-slate-100 dark:border-slate-800">
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Original Commitment</label>
-              <div className="text-sm font-bold text-slate-900 dark:text-white">₱{poAmount.toLocaleString()}</div>
+              <div className="text-sm font-bold text-slate-900 dark:text-white">₱{poAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</div>
             </div>
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Total Paid to Date</label>
@@ -709,13 +709,13 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Downpayment</label>
               <div className="text-sm font-bold text-amber-600 dark:text-amber-400">
-                {dpTarget > 0 ? `₱${dpTarget.toLocaleString()}` : "—"}
+                {dpTarget > 0 ? `₱${dpTarget.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}` : "—"}
               </div>
             </div>
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Balance after DP</label>
               <div className="text-sm font-bold text-slate-900 dark:text-white">
-                {dpTarget > 0 ? `₱${balanceAfterDp.toLocaleString()}` : "—"}
+                {dpTarget > 0 ? `₱${balanceAfterDp.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}` : "—"}
               </div>
             </div>
             <div>

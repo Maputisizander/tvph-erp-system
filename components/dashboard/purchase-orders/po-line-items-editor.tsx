@@ -204,7 +204,7 @@ export function POLineItemsEditor({
                         </td>
                         <td className={`${tdClass} text-right font-semibold text-slate-900 dark:text-white pr-4`}>
                           {currencySymbol}
-                          {rowAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {rowAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                         </td>
                         <td className={tdClass}>
                           <button
@@ -244,7 +244,7 @@ export function POLineItemsEditor({
                     {currencySymbol}
                     {totalAmount(draft).toLocaleString("en-US", {
                       minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
+                      maximumFractionDigits: 4,
                     })}
                   </td>
                   <td></td>
@@ -303,11 +303,11 @@ export function POLineItemsEditor({
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{li.uom}</td>
                   <td className="px-4 py-3 text-right text-slate-900 dark:text-white">
                     {currencySymbol}
-                    {Number(li.unit_price).toLocaleString()}
+                    {Number(li.unit_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                   </td>
                   <td className="px-4 py-3 text-right font-semibold text-slate-900 dark:text-white">
                     {currencySymbol}
-                    {Number(li.amount).toLocaleString()}
+                    {Number(li.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                   </td>
                 </tr>
               ))}
@@ -319,7 +319,7 @@ export function POLineItemsEditor({
                 </td>
                 <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-white">
                   {currencySymbol}
-                  {totalAmount(items).toLocaleString()}
+                  {totalAmount(items).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                 </td>
               </tr>
             </tfoot>

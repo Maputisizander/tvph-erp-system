@@ -121,11 +121,11 @@ export function AddDownpayment({
                   </span>
                   <span className="text-base font-bold text-amber-700 dark:text-amber-400 tabular-nums">
                     {currencySymbol}
-                    {amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                   </span>
                   <span className="text-xs text-slate-500">
                     PO total: {currencySymbol}
-                    {poAmount.toLocaleString()}
+                    {poAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                   </span>
                 </div>
               </div>

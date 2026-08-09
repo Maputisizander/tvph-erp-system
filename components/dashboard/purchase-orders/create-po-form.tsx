@@ -533,10 +533,10 @@ export function CreatePOForm({
                     DOWNPAYMENT {dpPercent || 0}%
                   </span>
                   <p className="text-lg font-bold text-amber-700 dark:text-amber-400 tabular-nums">
-                    {currencySymbol}{dpAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {currencySymbol}{dpAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                   </p>
                   <p className="text-xs text-slate-500">
-                    Balance: {currencySymbol}{Math.max(0, totalAmount - dpAmount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    Balance: {currencySymbol}{Math.max(0, totalAmount - dpAmount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                   </p>
                 </div>
                 <p className="text-xs text-slate-500">
@@ -679,7 +679,7 @@ export function CreatePOForm({
                       {currencySymbol}
                       {rowAmount.toLocaleString("en-US", {
                         minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
+                        maximumFractionDigits: 4,
                       })}
                     </td>
                     <td className={tdClass}>
@@ -719,7 +719,7 @@ export function CreatePOForm({
                   {currencySymbol}
                   {totalAmount.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
+                    maximumFractionDigits: 4,
                   })}
                 </td>
                 <td></td>
@@ -858,7 +858,7 @@ export function CreatePOForm({
                 <td className="px-3 py-3 text-right font-bold text-slate-900 dark:text-white">
                   {totalCable.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
+                    maximumFractionDigits: 4,
                   })}
                 </td>
                 <td></td>
