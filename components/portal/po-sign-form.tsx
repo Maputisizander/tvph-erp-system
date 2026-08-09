@@ -9,6 +9,8 @@ export function PoSignForm({ token, className = "" }: { token: string; className
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
   const [ipAddress, setIpAddress] = useState("Unknown");
+  const [file, setFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
   const router = useRouter();
@@ -26,8 +28,16 @@ export function PoSignForm({ token, className = "" }: { token: string; className
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFeedback(null);
+    if (!file) {
+      setFeedback({ ok: false, msg: "Please upload the signed purchase order PDF." });
+      return;
+    }
+    if (file.type !== "application/pdf") {
+      setFeedback({ ok: false, msg: "Only PDF files are accepted." });
+      return;
+    }
     startTransition(async () => {
-      const result = await signPortalPO(token, name, title, ipAddress);
+      const result = await signPortalPO(token, name, title, ipAddress, file);
       if (result?.error) {
         setFeedback({ ok: false, msg: result.error });
       } else {
@@ -63,6 +73,26 @@ export function PoSignForm({ token, className = "" }: { token: string; className
           placeholder="e.g. Managing Director"
           className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0a0a0a] px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
         />
+      </div>
+      <div>
+        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+          Signed Purchase Order PDF <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="file"
+          accept="application/pdf,.pdf"
+          required
+          onChange={(e) => {
+            const f = e.target.files?.[0] || null;
+            setFile(f);
+            setFileError(f && f.type !== "application/pdf" ? "Only PDF files are accepted." : null);
+          }}
+          className="block w-full text-sm text-slate-700 dark:text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-4 file:py-2 file:text-white file:font-semibold hover:file:bg-emerald-600"
+        />
+        {file && !fileError && (
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Selected: {file.name}</p>
+        )}
+        {fileError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fileError}</p>}
       </div>
 
       <button
