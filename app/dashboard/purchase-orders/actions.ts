@@ -1048,6 +1048,92 @@ export async function sendPOForSignature(poId: string) {
   return { success: true, emailWarning };
 }
 
+/**
+ * Requisitioner approves or rejects a vendor-signed PO: moves it to 'signed'
+ * (signed_doc_status 'approved') or back to 'pending_signature' with a reason
+ * (signed_doc_status 'rejected') so the vendor can re-sign.
+ */
+export async function reviewSignedPo(
+  poId: string,
+  decision: 'approve' | 'reject',
+  reason?: string,
+) {
+  const supabase = await createClient();
+  const { user, error: authError } = await requireCapability('po.write', supabase);
+  if (authError || !user) return { error: authError || 'Unauthorized' };
+
+  const { data: po } = await supabase
+    .from('purchase_orders')
+    .select('id, po_number, status, signed_doc_status, vendors ( name )')
+    .eq('id', poId)
+    .single();
+
+  if (!po) return { error: 'Purchase order not found.' };
+  if (po.status !== 'pending_signature' || po.signed_doc_status !== 'pending_approval') {
+    return { error: 'This purchase order has no signed document awaiting review.' };
+  }
+
+  const now = new Date().toISOString();
+
+  if (decision === 'approve') {
+    const { error } = await supabase
+      .from('purchase_orders')
+      .update({
+        status: 'signed',
+        signed_doc_status: 'approved',
+        signed_doc_approved_by: user.id,
+        signed_doc_approved_at: now,
+        signed_doc_rejection_reason: null,
+        updated_at: now,
+      })
+      .eq('id', poId);
+    if (error) return { error: error.message };
+
+    await recordAuditLog({
+      entity_type: 'purchase_order',
+      entity_id: poId,
+      action: 'UPDATE',
+      changes: { after: { status: 'signed', signed_doc_status: 'approved', signed_doc_approved_by: user.id } },
+      performed_by: user.id,
+    });
+  } else {
+    const rejectionReason = (reason ?? '').trim();
+    const { error } = await supabase
+      .from('purchase_orders')
+      .update({
+        status: 'pending_signature',
+        signed_doc_status: 'rejected',
+        signed_doc_rejection_reason: rejectionReason || 'No reason provided',
+        signed_doc_approved_by: null,
+        signed_doc_approved_at: null,
+        updated_at: now,
+      })
+      .eq('id', poId);
+    if (error) return { error: error.message };
+
+    await recordAuditLog({
+      entity_type: 'purchase_order',
+      entity_id: poId,
+      action: 'UPDATE',
+      changes: { after: { status: 'pending_signature', signed_doc_status: 'rejected', reason: rejectionReason } },
+      performed_by: user.id,
+    });
+  }
+
+  const vendor = (po.vendors ?? {}) as { name?: string };
+  await createNotification({
+    type: 'po',
+    title: decision === 'approve' ? '✅ Signed PO Approved' : '⚠️ Signed PO Rejected',
+    message: `${vendor.name || 'Vendor'}${decision === 'approve' ? "'s signed copy was approved" : "'s signed copy was rejected"} for ${po.po_number || 'the PO'}${decision === 'reject' && reason ? ` — ${reason}` : ''}.`,
+    link: `/dashboard/purchase-orders/${poId}`,
+    created_by: user.id,
+  });
+
+  revalidatePath(`/dashboard/purchase-orders/${poId}`);
+  revalidatePath('/dashboard/purchase-orders');
+  return { success: true };
+}
+
 export async function updatePOCcEmails(poId: string, ccEmails: string[]) {
   const supabase = await createClient();
   const { user, error: authError } = await requireCapability('po.write', supabase);
