@@ -12,8 +12,8 @@ export function statusBadgeClasses(status?: string | null): string {
   if (s === 'draft' || s === 'archived' || s === 'unsubmitted' || s === 'not_submitted' || s === 'planned' || s === 'inactive') return STATUS_BADGE.slate;
   if (s === 'cancelled' || s === 'expired' || s === 'terminated' || s === 'overdue' || s === 'failed' || s === 'bounced' || s === 'voided') return STATUS_BADGE.red;
   if (s === 'approved' || s === 'issued' || s === 'sent' || s === 'received' || s === 'confirmed') return STATUS_BADGE.blue;
-  if (s === 'paid' || s === 'active' || s === 'completed' || s === 'converted' || s === 'fully_billed' || s === 'fulfilled' || s === 'delivered' || s === 'opened') return STATUS_BADGE.emerald;
-  if (s === 'pending' || s === 'pending_approval' || s === 'pending_payment' || s === 'in_progress' || s === 'on_hold' || s === 'partially_paid' || s === 'partially_billed' || s === 'submitted' || s === 'signed') return STATUS_BADGE.amber;
+  if (s === 'paid' || s === 'active' || s === 'completed' || s === 'converted' || s === 'fully_billed' || s === 'fulfilled' || s === 'delivered' || s === 'opened' || s === 'signed') return STATUS_BADGE.emerald;
+  if (s === 'pending' || s === 'pending_approval' || s === 'pending_payment' || s === 'in_progress' || s === 'on_hold' || s === 'partially_paid' || s === 'partially_billed' || s === 'submitted' || s === 'pending_signature') return STATUS_BADGE.amber;
   if (s === 'pending_finance') return STATUS_BADGE.violet;
   return STATUS_BADGE.slate;
 }
