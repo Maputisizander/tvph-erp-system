@@ -1,6 +1,6 @@
 import * as React from "react";
-import { Link, Section, Text } from "@react-email/components";
-import { EmailLayout, styles } from "./layout";
+import { Link, Text } from "@react-email/components";
+import { CenteredLayout, styles } from "./layout-centered";
 
 export interface PoPendingFinanceEmailProps {
   poNumber: string;
@@ -8,13 +8,14 @@ export interface PoPendingFinanceEmailProps {
   amountLabel?: string | null;
   downpaymentLabel?: string | null;
   submittedByName?: string | null;
+  approvedByName?: string | null;
   reviewUrl: string;
 }
 
 /**
  * Sent to the finance pool when a PO passes the admin stage and is pending the
- * finance budget check. Once approved, the PO is issued to the vendor. The
- * action lives in-app.
+ * finance budget check. Centered barebones layout with a summary + CTA link to
+ * the PO detail page where finance can Approve/Reject.
  */
 export function PoPendingFinanceEmail({
   poNumber,
@@ -22,39 +23,52 @@ export function PoPendingFinanceEmail({
   amountLabel,
   downpaymentLabel,
   submittedByName,
+  approvedByName,
   reviewUrl,
 }: PoPendingFinanceEmailProps) {
   return (
-    <EmailLayout
-      preview={`PO ${poNumber} is pending the finance review`}
-      footerQuestionText="Questions? Just reply to this email and our team will help."
-    >
+    <CenteredLayout preview={`PO ${poNumber} is pending the finance review`}>
       <Text style={styles.heading}>Purchase Order {poNumber} needs the finance review</Text>
       <Text style={styles.paragraph}>
-        A purchase order has been approved by the admin and now requires the
-        finance budget check before it can be issued to the vendor.
+        Kindly review the purchase request against the available budget and let
+        me know if any revisions are required. If everything is in order, I
+        would appreciate your approval at your earliest convenience to avoid any
+        delay in processing.
       </Text>
-      <Section style={styles.panel}>
-        <Text style={styles.meta}>PO Number: {poNumber}</Text>
-        <Text style={styles.meta}>Vendor: {vendorName}</Text>
-        {amountLabel ? <Text style={styles.meta}>Total Amount: {amountLabel}</Text> : null}
-        {downpaymentLabel ? (
-          <Text style={styles.meta}>Downpayment: {downpaymentLabel}</Text>
-        ) : null}
-        {submittedByName ? (
-          <Text style={styles.meta}>Submitted by: {submittedByName}</Text>
-        ) : null}
-      </Section>
-      <Section style={{ margin: "8px 0 16px" }}>
-        <Link href={reviewUrl} style={styles.button}>
-          Review &amp; approve
-        </Link>
-      </Section>
-      <Text style={styles.paragraph}>
+      <Text style={styles.meta}>
+        PO Number: <span style={styles.metaValue}>{poNumber}</span>
+      </Text>
+      <Text style={styles.meta}>
+        Vendor: <span style={styles.metaValue}>{vendorName}</span>
+      </Text>
+      {amountLabel ? (
+        <Text style={styles.meta}>
+          Total Amount: <span style={styles.metaValue}>{amountLabel}</span>
+        </Text>
+      ) : null}
+      {downpaymentLabel ? (
+        <Text style={styles.meta}>
+          Downpayment: <span style={styles.metaValue}>{downpaymentLabel}</span>
+        </Text>
+      ) : null}
+      {submittedByName ? (
+        <Text style={styles.meta}>
+          Submitted by: <span style={styles.metaValue}>{submittedByName}</span>
+        </Text>
+      ) : null}
+      {approvedByName ? (
+        <Text style={styles.meta}>
+          Approved by: <span style={styles.metaValue}>{approvedByName}</span>
+        </Text>
+      ) : null}
+      <Link href={reviewUrl} style={styles.button}>
+        Review &amp; approve
+      </Link>
+      <Text style={styles.finePrint}>
         Open the purchase order to approve and issue it to the vendor, or reject
         it back to the drafter with a reason.
       </Text>
-    </EmailLayout>
+    </CenteredLayout>
   );
 }
 

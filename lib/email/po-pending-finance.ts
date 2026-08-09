@@ -32,7 +32,7 @@ export async function sendPoPendingFinanceEmail(
 
   const { data: po, error } = await supabase
     .from("purchase_orders")
-    .select("po_number, amount, currency, dp_amount, dp_percent, submitted_for_approval_by, vendors ( name )")
+    .select("po_number, amount, currency, dp_amount, dp_percent, submitted_for_approval_by, approved_by_user_id, vendors ( name )")
     .eq("id", poId)
     .single();
 
@@ -65,6 +65,17 @@ export async function sendPoPendingFinanceEmail(
     submittedByName = (submitter?.full_name as string | null) ?? null;
   }
 
+  const approverId = (po.approved_by_user_id as string | null) ?? opts.actorId ?? null;
+  let approvedByName: string | null = null;
+  if (approverId) {
+    const { data: approver } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", approverId)
+      .single();
+    approvedByName = (approver?.full_name as string | null) ?? null;
+  }
+
   const vendor = (po.vendors ?? {}) as { name?: string };
   const currency = (po.currency as string) || "PHP";
 
@@ -86,6 +97,7 @@ export async function sendPoPendingFinanceEmail(
       amountLabel: formatAmount(po.amount as number, currency),
       downpaymentLabel,
       submittedByName,
+      approvedByName,
       reviewUrl: `${BASE_URL}/dashboard/purchase-orders/${poId}`,
     }),
     createdBy: opts.actorId ?? null,
