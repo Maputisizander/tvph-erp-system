@@ -6,6 +6,130 @@ import { extractDocumentMetadata } from "@/app/actions/ocr";
 import { createNotification } from "@/utils/notifications";
 import { revalidatePath } from "next/cache";
 
+async function findValidMagicLink(supabase: Awaited<ReturnType<typeof createServiceRoleClient>>, token: string) {
+  return supabase
+    .from("magic_links")
+    .select("*")
+    .eq("token", token)
+    .gt("expires_at", new Date().toISOString())
+    .maybeSingle();
+}
+
+/**
+ * Validates a magic link minted for the PO signature portal (entity_type 'po')
+ * and returns the PO, vendor, and any prior signature. Vendors may come back
+ * to re-sign later, so this works regardless of the PO's current status.
+ */
+export async function validatePoPortalToken(token: string) {
+  const supabase = createServiceRoleClient();
+  const { data: magicLink, error } = await findValidMagicLink(supabase, token);
+
+  if (error || !magicLink) {
+    return { error: "Invalid or expired access token." };
+  }
+  if (magicLink.entity_type !== "po") {
+    return { error: "This link is not a purchase order signature link." };
+  }
+
+  const { data: po } = await supabase
+    .from("purchase_orders")
+    .select("id, po_number, amount, currency, status, issued_date, sent_at, signed_at, vendors ( name, contact_person )")
+    .eq("id", magicLink.entity_id)
+    .single();
+
+  if (!po) {
+    return { error: "Purchase order not found." };
+  }
+
+  const vendor = (po.vendors ?? {}) as { name?: string; contact_person?: string | null };
+
+  const { data: signature } = await supabase
+    .from("po_signatures")
+    .select("signer_name, signer_title, ip_address, signed_at")
+    .eq("po_id", po.id)
+    .order("signed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return {
+    success: true,
+    po,
+    vendor,
+    alreadySigned: !!signature?.signed_at,
+    signature,
+  };
+}
+
+/**
+ * Records a vendor e-signature for a PO: inserts a po_signatures row, stamps
+ * signed_at, and returns the PO from the transient 'signed' state back to
+ * 'issued'. Idempotent — re-signing replaces the latest signature. Anonymous
+ * portal access uses the service-role client, so recordAuditLog (user-scoped)
+ * is skipped here; the po_signatures row IS the audit trail.
+ */
+export async function signPortalPO(token: string, signerName: string, signerTitle: string, ipAddress: string) {
+  const name = signerName.trim();
+  if (!name) return { error: "Please enter your full name to sign." };
+
+  const supabase = createServiceRoleClient();
+  const { data: magicLink, error } = await findValidMagicLink(supabase, token);
+
+  if (error || !magicLink) {
+    return { error: "Invalid or expired access token." };
+  }
+  if (magicLink.entity_type !== "po") {
+    return { error: "This link is not a purchase order signature link." };
+  }
+
+  const { data: po } = await supabase
+    .from("purchase_orders")
+    .select("id, po_number, status, vendors ( name )")
+    .eq("id", magicLink.entity_id)
+    .single();
+
+  if (!po) {
+    return { error: "Purchase order not found." };
+  }
+
+  const vendor = (po.vendors ?? {}) as { name?: string };
+
+  const now = new Date().toISOString();
+  const { error: sigError } = await supabase.from("po_signatures").insert({
+    po_id: po.id,
+    signer_name: name,
+    signer_title: signerTitle.trim() || null,
+    ip_address: ipAddress,
+    signed_at: now,
+  });
+  if (sigError) return { error: sigError.message };
+
+  // 'signed' is a transient awaiting-signature state; once signed the PO is
+  // operational again (issued). Cancelled POs keep their status.
+  if (po.status === "signed") {
+    await supabase
+      .from("purchase_orders")
+      .update({ status: "issued", signed_at: now, updated_at: now })
+      .eq("id", po.id);
+  } else {
+    await supabase
+      .from("purchase_orders")
+      .update({ signed_at: now, updated_at: now })
+      .eq("id", po.id);
+  }
+
+  await createNotification({
+    type: "po",
+    title: "✍️ PO Signed",
+    message: `${vendor.name || "Vendor"} signed purchase order ${po.po_number || ""} (${name}).`,
+    link: `/dashboard/purchase-orders/${po.id}`,
+    created_by: magicLink.entity_id,
+  });
+
+  revalidatePath(`/dashboard/purchase-orders/${po.id}`);
+  revalidatePath("/dashboard/purchase-orders");
+  return { success: true, signedAt: now };
+}
+
 export async function validatePortalToken(token: string) {
   const supabase = createServiceRoleClient();
   const { data: magicLink, error } = await supabase
