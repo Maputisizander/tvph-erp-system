@@ -38,7 +38,8 @@ export function PoForSignatureEmail({
       <Text style={styles.paragraph}>
         Please review and e-sign Purchase Order <strong>{poNumber}</strong>.
         Clicking the button below opens a secure page where you can confirm and
-        sign the purchase order.
+        sign the purchase order. Have your executed/signed copy ready to upload
+        — it is required to complete your signature.
       </Text>
       <Section style={styles.panel}>
         <Text style={styles.meta}>PO Number: {poNumber}</Text>
