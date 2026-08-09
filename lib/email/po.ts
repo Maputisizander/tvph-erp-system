@@ -106,7 +106,7 @@ export async function sendPoIssuedEmail(
 /**
  * Emails the vendor a magic link to e-sign an issued PO. Does not attach the
  * PDF (the vendor opens the signature page instead). Decoupled from the action
- * that sets status to 'signed' — always resolves to a result object.
+ * that sets status to 'pending_signature' — always resolves to a result object.
  */
 export async function sendPoForSignatureEmail(
   poId: string,

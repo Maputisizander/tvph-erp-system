@@ -919,7 +919,7 @@ export async function updatePOStatus(poId: string, status: string) {
   // 'pending_finance' directly, otherwise a po.status holder could bypass
   // approval. 'signed' likewise only via sendPOForSignature, so a signature
   // request is always accompanied by the magic-link email.
-  if (status === 'issued' || status === 'pending_finance' || status === 'signed') {
+  if (status === 'issued' || status === 'pending_finance' || status === 'pending_signature') {
     const { data: po } = await supabase
       .from('purchase_orders')
       .select('status')
@@ -985,9 +985,9 @@ export async function resendPurchaseOrderEmail(poId: string) {
 
 /**
  * Requests an e-signature from the vendor: moves the PO into the transient
- * 'signed' state (out for signature), stamps sent_at, mints a portal magic
- * link, and emails the vendor a link to the signature page. Can be re-requested
- * for re-sign (status already 'signed').
+ * 'pending_signature' state (out for signature), stamps sent_at, mints a
+ * portal magic link, and emails the vendor a link to the signature page. Can
+ * be re-requested for re-sign (status already 'pending_signature').
  */
 export async function sendPOForSignature(poId: string) {
   const supabase = await createClient();
@@ -1000,7 +1000,7 @@ export async function sendPOForSignature(poId: string) {
     .eq('id', poId)
     .single();
 
-  if (!po || !['issued', 'signed'].includes(po.status)) {
+  if (!po || !['issued', 'pending_signature'].includes(po.status)) {
     return { error: 'Signature requests can only be sent for issued purchase orders.' };
   }
 
@@ -1012,7 +1012,7 @@ export async function sendPOForSignature(poId: string) {
   const now = new Date().toISOString();
   const { error, count } = await supabase
     .from('purchase_orders')
-    .update({ status: 'signed', sent_at: now, updated_at: now }, { count: 'exact' })
+    .update({ status: 'pending_signature', sent_at: now, updated_at: now }, { count: 'exact' })
     .eq('id', poId);
 
   if (error) return { error: error.message };
@@ -1022,7 +1022,7 @@ export async function sendPOForSignature(poId: string) {
     entity_type: 'purchase_order',
     entity_id: poId,
     action: 'UPDATE',
-    changes: { after: { status: 'signed', sent_at: now } },
+    changes: { after: { status: 'pending_signature', sent_at: now } },
     performed_by: user.id,
   });
 

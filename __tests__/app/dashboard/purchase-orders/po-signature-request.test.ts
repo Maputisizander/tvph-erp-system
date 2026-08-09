@@ -1,10 +1,10 @@
 /**
  * Unit tests for the sendPOForSignature server action.
  *
- * sendPOForSignature moves an issued PO into the transient 'signed' (out for
- * signature) state, stamps sent_at, mints a portal magic link, and emails the
- * vendor. It must reject non-issued POs and never fire when the caller lacks
- * the email.send capability.
+ * sendPOForSignature moves an issued PO into the transient 'pending_signature'
+ * (out for signature) state, stamps sent_at, mints a portal magic link, and
+ * emails the vendor. It must reject non-issued POs and never fire when the
+ * caller lacks the email.send capability.
  */
 
 import { sendPOForSignature } from '@/app/dashboard/purchase-orders/actions';
@@ -94,7 +94,7 @@ describe('sendPOForSignature', () => {
     expect(mockCreatePortalLink).not.toHaveBeenCalled();
   });
 
-  it('rejects when the PO is not issued or signed', async () => {
+  it('rejects when the PO is not issued or pending_signature', async () => {
     mockSupabase.from().select().eq().single.mockResolvedValue({
       data: { status: 'draft' },
       error: null,
@@ -108,11 +108,11 @@ describe('sendPOForSignature', () => {
     expect(mockCreatePortalLink).not.toHaveBeenCalled();
   });
 
-  it('moves an issued PO to signed, mints the link, and emails the vendor', async () => {
+  it('moves an issued PO to pending_signature, mints the link, and emails the vendor', async () => {
     const result = await sendPOForSignature('po-123');
 
     const updateCall = mockSupabase.from().update.mock.calls[0];
-    expect(updateCall[0].status).toBe('signed');
+    expect(updateCall[0].status).toBe('pending_signature');
     expect(typeof updateCall[0].sent_at).toBe('string');
 
     expect(mockCreatePortalLink).toHaveBeenCalledWith('po', 'po-123', 7, 'po');
@@ -131,9 +131,9 @@ describe('sendPOForSignature', () => {
     expect(result).toEqual({ success: true, emailWarning: undefined });
   });
 
-  it('allows re-sign (status already signed)', async () => {
+  it('allows re-sign (status already pending_signature)', async () => {
     mockSupabase.from().select().eq().single.mockResolvedValue({
-      data: { status: 'signed' },
+      data: { status: 'pending_signature' },
       error: null,
     });
 
