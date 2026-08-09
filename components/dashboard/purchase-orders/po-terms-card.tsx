@@ -62,7 +62,7 @@ export function PoTermsCard({ poId, status, terms, penalty, canEdit, canOverride
           <p className="text-sm text-slate-500 mt-1">Net {terms.net_days ?? 30} days{terms.dp_due_days != null ? ` · DP due in ${terms.dp_due_days} days` : ""}</p>
           {Number(terms.dp_amount) > 0 && (
             <p className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-400 mt-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 px-2.5 py-1 rounded-lg">
-              Downpayment: ₱{Number(terms.dp_amount).toLocaleString()}
+              Downpayment: ₱{Number(terms.dp_amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
             </p>
           )}
           <p className="text-sm text-slate-500">{terms.penalty_rate == null ? "No penalty rate configured" : `${Number(terms.penalty_rate) * 100}% ${terms.penalty_type === "fixed" ? "fixed (once)" : "monthly (daily-prorated)"}`}</p>

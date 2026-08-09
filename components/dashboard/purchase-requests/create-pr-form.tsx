@@ -372,12 +372,12 @@ export function CreatePRForm({
                     DOWNPAYMENT {dpPercent || 0}%
                   </span>
                   <p className="text-lg font-bold text-amber-700 dark:text-amber-400 tabular-nums">
-                    ₱{dpAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₱{dpAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                   </p>
                   <p className="text-xs text-slate-500">
                     Balance: ₱{Math.max(0, totalAmount - dpAmount).toLocaleString("en-US", {
                       minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
+                      maximumFractionDigits: 4,
                     })}
                   </p>
                 </div>
@@ -496,7 +496,7 @@ export function CreatePRForm({
                     <td className={`${tdClass} text-right font-semibold text-slate-900 dark:text-white pr-4`}>
                       ₱{rowAmount.toLocaleString("en-US", {
                         minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
+                        maximumFractionDigits: 4,
                       })}
                     </td>
                     <td className={tdClass}>
@@ -521,7 +521,7 @@ export function CreatePRForm({
                 <td className="px-3 py-3 text-right font-bold text-lg text-slate-900 dark:text-white pr-4">
                   ₱{totalAmount.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
+                    maximumFractionDigits: 4,
                   })}
                 </td>
                 <td></td>
@@ -664,7 +664,7 @@ export function CreatePRForm({
                 <td className="px-3 py-3 text-right font-bold text-slate-900 dark:text-white">
                   {totalCable.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
+                    maximumFractionDigits: 4,
                   })}
                 </td>
                 <td></td>

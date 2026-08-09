@@ -294,7 +294,7 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                 DOWNPAYMENT {Number(pr.dp_percent) > 0 ? `${Number(pr.dp_percent)}%` : ""}
               </span>
               <p className="text-xl font-bold text-amber-700 dark:text-amber-400 tabular-nums">
-                {currencySymbol}{Number(pr.dp_amount).toLocaleString()}
+                {currencySymbol}{Number(pr.dp_amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
               </p>
             </div>
           </div>
@@ -302,7 +302,7 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
             Balance after downpayment:{" "}
             <span className="font-bold">
               {currencySymbol}
-              {Math.max(0, Number(pr.amount) - Number(pr.dp_amount)).toLocaleString()}
+              {Math.max(0, Number(pr.amount) - Number(pr.dp_amount)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
             </span>
           </p>
         </div>
@@ -351,7 +351,7 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               <CircleDollarSign className="h-3.5 w-3.5" /> Estimated Total
             </label>
             <p className="mt-1 text-slate-900 dark:text-slate-300 font-medium">
-              {currencySymbol}{Number(pr.amount).toLocaleString()}
+              {currencySymbol}{Number(pr.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
             </p>
           </div>
           <div>
@@ -434,8 +434,8 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                     <td className="px-4 py-3 text-slate-900 dark:text-white font-medium">{li.description}</td>
                     <td className="px-4 py-3 text-right text-slate-900 dark:text-white">{Number(li.qty).toLocaleString()}</td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{li.uom}</td>
-                    <td className="px-4 py-3 text-right text-slate-900 dark:text-white">{currencySymbol}{Number(li.unit_price).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-900 dark:text-white">{currencySymbol}{Number(li.amount).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right text-slate-900 dark:text-white">{currencySymbol}{Number(li.unit_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-slate-900 dark:text-white">{currencySymbol}{Number(li.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</td>
                   </tr>
                 ))}
               </tbody>
@@ -445,7 +445,7 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                     Estimated Total
                   </td>
                   <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-white">
-                    {currencySymbol}{lineItems.reduce((sum: number, li: any) => sum + Number(li.amount), 0).toLocaleString()}
+                    {currencySymbol}{lineItems.reduce((sum: number, li: any) => sum + Number(li.amount), 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                   </td>
                 </tr>
               </tfoot>
@@ -488,7 +488,7 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{s.phase || "—"}</td>
                     <td className="px-4 py-3 text-right text-slate-900 dark:text-white">{Number(s.no_of_nodes).toLocaleString()}</td>
                     <td className="px-4 py-3 text-right text-slate-900 dark:text-white">
-                      {Number(s.cable_length_km).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {Number(s.cable_length_km).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                     </td>
                   </tr>
                 ))}
@@ -502,7 +502,7 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
                     {siteDetails.reduce((sum: number, s: any) => sum + Number(s.no_of_nodes), 0).toLocaleString()}
                   </td>
                   <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-white">
-                    {siteDetails.reduce((sum: number, s: any) => sum + Number(s.cable_length_km), 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {siteDetails.reduce((sum: number, s: any) => sum + Number(s.cable_length_km), 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                   </td>
                 </tr>
               </tfoot>
