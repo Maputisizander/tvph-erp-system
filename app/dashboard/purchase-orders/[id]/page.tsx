@@ -31,7 +31,6 @@ import { Suspense } from "react";
 import { POProjectAssigner } from "@/components/dashboard/purchase-orders/po-project-assigner";
 import { PODownloadDropdown } from "@/components/dashboard/purchase-orders/po-download-dropdown";
 import { PoResendButton } from "@/components/dashboard/purchase-orders/po-resend-button";
-import { PoSignatureRequestButton } from "@/components/dashboard/purchase-orders/po-signature-request-button";
 import { PoIssueButton } from "@/components/dashboard/purchase-orders/po-issue-button";
 import { PoMoreDropdown } from "@/components/dashboard/purchase-orders/po-more-dropdown";
 import { PoApprovalActions } from "@/components/dashboard/purchase-orders/po-approval-actions";
@@ -442,9 +441,6 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               {ISSUED_OR_LATER.includes(po.status) && canSendEmail && (
                 <PoResendButton poId={po.id} menu />
               )}
-              {["issued", "pending_signature"].includes(po.status) && canSendEmail && (
-                <PoSignatureRequestButton poId={po.id} menu />
-              )}
               {canCreatePR &&
                 (!paymentRequest ||
                   paymentRequest.status === "rejected" ||
@@ -488,7 +484,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
             </p>
             <p className="text-xs text-amber-600/80 dark:text-amber-400/60 mt-1">
               A signature request was sent{po.sent_at ? ` on ${new Date(po.sent_at).toLocaleDateString(undefined, { dateStyle: "long" })}` : ""} — awaiting the vendor's signed copy.
-              {canSendEmail ? " Use “Request Signature” above to re-send the link." : ""}
+              {canSendEmail ? " Use “Resend to Vendor” above to re-send the link." : ""}
             </p>
           </div>
         </div>
@@ -504,7 +500,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               {[poSignature.signer_title, new Date(poSignature.signed_at).toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" }), poSignature.ip_address && poSignature.ip_address !== "Unknown" ? `IP ${poSignature.ip_address}` : null]
                 .filter(Boolean)
                 .join(" · ")}
-              {canSendEmail ? " Use “Request Signature” to re-request if needed." : ""}
+              {canSendEmail ? " Use “Resend to Vendor” to re-send if needed." : ""}
             </p>
           </div>
         </div>

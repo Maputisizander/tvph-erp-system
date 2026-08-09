@@ -104,9 +104,9 @@ export async function sendPoIssuedEmail(
 }
 
 /**
- * Emails the vendor a magic link to e-sign an issued PO. Does not attach the
- * PDF (the vendor opens the signature page instead). Decoupled from the action
- * that sets status to 'pending_signature' — always resolves to a result object.
+ * Emails the vendor a magic link to e-sign an issued PO, with the PO PDF
+ * attached so the vendor can review it before signing. Decoupled from the
+ * action that sets status to 'pending_signature' — always resolves to a result.
  */
 export async function sendPoForSignatureEmail(
   poId: string,
@@ -140,6 +140,11 @@ export async function sendPoForSignatureEmail(
 
   const currency = (po.currency as string) || "PHP";
 
+  const rendered = await renderPoDocument(poId);
+  if (!rendered) {
+    return { status: "failed", error: "Failed to render PO PDF." };
+  }
+
   return sendEmail({
     kind: "po_for_signature",
     refId: poId,
@@ -155,6 +160,7 @@ export async function sendPoForSignatureEmail(
       signUrl: opts.signUrl,
       senderName: creator.full_name,
     }),
+    attachments: [{ filename: rendered.filename, content: rendered.buffer }],
     createdBy: opts.actorId ?? (po.created_by as string | null),
     vendorId: po.vendor_id as string | null,
   });
