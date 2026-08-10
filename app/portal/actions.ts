@@ -5,12 +5,14 @@ import { stampPdfWithSignature } from "@/utils/pdf-stamper";
 import { extractDocumentMetadata } from "@/app/actions/ocr";
 import { createNotification } from "@/utils/notifications";
 import { revalidatePath } from "next/cache";
+import { combineImagesToPdf } from "@/lib/pdf/combineImagesToPdf";
 
 async function findValidMagicLink(supabase: Awaited<ReturnType<typeof createServiceRoleClient>>, token: string) {
   return supabase
     .from("magic_links")
     .select("*")
     .eq("token", token)
+    .is("revoked_at", null)
     .gt("expires_at", new Date().toISOString())
     .maybeSingle();
 }
@@ -85,16 +87,57 @@ export async function signPortalPO(
   signerName: string,
   signerTitle: string,
   ipAddress: string,
-  file: File,
+  files: File | File[],
 ) {
   const name = signerName.trim();
   if (!name) return { error: "Please enter your full name to sign." };
 
-  if (!file) {
-    return { error: "Please upload the signed purchase order PDF to complete signing." };
+  const fileList = (Array.isArray(files) ? files : files ? [files] : []).filter(Boolean) as File[];
+  if (fileList.length === 0) {
+    return { error: "Please upload the signed purchase order PDF or up to 3 images to complete signing." };
   }
-  if (file.type !== "application/pdf") {
-    return { error: "Only PDF files are accepted for the signed purchase order." };
+
+  const ALLOWED_IMAGE = new Set(["image/jpeg", "image/jpg", "image/png"]);
+  const pdfs = fileList.filter((f) => f.type === "application/pdf");
+  const images = fileList.filter((f) => ALLOWED_IMAGE.has(f.type));
+  const unsupported = fileList.filter((f) => f.type !== "application/pdf" && !ALLOWED_IMAGE.has(f.type));
+  if (unsupported.length > 0) {
+    return { error: "Only PDF or JPEG/PNG images are accepted for the signed purchase order." };
+  }
+  if (pdfs.length > 0 && images.length > 0) {
+    return { error: "Please upload either a single PDF or up to 3 images, not both." };
+  }
+  if (pdfs.length > 1) {
+    return { error: "Only a single PDF file is accepted." };
+  }
+  if (images.length > 3) {
+    return { error: "Up to 3 images are accepted. Please combine additional pages into the same images." };
+  }
+  if (images.length === 0 && pdfs.length === 0) {
+    return { error: "Only PDF or JPEG/PNG images are accepted for the signed purchase order." };
+  }
+
+  // Build the final PDF buffer to store (single PDF as-is, or 1–3 images combined into one PDF
+  // so every downstream viewer keeps working against a single signed_file_url).
+  let fileBuffer: Buffer;
+  let fileName: string;
+  let displayName: string;
+  if (pdfs.length === 1) {
+    const pdfFile = pdfs[0];
+    fileBuffer = Buffer.from(await pdfFile.arrayBuffer());
+    fileName = pdfFile.name;
+    displayName = fileName;
+  } else {
+    const imagePayloads = await Promise.all(
+      images.map(async (f) => ({
+        bytes: new Uint8Array(await f.arrayBuffer()),
+        mimeType: f.type === "image/jpg" ? "image/jpeg" : f.type,
+      })),
+    );
+    const pdfBytes = await combineImagesToPdf(imagePayloads);
+    fileBuffer = Buffer.from(pdfBytes);
+    fileName = `signed-PO-${Date.now()}.pdf`;
+    displayName = images.map((f) => f.name).join(", ") || "signed-images.pdf";
   }
 
   const supabase = createServiceRoleClient();
@@ -119,7 +162,6 @@ export async function signPortalPO(
 
   const vendor = (po.vendors ?? {}) as { name?: string };
 
-  const fileBuffer = Buffer.from(await file.arrayBuffer());
   const filePath = `po/${po.id}/signed-${Date.now()}.pdf`;
   const { error: uploadError } = await supabase.storage
     .from("po-artifacts")
@@ -139,7 +181,7 @@ export async function signPortalPO(
     ip_address: ipAddress,
     signed_at: now,
     signed_file_url: publicUrl,
-    signed_file_name: file.name,
+    signed_file_name: displayName,
   });
   if (sigError) return { error: sigError.message };
 
@@ -156,6 +198,9 @@ export async function signPortalPO(
     )
     .eq("id", po.id);
   if (poError) return { error: poError.message };
+
+  // Single-use: retire this PO link so the vendor cannot re-upload without a resend from ERP.
+  await supabase.from("magic_links").update({ revoked_at: now }).eq("id", magicLink.id);
 
   await createNotification({
     type: "po",

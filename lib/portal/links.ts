@@ -49,6 +49,18 @@ export async function createPortalLink(
   expiresAt.setDate(expiresAt.getDate() + expiresInDays);
 
   const supabase = createServiceRoleClient();
+
+  // Single-use PO links: retire any still-active links for this PO so
+  // only the fresh token works (resend → old link invalid).
+  if (entityType === "po") {
+    await supabase
+      .from("magic_links")
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("entity_type", "po")
+      .eq("entity_id", entityId)
+      .is("revoked_at", null);
+  }
+
   const { error } = await supabase.from("magic_links").insert({
     token,
     entity_id: entityId,

@@ -99,45 +99,41 @@ async function PortalPoSignContent({ params }: { params: Promise<{ token: string
           </div>
 
           {/* Body */}
-          <div className="p-6 md:p-8">
-            {result.alreadySigned ? (
-              <div className="text-center py-8">
-                <div className="h-16 w-16 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mx-auto mb-4">
-                  <CheckCircle2 className="h-8 w-8" />
-                </div>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white font-plus-jakarta">
-                  This Purchase Order Has Been Signed
-                </h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-md mx-auto">
-                  Signed by <span className="font-semibold">{result.signature?.signer_name}</span>
-                  {result.signature?.signer_title ? `, ${result.signature.signer_title}` : ""}
-                  {result.signature?.signed_at
-                    ? ` on ${new Date(result.signature.signed_at).toLocaleDateString("en-PH", { day: "numeric", month: "long", year: "numeric" })}`
-                    : ""}.
-                  {po.status === "pending_signature" ? " You may sign again to re-confirm." : ""}
-                </p>
-                {result.signature?.signed_file_url && (
-                  <a
-                    href={result.signature.signed_file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 mt-6 bg-emerald-700 hover:bg-emerald-600 text-white rounded-2xl px-6 py-3 font-semibold transition-all active:scale-95"
-                  >
-                    <FileText className="h-5 w-5" /> Download Signed PO
-                  </a>
-                )}
-                {po.status === "pending_signature" && (
-                  <PoSignForm
-                    token={token}
-                    className="mt-6"
-                    signedFileUrl={result.signature?.signed_file_url}
-                  />
-                )}
-              </div>
-            ) : (
-              <PoSignForm token={token} />
-            )}
-          </div>
+           <div className="p-6 md:p-8">
+             {result.alreadySigned ? (
+               <div className="text-center py-8">
+                 <div className="h-16 w-16 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mx-auto mb-4">
+                   <CheckCircle2 className="h-8 w-8" />
+                 </div>
+                 <h2 className="text-xl font-bold text-slate-900 dark:text-white font-plus-jakarta">
+                   This Purchase Order Has Been Signed
+                 </h2>
+                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-md mx-auto">
+                   Signed by <span className="font-semibold">{result.signature?.signer_name}</span>
+                   {result.signature?.signer_title ? `, ${result.signature.signer_title}` : ""}
+                   {result.signature?.signed_at
+                     ? ` on ${new Date(result.signature.signed_at).toLocaleDateString("en-PH", { day: "numeric", month: "long", year: "numeric" })}`
+                     : ""}
+                   .
+                 </p>
+                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                   This link has been retired. Request a new link from your TelcoVantage contact if a correction is needed.
+                 </p>
+                 {result.signature?.signed_file_url && (
+                   <a
+                     href={result.signature.signed_file_url}
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     className="inline-flex items-center gap-2 mt-6 bg-emerald-700 hover:bg-emerald-600 text-white rounded-2xl px-6 py-3 font-semibold transition-all active:scale-95"
+                   >
+                     <FileText className="h-5 w-5" /> Download Signed PO
+                   </a>
+                 )}
+               </div>
+             ) : (
+               <PoSignForm token={token} />
+             )}
+           </div>
         </div>
 
         <p className="text-center text-xs text-slate-400 dark:text-slate-600 mt-6">
