@@ -39,7 +39,7 @@ const DOCUMENT_TYPES = [
   { id: 'vendor_information_summary', label: 'Vendor Information Summary' },
   { id: 'general_information_sheet', label: 'Latest General Information Sheet' },
   { id: 'audited_financial_statements', label: 'Audited Financial Statements (3yrs)' },
-  { id: 'sec_registration', label: 'SEC Registration / Articles' },
+  { id: 'sec_registration', label: 'SEC Registration / DTI' },
   { id: 'secretary_certificate', label: 'Secretary Certificate' },
   { id: 'safety_drug_policy', label: 'Safety & Drug Free Policy' },
   { id: 'iso_certification', label: 'ISO Certification' },
