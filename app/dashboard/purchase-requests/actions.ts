@@ -658,8 +658,9 @@ export async function revivePurchaseRequest(prId: string) {
 
 export async function deletePurchaseRequest(prId: string) {
   const supabase = await createClient();
-  const { user, error: authError } = await requireCapability('pr.delete', supabase);
+  const { user, role, error: authError } = await getCurrentProfile(supabase);
   if (authError || !user) return { error: authError || 'Unauthorized.' };
+  if (!hasCapability(role, 'pr.delete')) return { error: 'Unauthorized.' };
 
   const { data: pr } = await supabase
     .from('purchase_requests')
@@ -667,8 +668,22 @@ export async function deletePurchaseRequest(prId: string) {
     .eq('id', prId)
     .single();
 
-  if (!pr || !['draft', 'cancelled'].includes(pr.status)) {
-    return { error: 'Only draft or cancelled PRs can be deleted.' };
+  // Superadmins may delete a PR in any status; everyone else only drafts.
+  const allowedStatuses = role === 'superadmin'
+    ? ['draft', 'cancelled', 'pending_approval', 'pending_finance', 'approved', 'converted']
+    : ['draft'];
+  if (!pr || !allowedStatuses.includes(pr.status)) {
+    return { error: role === 'superadmin' ? 'Purchase request not found.' : 'Only draft PRs can be deleted.' };
+  }
+
+  // A converted PR is referenced by its PO (no cascade on the FK), so unlink
+  // it first. The PO keeps its pr_number snapshot as a historical record.
+  if (pr.status === 'converted') {
+    const { error: unlinkError } = await supabase
+      .from('purchase_orders')
+      .update({ purchase_request_id: null })
+      .eq('purchase_request_id', prId);
+    if (unlinkError) return { error: unlinkError.message };
   }
 
   const { error } = await supabase

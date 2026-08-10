@@ -145,7 +145,7 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
                 <th className="px-3 py-3 font-semibold">Project</th>
                 <th className="px-3 py-3 font-semibold">Preferred Vendor</th>
                 <th className="px-3 py-3 font-semibold">Est. Amount</th>
-                <th className="px-3 py-3 font-semibold">Status</th>
+                <th className="px-3 py-3 font-semibold text-center">Status</th>
                 <th className="px-3 py-3 font-semibold text-right">Actions</th>
               </tr>
             </thead>
@@ -203,7 +203,7 @@ async function PurchaseRequestsContent({ searchParams: searchParamsPromise }: { 
                   </td>
                   <td className="px-3 py-3.5 text-right">
                     <span className="inline-flex items-center justify-end gap-2">
-                      {['draft', 'cancelled'].includes(pr.status) && canDelete && (
+                      {canDelete && (currentRole === 'superadmin' || pr.status === 'draft') && (
                         <PrDeleteRowButton prId={pr.id} />
                       )}
                       {pr.status === 'approved' && (
