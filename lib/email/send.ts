@@ -10,6 +10,7 @@ export type EmailKind =
   | "po_for_signature"
   | "po_pending_approval"
   | "po_pending_finance"
+  | "po_signed_acknowledged"
   | "pr_pending_approval"
   | "pr_pending_finance"
   | "pr_approved"

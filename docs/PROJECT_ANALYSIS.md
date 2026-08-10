@@ -1,6 +1,6 @@
 # Project Analysis — TelcoVantage ERP System
 
-> Last updated: 2026-08-04
+> Last updated: 2026-08-10
 
 ## Stack
 
@@ -120,7 +120,7 @@ __tests__/             # Jest tests (business logic focus)
 ## Database
 
 - **38 migrations** in `supabase/migrations/` — additive only, no down-migrations
-- **Key tables**: `profiles`, `vendors`, `vendor_documents`, `tvph_documents`, `projects`, `project_vendors`, `vendor_contracts`, `purchase_orders`, `service_invoices`, `payments`, `audit_logs`, `notifications`, `crm_accounts`, `crm_contacts`, `erp_documents`, `customer_documents`, `employee_documents`, `assets`, `email_logs`, `chat_messages`, `payment_requests`, `payment_reservations`, `completion_certificates`, `internal_entities`, `purchase_requests` (+ `pr_line_items`, `pr_site_details`; header carries `vendor_id` — optional nominated vendor prefilled onto the PO at conversion — plus `dp_amount`/`dp_percent` where `dp_amount = amount × dp_percent/100`, inherited by the PO, which also stores `dp_percent`)
+- **Key tables**: `profiles`, `vendors`, `vendor_documents`, `vendor_document_files`, `vendor_document_file_versions`, `tvph_documents`, `projects`, `project_vendors`, `vendor_contracts`, `purchase_orders`, `service_invoices`, `payments`, `audit_logs`, `notifications`, `crm_accounts`, `crm_contacts`, `erp_documents`, `customer_documents`, `employee_documents`, `assets`, `email_logs`, `chat_messages`, `payment_requests`, `payment_reservations`, `completion_certificates`, `internal_entities`, `purchase_requests` (+ `pr_line_items`, `pr_site_details`; header carries `vendor_id` — optional nominated vendor prefilled onto the PO at conversion — plus `dp_amount`/`dp_percent` where `dp_amount = amount × dp_percent/100`, inherited by the PO, which also stores `dp_percent`)
 - **RLS** enabled on all tables
 - **Storage buckets**: `avatars`, `vendor-documents`, `tvph-documents`, `erp-documents`, `customer-documents`, `employee-documents`, + payment/PO buckets
 - **Cron**: `pg_cron` + `pg_net` for document expiry + invoice due reminders
@@ -139,5 +139,5 @@ __tests__/             # Jest tests (business logic focus)
 - `unstable_instant = { prefetch: "static" }` for instant navigation
 - Report calculations shared between UI and PDF routes via `lib/reports/`
 - AI tools (`lib/chat/tools.ts`) import server actions directly
-- 14-point vendor accreditation defined in `lib/vendors/document-types.ts`
+- 14-point vendor accreditation defined in `lib/vendors/document-types.ts`; each doc type can hold **multiple files** (`vendor_document_files`), each with its own version history (`vendor_document_file_versions`) and add/update/delete actions in `app/dashboard/vendors/actions.ts` (portal uploads append files too)
 - Tests target business logic (PO guards, invoice guards), not UI snapshots

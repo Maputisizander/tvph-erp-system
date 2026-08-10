@@ -91,29 +91,15 @@ export async function uploadDocument(
   const { user, error: authError } = await requireCapability("vendor.write", supabase);
   if (authError || !user) return { error: authError || "Unauthorized" };
 
-  const file = formData.get("file") as File;
+  const files = formData.getAll("file").filter((f): f is File => f instanceof File && f.size > 0);
   const expiryDate = formData.get("expiryDate") as string;
   const notes = formData.get("notes") as string;
 
-  if (!file) return { error: "No file provided" };
-
-  const fileExt = file.name.split(".").pop();
-  const fileName = `${docType}_${Date.now()}.${fileExt}`;
-  const filePath = `vendors/${vendorId}/${docType}/${fileName}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from("vendor-documents")
-    .upload(filePath, file, { contentType: file.type, upsert: false });
-
-  if (uploadError) return { error: uploadError.message };
-
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from("vendor-documents").getPublicUrl(filePath);
+  if (files.length === 0) return { error: "No file provided" };
 
   const { data: existingDocument, error: existingError } = await supabase
     .from("vendor_documents")
-    .select("id, version_number")
+    .select("id")
     .eq("vendor_id", vendorId)
     .eq("doc_type", docType)
     .is("archived_at", null)
@@ -121,10 +107,8 @@ export async function uploadDocument(
 
   if (existingError) return { error: existingError.message };
 
-  let docId = "";
-  let versionNumber = 1;
-
-  if (!existingDocument) {
+  let docId = existingDocument?.id || "";
+  if (!docId) {
     const { data: newDoc, error: insertError } = await supabase
       .from("vendor_documents")
       .insert({
@@ -140,35 +124,68 @@ export async function uploadDocument(
 
     if (insertError || !newDoc) return { error: insertError?.message || "Failed to create document" };
     docId = newDoc.id;
-  } else {
-    docId = existingDocument.id;
-    versionNumber = (existingDocument.version_number || 1) + 1;
   }
 
-  const { data: version, error: versionError } = await supabase
-    .from("vendor_document_versions")
-    .insert({
-      document_id: docId,
-      version_number: versionNumber,
-      file_url: publicUrl,
-      file_name: file.name,
-      uploaded_by: user.id,
-      notes: notes || null,
-    })
-    .select("id")
-    .single();
+  let lastUrl = "";
+  let lastName = "";
+  let uploadedCount = 0;
 
-  if (versionError || !version) {
-    return { error: versionError?.message || "Failed to create document version" };
+  for (const file of files) {
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${docType}_${Date.now()}_${uploadedCount}.${fileExt}`;
+    const filePath = `vendors/${vendorId}/${docType}/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("vendor-documents")
+      .upload(filePath, file, { contentType: file.type, upsert: false });
+
+    if (uploadError) return { error: uploadError.message };
+
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("vendor-documents").getPublicUrl(filePath);
+
+    const { data: fileRow, error: fileInsertError } = await supabase
+      .from("vendor_document_files")
+      .insert({
+        document_id: docId,
+        file_url: publicUrl,
+        file_name: file.name,
+        uploaded_by: user.id,
+        notes: notes || null,
+      })
+      .select("id")
+      .single();
+
+    if (fileInsertError || !fileRow) {
+      return { error: fileInsertError?.message || "Failed to save file" };
+    }
+
+    const { error: versionError } = await supabase
+      .from("vendor_document_file_versions")
+      .insert({
+        file_id: fileRow.id,
+        version_number: 1,
+        file_url: publicUrl,
+        file_name: file.name,
+        uploaded_by: user.id,
+        notes: notes || null,
+      })
+      .select("id")
+      .single();
+
+    if (versionError) return { error: versionError.message };
+
+    uploadedCount++;
+    lastUrl = publicUrl;
+    lastName = file.name;
   }
 
   const { error: dbError } = await supabase
     .from("vendor_documents")
     .update({
-      current_version_id: version.id,
-      file_url: publicUrl,
-      file_name: file.name,
-      version_number: versionNumber,
+      file_url: lastUrl,
+      file_name: lastName,
       status: "submitted",
       expiry_date: expiryDate || null,
       notes: notes || null,
@@ -184,20 +201,387 @@ export async function uploadDocument(
     entity_type: "vendor_document",
     entity_id: vendorId,
     action: "UPDATE",
-    changes: { after: { doc_type: docType, status: "submitted", version: versionNumber } },
+    changes: { after: { doc_type: docType, status: "submitted", files_added: uploadedCount } },
     performed_by: user.id,
   });
 
   await createNotification({
     type: "vendor",
     title: "📁 Vendor Document Added",
-    message: `A new version (v${versionNumber}) of document ${docType} was uploaded for a vendor.`,
+    message: `${uploadedCount} file(s) added for document ${docType}.`,
     link: `/dashboard/vendors/${vendorId}`,
     created_by: user.id,
   });
 
   revalidatePath(`/dashboard/vendors/${vendorId}`);
   return { success: true };
+}
+
+/** Adds one or more files to an existing document row (e.g. extra files for a custom doc). */
+export async function uploadDocumentFiles(
+  documentId: string,
+  formData: FormData,
+) {
+  const supabase = await createClient();
+  const { user, error: authError } = await requireCapability("vendor.write", supabase);
+  if (authError || !user) return { error: authError || "Unauthorized" };
+
+  const files = formData.getAll("file").filter((f): f is File => f instanceof File && f.size > 0);
+  if (files.length === 0) return { error: "No file provided" };
+
+  const { data: doc } = await supabase
+    .from("vendor_documents")
+    .select("id, vendor_id, doc_type, label")
+    .eq("id", documentId)
+    .is("archived_at", null)
+    .single();
+
+  if (!doc) return { error: "Document not found" };
+
+  let lastUrl = "";
+  let lastName = "";
+  let uploadedCount = 0;
+
+  for (const file of files) {
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${doc.doc_type}_${Date.now()}_${uploadedCount}.${fileExt}`;
+    const filePath = `vendors/${doc.vendor_id}/${doc.doc_type === "custom" ? "custom" : doc.doc_type}/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("vendor-documents")
+      .upload(filePath, file, { contentType: file.type, upsert: false });
+    if (uploadError) return { error: uploadError.message };
+
+    const { data: { publicUrl } } = supabase.storage.from("vendor-documents").getPublicUrl(filePath);
+
+    const { data: fileRow, error: fileInsertError } = await supabase
+      .from("vendor_document_files")
+      .insert({
+        document_id: doc.id,
+        file_url: publicUrl,
+        file_name: file.name,
+        uploaded_by: user.id,
+      })
+      .select("id")
+      .single();
+    if (fileInsertError || !fileRow) return { error: fileInsertError?.message || "Failed to save file" };
+
+    const { error: versionError } = await supabase
+      .from("vendor_document_file_versions")
+      .insert({
+        file_id: fileRow.id,
+        version_number: 1,
+        file_url: publicUrl,
+        file_name: file.name,
+        uploaded_by: user.id,
+      });
+    if (versionError) return { error: versionError.message };
+
+    uploadedCount++;
+    lastUrl = publicUrl;
+    lastName = file.name;
+  }
+
+  const { error: dbError } = await supabase
+    .from("vendor_documents")
+    .update({
+      file_url: lastUrl,
+      file_name: lastName,
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+      uploaded_by: user.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", doc.id);
+  if (dbError) return { error: dbError.message };
+
+  await recordAuditLog({
+    entity_type: "vendor_document",
+    entity_id: doc.vendor_id,
+    action: "UPDATE",
+    changes: { after: { document_id: doc.id, status: "submitted", files_added: uploadedCount } },
+    performed_by: user.id,
+  });
+
+  revalidatePath(`/dashboard/vendors/${doc.vendor_id}`);
+  return { success: true };
+}
+
+/** Replaces a single uploaded file (keeps the previous file in per-file history). */
+export async function updateVendorDocumentFile(
+  fileId: string,
+  formData: FormData,
+) {
+  const supabase = await createClient();
+  const { user, error: authError } = await requireCapability("vendor.write", supabase);
+  if (authError || !user) return { error: authError || "Unauthorized" };
+
+  const file = formData.get("file") as File;
+  if (!file) return { error: "No file provided" };
+
+  const { data: fileRow } = await supabase
+    .from("vendor_document_files")
+    .select("id, document_id, file_url, vendor_documents(doc_type, label, vendor_id)")
+    .eq("id", fileId)
+    .single();
+
+  if (!fileRow) return { error: "File not found" };
+
+  const doc = fileRow.vendor_documents as any;
+  if (!doc) return { error: "Document not found" };
+
+  const labelSlug = doc.label
+    ? doc.label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/_+$/, "").slice(0, 40)
+    : doc.doc_type;
+  const fileExt = file.name.split(".").pop();
+  const fileName = `${labelSlug}_${Date.now()}.${fileExt}`;
+  const filePath = `vendors/${doc.vendor_id}/${doc.doc_type === "custom" ? "custom" : doc.doc_type}/${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("vendor-documents")
+    .upload(filePath, file, { contentType: file.type, upsert: false });
+  if (uploadError) return { error: uploadError.message };
+
+  const { data: { publicUrl } } = supabase.storage.from("vendor-documents").getPublicUrl(filePath);
+
+  const { data: maxVer } = await supabase
+    .from("vendor_document_file_versions")
+    .select("version_number")
+    .eq("file_id", fileId)
+    .order("version_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const nextVersion = (maxVer?.version_number || 0) + 1;
+
+  const { data: version, error: versionError } = await supabase
+    .from("vendor_document_file_versions")
+    .insert({
+      file_id: fileId,
+      version_number: nextVersion,
+      file_url: publicUrl,
+      file_name: file.name,
+      uploaded_by: user.id,
+      notes: null,
+    })
+    .select("id")
+    .single();
+
+  if (versionError || !version) {
+    return { error: versionError?.message || "Failed to save file version" };
+  }
+
+  const { error: updateError } = await supabase
+    .from("vendor_document_files")
+    .update({
+      file_url: publicUrl,
+      file_name: file.name,
+      uploaded_by: user.id,
+    })
+    .eq("id", fileId);
+
+  if (updateError) return { error: updateError.message };
+
+  await supabase
+    .from("vendor_documents")
+    .update({
+      file_url: publicUrl,
+      file_name: file.name,
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+      uploaded_by: user.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", fileRow.document_id);
+
+  await recordAuditLog({
+    entity_type: "vendor_document",
+    entity_id: doc.vendor_id,
+    action: "UPDATE",
+    changes: { after: { document_id: fileRow.document_id, file_updated: file.name, version: nextVersion } },
+    performed_by: user.id,
+  });
+
+  revalidatePath(`/dashboard/vendors/${doc.vendor_id}`);
+  return { success: true };
+}
+
+/** Deletes a single uploaded file (cascades its history) and removes storage objects. */
+export async function deleteVendorDocumentFile(fileId: string) {
+  const supabase = await createClient();
+  const { user, error: authError } = await requireCapability("vendor.write", supabase);
+  if (authError || !user) return { error: authError || "Unauthorized" };
+
+  const { data: fileRow } = await supabase
+    .from("vendor_document_files")
+    .select("id, document_id, file_url, file_name, vendor_documents(vendor_id)")
+    .eq("id", fileId)
+    .single();
+
+  if (!fileRow) return { error: "File not found" };
+
+  const { data: versions } = await supabase
+    .from("vendor_document_file_versions")
+    .select("file_url")
+    .eq("file_id", fileId);
+
+  const storagePaths = [fileRow.file_url, ...(versions || []).map((v) => v.file_url)]
+    .map((url) => url.split("/public/vendor-documents/")[1])
+    .filter((p): p is string => Boolean(p));
+
+  if (storagePaths.length > 0) {
+    await supabase.storage.from("vendor-documents").remove(storagePaths);
+  }
+
+  const { error } = await supabase
+    .from("vendor_document_files")
+    .delete()
+    .eq("id", fileId);
+
+  if (error) return { error: error.message };
+
+  const { data: remaining } = await supabase
+    .from("vendor_document_files")
+    .select("file_url, file_name")
+    .eq("document_id", fileRow.document_id)
+    .order("created_at", { ascending: false });
+
+  const latest = remaining?.[0];
+  await supabase
+    .from("vendor_documents")
+    .update({
+      file_url: latest?.file_url || null,
+      file_name: latest?.file_name || null,
+      status: latest ? "submitted" : "not_submitted",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", fileRow.document_id);
+
+  await recordAuditLog({
+    entity_type: "vendor_document",
+    entity_id: (fileRow.vendor_documents as any)?.vendor_id,
+    action: "DELETE",
+    changes: { after: { document_id: fileRow.document_id, file_deleted: fileRow.file_name } },
+    performed_by: user.id,
+  });
+
+  const vendorId = (fileRow.vendor_documents as any)?.vendor_id;
+  if (vendorId) revalidatePath(`/dashboard/vendors/${vendorId}`);
+  return { success: true };
+}
+
+/** Returns the version history for a single uploaded file (oldest-aware, current flagged). */
+export async function getVendorDocumentFileVersions(fileId: string) {
+  const supabase = await createClient();
+
+  const { data: fileRow } = await supabase
+    .from("vendor_document_files")
+    .select("file_url")
+    .eq("id", fileId)
+    .single();
+
+  if (!fileRow) return { versions: [] };
+
+  const { data: versions, error } = await supabase
+    .from("vendor_document_file_versions")
+    .select(`
+      id,
+      version_number,
+      file_name,
+      file_url,
+      notes,
+      created_at,
+      uploaded_by,
+      profiles!uploaded_by(full_name, email)
+    `)
+    .eq("file_id", fileId)
+    .order("version_number", { ascending: false });
+
+  if (error) return { error: error.message };
+
+  return {
+    versions: (versions || []).map((v) => ({
+      ...v,
+      is_current: v.file_url === fileRow.file_url,
+    })),
+  };
+}
+
+/** Rolls a single uploaded file back to one of its historical versions. */
+export async function rollbackVendorDocumentFile(
+  fileId: string,
+  versionId: string,
+) {
+  const supabase = await createClient();
+  const { user, error: authError } = await requireCapability("document.approve", supabase);
+  if (authError || !user) return { error: authError || "Unauthorized" };
+
+  const { data: version } = await supabase
+    .from("vendor_document_file_versions")
+    .select("file_url, file_name")
+    .eq("id", versionId)
+    .eq("file_id", fileId)
+    .single();
+
+  if (!version) return { error: "Version not found" };
+
+  const { data: fileRow } = await supabase
+    .from("vendor_document_files")
+    .select("id, document_id, vendor_documents(vendor_id)")
+    .eq("id", fileId)
+    .single();
+
+  if (!fileRow) return { error: "File not found" };
+
+  const { error } = await supabase
+    .from("vendor_document_files")
+    .update({ file_url: version.file_url, file_name: version.file_name })
+    .eq("id", fileId);
+
+  if (error) return { error: error.message };
+
+  await supabase
+    .from("vendor_documents")
+    .update({
+      file_url: version.file_url,
+      file_name: version.file_name,
+      status: "submitted",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", fileRow.document_id);
+
+  await recordAuditLog({
+    entity_type: "vendor_document",
+    entity_id: (fileRow.vendor_documents as any)?.vendor_id,
+    action: "UPDATE",
+    changes: { after: { action: "rollback_file", file_id: fileId, version_id: versionId } },
+    performed_by: user.id,
+  });
+
+  const vendorId = (fileRow.vendor_documents as any)?.vendor_id;
+  if (vendorId) revalidatePath(`/dashboard/vendors/${vendorId}`);
+  return { success: true };
+}
+
+/** Signed URL for a specific file-version record (per-file history). */
+export async function getVendorFileVersionSignedUrl(versionId: string) {
+  const supabase = await createClient();
+  const { data: version } = await supabase
+    .from("vendor_document_file_versions")
+    .select("file_url")
+    .eq("id", versionId)
+    .single();
+
+  if (!version) return { error: "Version not found" };
+
+  const path = version.file_url.split("/public/vendor-documents/")[1];
+  if (!path) return { url: version.file_url };
+
+  const { data } = await supabase.storage
+    .from("vendor-documents")
+    .createSignedUrl(path, 3600);
+
+  return { url: data?.signedUrl || version.file_url };
 }
 
 export async function createVendor(prevState: any, formData: FormData) {

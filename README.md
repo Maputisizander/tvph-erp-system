@@ -57,7 +57,7 @@ The vendor module covers vendor onboarding, compliance review, portal document c
   - Vendor Information Summary
   - Latest General Information Sheet
   - Audited Financial Statements
-  - SEC Registration / Articles
+  - SEC Registration / DTI
   - Secretary Certificate
   - Safety & Drug Free Policy
   - ISO Certification

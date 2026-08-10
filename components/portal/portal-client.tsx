@@ -16,6 +16,7 @@ interface Document {
   file_name?: string | null;
   file_url?: string | null;
   notes?: string | null;
+  vendor_document_files?: { id: string; file_name?: string | null }[];
 }
 
 interface PortalClientProps {
@@ -194,16 +195,27 @@ export default function PortalClient({
         }
 
         // Re-fetch documents
-        const activeDoc = {
+        const newEntry: Document = {
           doc_type: selectedDocType,
           status: "submitted",
           file_name: file.name,
           expiry_date: expiryDate || null,
-          notes: notes || null
+          notes: notes || null,
+          vendor_document_files: [],
         };
+        const existing = documents.find(d => d.doc_type === selectedDocType);
+        if (existing?.vendor_document_files?.length) {
+          newEntry.vendor_document_files = [...existing.vendor_document_files];
+        }
+        if (result.uploadedFile) {
+          newEntry.vendor_document_files = [
+            ...(newEntry.vendor_document_files || []),
+            { id: result.uploadedFile.id, file_name: result.uploadedFile.file_name },
+          ];
+        }
         setDocuments(prev => {
           const filtered = prev.filter(d => d.doc_type !== selectedDocType);
-          return [...filtered, activeDoc];
+          return [...filtered, newEntry];
         });
 
         // Close upload section
@@ -320,7 +332,14 @@ export default function PortalClient({
                   </h3>
                   
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
-                    {doc?.file_name ? `Uploaded: ${doc.file_name}` : "Click to draw signature and upload document."}
+                    {doc && doc.vendor_document_files && doc.vendor_document_files.length > 0 ? (
+                      <>
+                        {doc.vendor_document_files.length} file(s) uploaded
+                        {doc.vendor_document_files.length > 1 && " — click to add another"}
+                      </>
+                    ) : doc?.file_name
+                      ? `Uploaded: ${doc.file_name}`
+                      : "Click to draw signature and upload document."}
                   </p>
                   
                   {doc?.expiry_date && (

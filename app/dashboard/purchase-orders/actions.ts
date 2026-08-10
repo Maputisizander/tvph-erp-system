@@ -10,6 +10,7 @@ import { sendPoForSignatureEmail } from '@/lib/email/po';
 import { createPortalLink } from '@/lib/portal/links';
 import { sendPoPendingApprovalEmail } from '@/lib/email/po-pending-approval';
 import { sendPoPendingFinanceEmail } from '@/lib/email/po-pending-finance';
+import { sendPoSignedAcknowledgedEmail } from '@/lib/email/po-signed-acknowledged';
 
 type POLineItem = { item_code?: string; description: string; qty: number; uom?: string; unit_price: number };
 type POSiteDetail = { region: string; area_city: string; no_of_nodes: number; cable_length_km: number; node_id?: string; phase?: string };
@@ -1104,6 +1105,19 @@ export async function reviewSignedPo(
     link: `/dashboard/purchase-orders/${poId}`,
     created_by: user.id,
   });
+
+  if (decision === 'approve') {
+    const emailResult = await sendPoSignedAcknowledgedEmail(poId, { actorId: user.id });
+    if (emailResult.status === 'failed') {
+      await createNotification({
+        type: 'po',
+        title: '⚠️ Acknowledgment email not sent',
+        message: `The signed-PO acknowledgment email for ${po.po_number || 'the PO'} could not be sent.${emailResult.error ? ` ${emailResult.error}` : ''}`,
+        link: `/dashboard/purchase-orders/${poId}`,
+        created_by: user.id,
+      });
+    }
+  }
 
   revalidatePath(`/dashboard/purchase-orders/${poId}`);
   revalidatePath('/dashboard/purchase-orders');
