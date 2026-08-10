@@ -162,6 +162,22 @@ export async function signPortalPO(
 
   const vendor = (po.vendors ?? {}) as { name?: string };
 
+  // Single-use: block re-upload without a fresh link from ERP.
+  const { data: existingSig } = await supabase
+    .from("po_signatures")
+    .select("id")
+    .eq("po_id", po.id)
+    .limit(1)
+    .maybeSingle();
+  if (existingSig) {
+    const graceExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    await supabase.from("magic_links").update({ expires_at: graceExpiresAt }).eq("id", magicLink.id);
+    return {
+      error:
+        "This purchase order has already been signed. This link has been retired. Please request a new link from your TelcoVantage contact if a correction is needed.",
+    };
+  }
+
   const filePath = `po/${po.id}/signed-${Date.now()}.pdf`;
   const { error: uploadError } = await supabase.storage
     .from("po-artifacts")
@@ -199,8 +215,10 @@ export async function signPortalPO(
     .eq("id", po.id);
   if (poError) return { error: poError.message };
 
-  // Single-use: retire this PO link so the vendor cannot re-upload without a resend from ERP.
-  await supabase.from("magic_links").update({ revoked_at: now }).eq("id", magicLink.id);
+  // Keep success visible for ~15 mins so refresh still shows "This Purchase Order Has Been Signed"
+  // instead of "Access Expired" (issue #115), then let the link expire naturally.
+  const graceExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  await supabase.from("magic_links").update({ expires_at: graceExpiresAt }).eq("id", magicLink.id);
 
   await createNotification({
     type: "po",
