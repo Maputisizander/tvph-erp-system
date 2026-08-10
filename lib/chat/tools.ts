@@ -489,18 +489,6 @@ export const erpTools = {
 
       const { data: { publicUrl } } = supabase.storage.from("vendor-documents").getPublicUrl(filePath);
 
-      const documentPayload = {
-        vendor_id: input.vendor_id,
-        doc_type: input.doc_type,
-        file_url: publicUrl,
-        file_name: input.file_name,
-        status: "submitted",
-        expiry_date: input.expiry_date || null,
-        submitted_at: new Date().toISOString(),
-        uploaded_by: user.id,
-        updated_at: new Date().toISOString(),
-      };
-
       const { data: existing } = await supabase
         .from("vendor_documents")
         .select("id")
@@ -509,9 +497,62 @@ export const erpTools = {
         .is("archived_at", null)
         .maybeSingle();
 
-      const { error: dbError } = existing
-        ? await supabase.from("vendor_documents").update(documentPayload).eq("id", existing.id)
-        : await supabase.from("vendor_documents").insert(documentPayload);
+      let docId = "";
+      if (existing) {
+        docId = existing.id;
+      } else {
+        const { data: newDoc, error: insertError } = await supabase
+          .from("vendor_documents")
+          .insert({
+            vendor_id: input.vendor_id,
+            doc_type: input.doc_type,
+            status: "submitted",
+            submitted_at: new Date().toISOString(),
+            uploaded_by: user.id,
+            updated_at: new Date().toISOString(),
+          })
+          .select("id")
+          .single();
+        if (insertError || !newDoc) return { error: insertError?.message || "Failed to insert document" };
+        docId = newDoc.id;
+      }
+
+      const { data: fileRow, error: fileError } = await supabase
+        .from("vendor_document_files")
+        .insert({
+          document_id: docId,
+          file_url: publicUrl,
+          file_name: input.file_name,
+          uploaded_by: user.id,
+        })
+        .select("id")
+        .single();
+
+      if (fileError || !fileRow) return { error: fileError?.message || "Failed to save file" };
+
+      const { error: versionError } = await supabase
+        .from("vendor_document_file_versions")
+        .insert({
+          file_id: fileRow.id,
+          version_number: 1,
+          file_url: publicUrl,
+          file_name: input.file_name,
+          uploaded_by: user.id,
+        });
+      if (versionError) return { error: versionError.message };
+
+      const { error: dbError } = await supabase
+        .from("vendor_documents")
+        .update({
+          file_url: publicUrl,
+          file_name: input.file_name,
+          status: "submitted",
+          expiry_date: input.expiry_date || null,
+          submitted_at: new Date().toISOString(),
+          uploaded_by: user.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", docId);
 
       if (dbError) return { error: dbError.message };
 

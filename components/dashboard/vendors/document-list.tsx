@@ -16,17 +16,23 @@ import {
   History,
   RotateCcw,
   User,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  Files,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   uploadDocument,
+  uploadDocumentFiles,
   approveVendorDocument,
   uploadCustomVendorDocument,
   approveVendorDocumentById,
-  getVendorDocumentVersions,
-  getVendorVersionSignedUrl,
-  rollbackVendorDocumentVersion,
-  updateVendorDocumentVersion,
+  updateVendorDocumentFile,
+  deleteVendorDocumentFile,
+  getVendorDocumentFileVersions,
+  getVendorFileVersionSignedUrl,
+  rollbackVendorDocumentFile,
 } from "@/app/dashboard/vendors/actions";
 import { RequestDocumentsButton } from "./request-documents-button";
 import { hasCapability } from "@/lib/auth/roles";
@@ -48,6 +54,15 @@ const DOCUMENT_TYPES = [
   { id: 'other_licenses', label: 'Other Licenses or Permits' },
 ];
 
+interface DocumentFile {
+  id: string;
+  file_url?: string;
+  file_name?: string;
+  notes?: string | null;
+  created_at?: string;
+  uploaded_by?: string;
+}
+
 interface Document {
   id: string;
   doc_type: string;
@@ -58,12 +73,14 @@ interface Document {
   expiry_date?: string;
   version_number?: number;
   current_version_id?: string;
+  vendor_document_files?: DocumentFile[];
 }
 
 interface VersionInfo {
   id: string;
   version_number: number;
   file_name: string;
+  file_url: string;
   notes: string | null;
   created_at: string;
   uploaded_by: string;
@@ -72,7 +89,7 @@ interface VersionInfo {
 }
 
 export function DocumentList({ vendorId, documents, userRole }: { vendorId: string; documents: Document[]; userRole?: string }) {
-  const [uploading, setUploading] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [approvingDoc, setApprovingDoc] = useState<string | null>(null);
   const [approveExpiryDate, setApproveExpiryDate] = useState("");
   const [approveError, setApproveError] = useState<string | null>(null);
@@ -81,7 +98,9 @@ export function DocumentList({ vendorId, documents, userRole }: { vendorId: stri
   const [customLabel, setCustomLabel] = useState("");
   const [customFile, setCustomFile] = useState<File | null>(null);
   const [customUploading, setCustomUploading] = useState(false);
-  const [historyDoc, setHistoryDoc] = useState<Document | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [historyFile, setHistoryFile] = useState<DocumentFile | null>(null);
+  const [historyDocName, setHistoryDocName] = useState("");
   const [versions, setVersions] = useState<VersionInfo[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [rollbacking, setRollbacking] = useState<string | null>(null);
@@ -102,16 +121,39 @@ export function DocumentList({ vendorId, documents, userRole }: { vendorId: stri
 
   const isAdmin = hasCapability(userRole, 'document.approve');
 
-  const handleUpload = async (docType: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(docType);
+  const handleUpload = async (doc: Document | null, docType: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).filter((f) => f.size > 0);
+    if (files.length === 0) return;
+    setBusy(`add:${doc ? doc.id : docType}`);
     const formData = new FormData();
-    formData.append('file', file);
-    const result = await uploadDocument(vendorId, docType, formData);
+    files.forEach((f) => formData.append('file', f));
+    const result = doc
+      ? await uploadDocumentFiles(doc.id, formData)
+      : await uploadDocument(vendorId, docType, formData);
     if (result.error) alert(result.error);
     else router.refresh();
-    setUploading(null);
+    setBusy(null);
+  };
+
+  const handleUpdateFile = async (fileId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(`update:${fileId}`);
+    const formData = new FormData();
+    formData.append('file', file);
+    const result = await updateVendorDocumentFile(fileId, formData);
+    if (result.error) alert(result.error);
+    else router.refresh();
+    setBusy(null);
+  };
+
+  const handleDeleteFile = async (fileId: string) => {
+    if (!confirm('Delete this file? This cannot be undone.')) return;
+    setBusy(`delete:${fileId}`);
+    const result = await deleteVendorDocumentFile(fileId);
+    if (result.error) alert(result.error);
+    else router.refresh();
+    setBusy(null);
   };
 
   const handleApprove = async (docType: string) => {
@@ -141,48 +183,37 @@ export function DocumentList({ vendorId, documents, userRole }: { vendorId: stri
     formData.append('file', customFile);
     const result = await uploadCustomVendorDocument(vendorId, customLabel.trim(), formData);
     if (result.error) { alert(result.error); }
-    else { router.refresh(); router.refresh(); }
+    else { router.refresh(); }
     setCustomUploading(false);
     setShowAddForm(false);
     setCustomLabel('');
     setCustomFile(null);
   };
 
-  const handleUpdateVersion = async (docId: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(docId);
-    const formData = new FormData();
-    formData.append('file', file);
-    const result = await updateVendorDocumentVersion(docId, formData);
-    if (result.error) alert(result.error);
-    else router.refresh();
-    setUploading(null);
-  };
-
-  const openHistory = async (doc: Document) => {
-    setHistoryDoc(doc);
+  const openHistory = async (file: DocumentFile, docName: string) => {
+    setHistoryFile(file);
+    setHistoryDocName(docName);
     setLoadingVersions(true);
-    const result = await getVendorDocumentVersions(doc.id);
+    const result = await getVendorDocumentFileVersions(file.id);
     setLoadingVersions(false);
-    if (result.error) { alert(result.error); setHistoryDoc(null); }
+    if (result.error) { alert(result.error); setHistoryFile(null); }
     else setVersions((result.versions as VersionInfo[]) || []);
   };
 
-  const closeHistory = () => { setHistoryDoc(null); setVersions([]); };
+  const closeHistory = () => { setHistoryFile(null); setVersions([]); };
 
   const handleRollback = async (versionId: string) => {
-    if (!historyDoc) return;
+    if (!historyFile) return;
     if (!confirm('Roll back to this version?')) return;
     setRollbacking(versionId);
-    const result = await rollbackVendorDocumentVersion(historyDoc.id, versionId);
+    const result = await rollbackVendorDocumentFile(historyFile.id, versionId);
     setRollbacking(null);
     if (result.error) alert(result.error);
     else router.refresh();
   };
 
   const handleViewVersion = async (versionId: string) => {
-    const result = await getVendorVersionSignedUrl(versionId);
+    const result = await getVendorFileVersionSignedUrl(versionId);
     if (result.error) alert(result.error);
     else if (result.url) window.open(result.url, '_blank', 'noopener,noreferrer');
   };
@@ -192,79 +223,144 @@ export function DocumentList({ vendorId, documents, userRole }: { vendorId: stri
     return profile?.full_name || profile?.email || 'Unknown';
   };
 
-  const RowActions = ({ doc, isSubmitted, isApproved, canApprove, docIdent, onApprove }: {
-    doc: Document; isSubmitted: boolean; isApproved: boolean; canApprove: boolean;
-    docIdent: string; onApprove: () => void;
-  }) => (
-    <div className="flex items-center justify-end gap-1">
-      {(doc.version_number || 0) > 0 && (
-        <button
-          onClick={() => openHistory(doc)}
+  const docName = (doc: Document) =>
+    doc.label || DOCUMENT_TYPES.find((t) => t.id === doc.doc_type)?.label || doc.doc_type.replace(/_/g, ' ');
+
+  const toggleExpanded = (docId: string) => setExpanded((prev) => ({ ...prev, [docId]: !prev[docId] }));
+
+  const UploadButton = ({ busy, onClick }: { busy: boolean; onClick: (e: React.ChangeEvent<HTMLInputElement>) => void }) => (
+    <label className="cursor-pointer">
+      <input type="file" multiple className="hidden" onChange={onClick} disabled={busy} />
+      <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all ${
+        busy
+          ? 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+          : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all border border-emerald-200 dark:border-emerald-800/50'
+      }`}>
+        {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+        Add files
+      </div>
+    </label>
+  );
+
+  const RowActions = ({ doc, canApprove, onApprove }: {
+    doc: Document; canApprove: boolean; onApprove: () => void;
+  }) => {
+    const files = doc.vendor_document_files || [];
+    const isOpen = !!expanded[doc.id];
+    return (
+      <div className="flex items-center justify-end gap-1">
+        {files.length > 0 && (
+          <button
+            onClick={() => toggleExpanded(doc.id)}
+            className={`p-1.5 rounded-lg transition-colors ${isOpen ? 'text-primary bg-primary/5' : 'text-slate-400 hover:text-primary hover:bg-primary/5'}`}
+            title={isOpen ? 'Hide files' : 'Show files'}
+          >
+            {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          </button>
+        )}
+        {canApprove && (
+          approvingDoc === doc.id ? (
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                value={approveExpiryDate}
+                onChange={(e) => setApproveExpiryDate(e.target.value)}
+                className="w-28 px-1.5 py-1 text-xs border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0a0a0a] focus:outline-none focus:border-primary"
+              />
+              <button
+                onClick={onApprove}
+                disabled={approving}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-emerald-500 hover:bg-emerald-600 text-white transition-all disabled:opacity-50"
+              >
+                {approving ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
+                OK
+              </button>
+              <button onClick={() => { setApprovingDoc(null); setApproveError(null); }} className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                X
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setApprovingDoc(doc.id)}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all border border-emerald-200 dark:border-emerald-800/50"
+            >
+              <ShieldCheck className="h-3 w-3" />
+              Approve
+            </button>
+          )
+        )}
+        <UploadButton busy={busy === `add:${doc.id}`} onClick={(e) => handleUpload(doc, doc.doc_type, e)} />
+      </div>
+    );
+  };
+
+  const FileActions = ({ doc, file }: { doc: Document; file: DocumentFile }) => (
+    <div className="flex items-center gap-1">
+      {file.file_url && (
+        <a href={file.file_url} target="_blank" rel="noopener noreferrer"
           className="p-1.5 text-slate-400 hover:text-primary transition-colors rounded-lg hover:bg-primary/5"
-          title="Version history"
-        >
-          <History className="h-3.5 w-3.5" />
-        </button>
-      )}
-      {isSubmitted && doc.file_url && (
-        <a href={doc.file_url} target="_blank" rel="noopener noreferrer"
-          className="p-1.5 text-slate-400 hover:text-primary transition-colors rounded-lg hover:bg-primary/5"
-          title="View Document"
+          title="View file"
         >
           <ExternalLink className="h-3.5 w-3.5" />
         </a>
       )}
-      {canApprove && (
-        approvingDoc === docIdent ? (
-          <div className="flex items-center gap-1.5">
-            <input
-              type="date"
-              value={approveExpiryDate}
-              onChange={(e) => setApproveExpiryDate(e.target.value)}
-              className="w-28 px-1.5 py-1 text-xs border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0a0a0a] focus:outline-none focus:border-primary"
-            />
-            <button
-              onClick={onApprove}
-              disabled={approving}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-emerald-500 hover:bg-emerald-600 text-white transition-all disabled:opacity-50"
-            >
-              {approving ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
-              OK
-            </button>
-            <button onClick={() => { setApprovingDoc(null); setApproveError(null); }} className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
-              X
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setApprovingDoc(docIdent)}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all border border-emerald-200 dark:border-emerald-800/50"
-          >
-            <ShieldCheck className="h-3 w-3" />
-            Approve
-          </button>
-        )
-      )}
-      <label className="cursor-pointer">
-        <input
-          type="file"
-          className="hidden"
-          onChange={(e) => doc.doc_type === 'custom' ? handleUpdateVersion(doc.id, e) : handleUpload(doc.doc_type, e)}
-          disabled={uploading === (doc.doc_type === 'custom' ? doc.id : doc.doc_type)}
-        />
-        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all ${
-          uploading === (doc.doc_type === 'custom' ? doc.id : doc.doc_type)
-            ? 'bg-slate-100 dark:bg-slate-800 text-slate-400'
-            : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all border border-emerald-200 dark:border-emerald-800/50'
-        }`}>
-          {uploading === (doc.doc_type === 'custom' ? doc.id : doc.doc_type)
-            ? <Loader2 className="h-3 w-3 animate-spin" />
-            : <Upload className="h-3 w-3" />}
-          {(isSubmitted || (doc.version_number || 0) > 0) ? 'Update' : 'Upload'}
+      <button
+        onClick={() => openHistory(file, docName(doc))}
+        className="p-1.5 text-slate-400 hover:text-primary transition-colors rounded-lg hover:bg-primary/5"
+        title="File history"
+      >
+        <History className="h-3.5 w-3.5" />
+      </button>
+      <label className="cursor-pointer" title="Replace this file">
+        <input type="file" className="hidden" onChange={(e) => handleUpdateFile(file.id, e)} disabled={busy === `update:${file.id}`} />
+        <div className={`p-1.5 rounded-lg transition-colors ${busy === `update:${file.id}` ? 'text-slate-300' : 'text-slate-400 hover:text-primary hover:bg-primary/5'}`}>
+          {busy === `update:${file.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
         </div>
       </label>
+      <button
+        onClick={() => handleDeleteFile(file.id)}
+        disabled={busy === `delete:${file.id}`}
+        className="p-1.5 text-slate-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-500/5 disabled:opacity-50"
+        title="Delete file"
+      >
+        {busy === `delete:${file.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+      </button>
     </div>
   );
+
+  const FileRows = ({ doc }: { doc: Document }) => {
+    const files = doc.vendor_document_files || [];
+    if (!expanded[doc.id] || files.length === 0) return null;
+    return (
+      <tr className="bg-slate-50/50 dark:bg-slate-800/10 border-t-0">
+        <td colSpan={4} className="px-6 py-3">
+          <div className="space-y-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a]/40 p-3">
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+              <Files className="h-3.5 w-3.5" /> Uploaded files ({files.length})
+            </div>
+            {files.map((file) => (
+              <div key={file.id} className="flex items-center justify-between gap-3 py-1.5 border-b border-slate-100 dark:border-slate-800/50 last:border-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 shrink-0">
+                    <FileText className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate" title={file.file_name}>
+                      {file.file_name}
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      {file.created_at ? new Date(file.created_at).toLocaleDateString() : ''}
+                    </p>
+                  </div>
+                </div>
+                <FileActions doc={doc} file={file} />
+              </div>
+            ))}
+          </div>
+        </td>
+      </tr>
+    );
+  };
 
   const StatusBadge = ({ doc }: { doc?: Document }) => {
     const isApproved = doc?.status === 'approved';
@@ -353,6 +449,7 @@ export function DocumentList({ vendorId, documents, userRole }: { vendorId: stri
                 </label>
                 <input
                   type="file"
+                  multiple
                   onChange={(e) => setCustomFile(e.target.files?.[0] || null)}
                   className="w-full text-sm text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition-all"
                 />
@@ -386,111 +483,129 @@ export function DocumentList({ vendorId, documents, userRole }: { vendorId: stri
               const isSubmitted = doc?.status === 'submitted' || doc?.status === 'approved';
               const isApproved = doc?.status === 'approved';
               const canApprove = isAdmin && doc?.status === 'submitted';
+              const fileCount = doc?.vendor_document_files?.length || 0;
 
               return (
-                <tr key={type.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${isApproved ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : isSubmitted ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
-                        <FileText className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <span className={`font-medium ${isSubmitted ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>{type.label}</span>
-                        {(doc?.version_number || 0) > 0 && (
-                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                            v{doc!.version_number}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4"><StatusBadge doc={doc} /></td>
-                  <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                    {doc?.expiry_date ? (
-                      <div className="flex items-center gap-1.5 text-xs"><Calendar className="h-3.5 w-3.5" />{new Date(doc.expiry_date).toLocaleDateString()}</div>
-                    ) : '-'}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    {doc ? (
-                      <>
-                        <RowActions doc={doc} isSubmitted={isSubmitted} isApproved={isApproved} canApprove={canApprove} docIdent={type.id} onApprove={() => handleApprove(type.id)} />
-                        {approveError && approvingDoc === type.id && (
-                          <p className="text-[10px] text-red-500 mt-1 text-right">{approveError}</p>
-                        )}
-                      </>
-                    ) : (
-                      <label className="cursor-pointer">
-                        <input type="file" className="hidden" onChange={(e) => handleUpload(type.id, e)} disabled={uploading === type.id} />
-                        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all justify-end ${uploading === type.id ? 'bg-slate-100 dark:bg-slate-800 text-slate-400' : 'bg-primary/10 text-primary hover:bg-primary hover:text-white'}`}>
-                          {uploading === type.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-                          Upload
+                <FragmentRow key={type.id}>
+                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${isApproved ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : isSubmitted ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                          <FileText className="h-4 w-4" />
                         </div>
-                      </label>
-                    )}
-                  </td>
-                </tr>
+                        <div className="min-w-0">
+                          <span className={`font-medium ${isSubmitted ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>{type.label}</span>
+                          {fileCount > 0 && (
+                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                              {fileCount} file{fileCount > 1 ? 's' : ''}
+                            </span>
+                          )}
+                          {doc?.file_name && (
+                            <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5 max-w-[220px]">
+                              {doc.file_name}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4"><StatusBadge doc={doc} /></td>
+                    <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
+                      {doc?.expiry_date ? (
+                        <div className="flex items-center gap-1.5 text-xs"><Calendar className="h-3.5 w-3.5" />{new Date(doc.expiry_date).toLocaleDateString()}</div>
+                      ) : '-'}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      {doc ? (
+                        <>
+                          <RowActions doc={doc} canApprove={canApprove} onApprove={() => handleApprove(type.id)} />
+                          {approveError && approvingDoc === doc.id && (
+                            <p className="text-[10px] text-red-500 mt-1 text-right">{approveError}</p>
+                          )}
+                        </>
+                      ) : (
+                        <label className="cursor-pointer">
+                          <input type="file" multiple className="hidden" onChange={(e) => handleUpload(null, type.id, e)} disabled={busy === `add:${type.id}`} />
+                          <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all justify-end ${busy === `add:${type.id}` ? 'bg-slate-100 dark:bg-slate-800 text-slate-400' : 'bg-primary/10 text-primary hover:bg-primary hover:text-white'}`}>
+                            {busy === `add:${type.id}` ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                            Upload
+                          </div>
+                        </label>
+                      )}
+                    </td>
+                  </tr>
+                  {doc && <FileRows doc={doc} />}
+                </FragmentRow>
               );
             })}
             {customDocs.map((doc) => {
               const isSubmitted = doc.status === 'submitted' || doc.status === 'approved';
               const isApproved = doc.status === 'approved';
               const canApprove = isAdmin && doc.status === 'submitted';
+              const fileCount = doc.vendor_document_files?.length || 0;
 
               return (
-                <tr key={doc.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${isApproved ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : isSubmitted ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
-                        <FileText className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <span className={`font-medium ${isSubmitted ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
-                          {doc.label || 'Untitled'}
-                        </span>
-                        {(doc.version_number || 0) > 0 && (
-                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                            v{doc.version_number}
+                <FragmentRow key={doc.id}>
+                  <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${isApproved ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : isSubmitted ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                          <FileText className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <span className={`font-medium ${isSubmitted ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
+                            {doc.label || 'Untitled'}
                           </span>
-                        )}
+                          {fileCount > 0 && (
+                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                              {fileCount} file{fileCount > 1 ? 's' : ''}
+                            </span>
+                          )}
+                          {doc.file_name && (
+                            <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5 max-w-[220px]">
+                              {doc.file_name}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4"><StatusBadge doc={doc} /></td>
-                  <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                    {doc.expiry_date ? (
-                      <div className="flex items-center gap-1.5 text-xs"><Calendar className="h-3.5 w-3.5" />{new Date(doc.expiry_date).toLocaleDateString()}</div>
-                    ) : '-'}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <RowActions doc={doc} isSubmitted={isSubmitted} isApproved={isApproved} canApprove={canApprove} docIdent={doc.id} onApprove={() => handleApproveById(doc.id)} />
-                    {approveError && approvingDoc === doc.id && (
-                      <p className="text-[10px] text-red-500 mt-1 text-right">{approveError}</p>
-                    )}
-                  </td>
-                </tr>
+                    </td>
+                    <td className="px-6 py-4"><StatusBadge doc={doc} /></td>
+                    <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
+                      {doc.expiry_date ? (
+                        <div className="flex items-center gap-1.5 text-xs"><Calendar className="h-3.5 w-3.5" />{new Date(doc.expiry_date).toLocaleDateString()}</div>
+                      ) : '-'}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <RowActions doc={doc} canApprove={canApprove} onApprove={() => handleApproveById(doc.id)} />
+                      {approveError && approvingDoc === doc.id && (
+                        <p className="text-[10px] text-red-500 mt-1 text-right">{approveError}</p>
+                      )}
+                    </td>
+                  </tr>
+                  <FileRows doc={doc} />
+                </FragmentRow>
               );
             })}
           </tbody>
         </table>
       </div>
 
-      {/* Version History Modal */}
-      {historyDoc && (
+      {/* Per-File History Modal */}
+      {historyFile && (
         <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={closeHistory}>
           <div className="relative w-full max-w-lg max-h-[80vh] bg-white dark:bg-[#071F15] rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col animate-in zoom-in-95 duration-300" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                   <History className="h-5 w-5" />
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    {historyDoc.label || (DOCUMENT_TYPES.find((t) => t.id === historyDoc.doc_type)?.label || historyDoc.doc_type.replace(/_/g, ' '))}
+                <div className="min-w-0">
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white truncate" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    {historyDocName}
                   </h3>
-                  <p className="text-[10px] text-slate-500 font-medium uppercase tracking-widest">Version History</p>
+                  <p className="text-[10px] text-slate-500 font-medium uppercase tracking-widest truncate">File History · {historyFile.file_name}</p>
                 </div>
               </div>
-              <button onClick={closeHistory} className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all shadow-sm">
+              <button onClick={closeHistory} className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all shadow-sm shrink-0">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -552,4 +667,8 @@ export function DocumentList({ vendorId, documents, userRole }: { vendorId: stri
       )}
     </div>
   );
+}
+
+function FragmentRow({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
 }

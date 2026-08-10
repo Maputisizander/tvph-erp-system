@@ -192,7 +192,10 @@ export async function validatePortalToken(token: string) {
 
     const { data: documents } = await supabase
       .from("vendor_documents")
-      .select("id, doc_type, status, expiry_date, file_name, file_url, notes")
+      .select(`
+        id, doc_type, status, expiry_date, file_name, file_url, notes,
+        vendor_document_files(id, file_name, file_url, created_at)
+      `)
       .eq("vendor_id", magicLink.entity_id)
       .is("archived_at", null);
 
@@ -252,8 +255,8 @@ export async function uploadPortalDocument(
   if (!file) return { error: "No file provided" };
 
   let fileBuffer = await file.arrayBuffer();
-  let fileName = file.name;
-  let finalMimeType = file.type;
+  const fileName = file.name;
+  const finalMimeType = file.type;
 
   // 2. Fetch Entity Name
   let entityName = "Unknown Entity";
@@ -308,55 +311,42 @@ export async function uploadPortalDocument(
     data: { publicUrl },
   } = supabase.storage.from(bucketName).getPublicUrl(filePath);
 
-  // 6. DB Updates & Version Tracking
+  // 6. DB Updates & File Tracking
+  let uploadedFile: { id: string; file_name: string } | null = null;
   if (magicLink.entity_type === "vendor") {
     const { data: existingDoc } = await supabase
       .from("vendor_documents")
-      .select("id, version_number")
+      .select("id")
       .eq("vendor_id", magicLink.entity_id)
       .eq("doc_type", docType)
       .is("archived_at", null)
       .maybeSingle();
 
-    const versionNumber = existingDoc ? existingDoc.version_number + 1 : 1;
-    const documentPayload = {
-      vendor_id: magicLink.entity_id,
-      doc_type: docType,
-      file_url: publicUrl,
-      file_name: fileName,
-      status: "submitted",
-      expiry_date: expiryDate || (ocrData as any).expiry_date || null,
-      notes: notes || null,
-      submitted_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      ocr_data: ocrData,
-      version_number: versionNumber,
-    };
-
     let docId = "";
     if (existingDoc) {
-      const { error: dbError } = await supabase
-        .from("vendor_documents")
-        .update(documentPayload)
-        .eq("id", existingDoc.id);
-      if (dbError) return { error: dbError.message };
       docId = existingDoc.id;
     } else {
       const { data: newDoc, error: dbError } = await supabase
         .from("vendor_documents")
-        .insert(documentPayload)
+        .insert({
+          vendor_id: magicLink.entity_id,
+          doc_type: docType,
+          status: "submitted",
+          submitted_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          ocr_data: ocrData,
+        })
         .select("id")
         .single();
       if (dbError || !newDoc) return { error: dbError?.message || "Failed to insert document" };
       docId = newDoc.id;
     }
 
-    // Save Version Entry
-    const { data: versionEntry } = await supabase
-      .from("vendor_document_versions")
+    // Append a new file slot (portal uploads accumulate instead of replacing)
+    const { data: fileRow, error: fileError } = await supabase
+      .from("vendor_document_files")
       .insert({
         document_id: docId,
-        version_number: versionNumber,
         file_url: publicUrl,
         file_name: fileName,
         notes: notes || "Uploaded via Portal",
@@ -364,18 +354,48 @@ export async function uploadPortalDocument(
       .select("id")
       .single();
 
-    if (versionEntry) {
-      await supabase
-        .from("vendor_documents")
-        .update({ current_version_id: versionEntry.id })
-        .eq("id", docId);
-    }
+    if (fileError || !fileRow) return { error: fileError?.message || "Failed to save file" };
+    uploadedFile = { id: fileRow.id, file_name: fileName };
+
+    const { data: maxVer } = await supabase
+      .from("vendor_document_file_versions")
+      .select("version_number")
+      .eq("file_id", fileRow.id)
+      .order("version_number", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { error: versionError } = await supabase
+      .from("vendor_document_file_versions")
+      .insert({
+        file_id: fileRow.id,
+        version_number: (maxVer?.version_number || 0) + 1,
+        file_url: publicUrl,
+        file_name: fileName,
+        notes: notes || "Uploaded via Portal",
+      });
+    if (versionError) return { error: versionError.message };
+
+    const { error: dbError } = await supabase
+      .from("vendor_documents")
+      .update({
+        file_url: publicUrl,
+        file_name: fileName,
+        status: "submitted",
+        expiry_date: expiryDate || (ocrData as any).expiry_date || null,
+        notes: notes || null,
+        submitted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        ocr_data: ocrData,
+      })
+      .eq("id", docId);
+    if (dbError) return { error: dbError.message };
 
     // Trigger Notification for Procurement
     await createNotification({
       type: "vendor",
       title: "📁 Portal Upload: Vendor Compliance",
-      message: `${entityName} uploaded a new ${docType.toUpperCase().replace(/_/g, " ")} (v${versionNumber}).`,
+      message: `${entityName} uploaded a file for ${docType.toUpperCase().replace(/_/g, " ")}.`,
       link: `/dashboard/vendors/${magicLink.entity_id}`,
       created_by: magicLink.entity_id, // Route identifier
     });
@@ -453,5 +473,5 @@ export async function uploadPortalDocument(
     });
   }
 
-  return { success: true, ocrData };
+  return { success: true, ocrData, uploadedFile };
 }

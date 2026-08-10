@@ -60,9 +60,9 @@ async function VendorDetailContent({
       .select('*')
       .eq('id', params.id)
       .single(),
-    supabase
-      .from('vendor_documents')
-      .select('*')
+supabase
+      .from("vendor_documents")
+      .select('*, vendor_document_files(*)')
       .eq('vendor_id', params.id),
     supabase
       .from('purchase_orders')
@@ -98,18 +98,24 @@ async function VendorDetailContent({
     notFound();
   }
 
-  // Generate signed URLs for each document
+  // Generate signed URLs for each document and each uploaded file
+  const signPath = async (url: string | null) => {
+    if (!url) return url;
+    const path = url.split('/public/vendor-documents/')[1];
+    if (!path) return url;
+    const { data } = await supabase.storage
+      .from('vendor-documents')
+      .createSignedUrl(path, 3600); // 1 hour
+    return data?.signedUrl || url;
+  };
+
   const documentsWithUrls = await Promise.all((rawDocuments || []).map(async (doc) => {
-    if (doc.file_url) {
-      const path = doc.file_url.split('/public/vendor-documents/')[1];
-      if (path) {
-        const { data } = await supabase.storage
-          .from('vendor-documents')
-          .createSignedUrl(path, 3600); // 1 hour
-        return { ...doc, file_url: data?.signedUrl || doc.file_url };
-      }
-    }
-    return doc;
+    const file_url = await signPath(doc.file_url);
+    const files = await Promise.all((doc.vendor_document_files || []).map(async (f: any) => ({
+      ...f,
+      file_url: await signPath(f.file_url),
+    })));
+    return { ...doc, file_url, vendor_document_files: files };
   }));
 
   const tabs = [
