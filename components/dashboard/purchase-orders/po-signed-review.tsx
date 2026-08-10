@@ -33,7 +33,10 @@ export function PoSignedReview({
       } else {
         setFeedback({
           ok: true,
-          msg: decision === "approve" ? "Signed PO approved." : "Signed PO rejected. The vendor can re-upload via the portal link.",
+          msg:
+            decision === "approve"
+              ? "Signed PO approved."
+              : "Signed PO rejected. Resend the signature request to let the vendor re-upload.",
         });
         router.refresh();
       }
