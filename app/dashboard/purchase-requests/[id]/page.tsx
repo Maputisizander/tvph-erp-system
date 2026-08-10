@@ -196,7 +196,7 @@ async function PRDetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
           {pr.status === "cancelled" && canRevive && (
             <PrReviveButton prId={pr.id} />
           )}
-          {["draft", "cancelled"].includes(pr.status) && canDelete && (
+          {canDelete && (currentRole === "superadmin" || pr.status === "draft") && (
             <PrDeleteButton prId={pr.id} />
           )}
         </div>

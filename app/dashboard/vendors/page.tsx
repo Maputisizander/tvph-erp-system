@@ -114,7 +114,7 @@ async function VendorsContent({
               <th className="px-4 py-3 font-semibold w-[18%]">Contact Person</th>
               <th className="px-4 py-3 font-semibold w-[17%]">Accreditation</th>
               <th className="px-4 py-3 font-semibold w-[10%]">Status</th>
-              <th className="px-4 py-3 font-semibold w-[10%]">NDA</th>
+              <th className="px-4 py-3 font-semibold w-[10%] text-center">NDA</th>
               <th className="px-4 py-3 font-semibold w-[7%] text-right">Actions</th>
             </tr>
           </thead>

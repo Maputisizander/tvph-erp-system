@@ -126,7 +126,13 @@ async function PortalPoSignContent({ params }: { params: Promise<{ token: string
                     <FileText className="h-5 w-5" /> Download Signed PO
                   </a>
                 )}
-                {po.status === "pending_signature" && <PoSignForm token={token} className="mt-6" />}
+                {po.status === "pending_signature" && (
+                  <PoSignForm
+                    token={token}
+                    className="mt-6"
+                    signedFileUrl={result.signature?.signed_file_url}
+                  />
+                )}
               </div>
             ) : (
               <PoSignForm token={token} />
