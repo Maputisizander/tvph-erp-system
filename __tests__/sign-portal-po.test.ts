@@ -104,7 +104,9 @@ describe("signPortalPO", () => {
 
   it("uploads the file, inserts the signature, and keeps the PO in pending_signature", async () => {
     const { chain, client } = mockClient();
-    chain.maybeSingle.mockResolvedValue({ data: MAGIC, error: null });
+    chain.maybeSingle
+      .mockResolvedValueOnce({ data: MAGIC, error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
     chain.single.mockResolvedValue({ data: PO, error: null });
     const upload = client.storage.from("po-artifacts").upload;
     upload.mockResolvedValue({ error: null });
@@ -130,7 +132,9 @@ describe("signPortalPO", () => {
 
   it("combines up to 3 images into a PDF and uploads", async () => {
     const { chain, client } = mockClient();
-    chain.maybeSingle.mockResolvedValue({ data: MAGIC, error: null });
+    chain.maybeSingle
+      .mockResolvedValueOnce({ data: MAGIC, error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
     chain.single.mockResolvedValue({ data: PO, error: null });
     const upload = client.storage.from("po-artifacts").upload;
     upload.mockResolvedValue({ error: null });
@@ -156,21 +160,38 @@ describe("signPortalPO", () => {
     expect(res).toHaveProperty("success", true);
   });
 
-  it("revokes the magic link after a successful upload", async () => {
+  it("shortens the link expiry to ~15 mins after a successful upload", async () => {
     const { chain, client } = mockClient();
-    chain.maybeSingle.mockResolvedValue({ data: MAGIC, error: null });
+    chain.maybeSingle
+      .mockResolvedValueOnce({ data: MAGIC, error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
     chain.single.mockResolvedValue({ data: PO, error: null });
     const upload = client.storage.from("po-artifacts").upload;
     upload.mockResolvedValue({ error: null });
     chain.insert.mockResolvedValue({ error: null });
-    // Capture update calls to verify revoke occurs.
     const updateMock = jest.fn(() => ({ eq: jest.fn().mockResolvedValue({ error: null }) }));
     chain.update = updateMock;
 
     await signPortalPO("tok", "Jane Doe", "MD", "1.2.3.4", PDF_FILE);
 
-    // Last update call should be the revoke for magic_links.
-    const revokeCall = updateMock.mock.calls.find((c: unknown[]) => (c[0] as Record<string, unknown>).revoked_at);
-    expect(revokeCall).toBeDefined();
+    const graceCall = updateMock.mock.calls.find((c: unknown[]) => (c[0] as Record<string, unknown>).expires_at);
+    expect(graceCall).toBeDefined();
+    const expiresAt = new Date((graceCall![0] as Record<string, string>).expires_at).getTime();
+    expect(expiresAt).toBeGreaterThan(Date.now() + 14 * 60 * 1000);
+    expect(expiresAt).toBeLessThan(Date.now() + 16 * 60 * 1000);
+  });
+
+  it("rejects a re-upload when the PO is already signed", async () => {
+    const { chain } = mockClient();
+    chain.maybeSingle
+      .mockResolvedValueOnce({ data: MAGIC, error: null })
+      .mockResolvedValueOnce({ data: { id: "sig-1" }, error: null });
+    chain.single.mockResolvedValue({ data: PO, error: null });
+
+    const res = await signPortalPO("tok", "Jane Doe", "MD", "1.2.3.4", PDF_FILE);
+    expect(res).toEqual({
+      error:
+        "This purchase order has already been signed. This link has been retired. Please request a new link from your TelcoVantage contact if a correction is needed.",
+    });
   });
 });
