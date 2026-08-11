@@ -58,4 +58,22 @@ describe('parseSiteDetailClipboard', () => {
     expect(warnings[0]).toContain('row 3');
     expect(warnings[0]).toContain('A');
   });
+
+  it('parses cable lengths with unit suffixes (meters, kms, commas)', () => {
+    const { rows, warnings } = parseSiteDetailClipboard('A\t0.648 m\nB\t0.33 M\nC\t5.5 kms\nD\t1,500 m');
+    expect(rows).toEqual([
+      { node_id: 'A', cable_length_km: 0.648 },
+      { node_id: 'B', cable_length_km: 0.33 },
+      { node_id: 'C', cable_length_km: 5.5 },
+      { node_id: 'D', cable_length_km: 1500 },
+    ]);
+    expect(warnings).toEqual([]);
+  });
+
+  it('takes the first number from ranges and keeps no-digit cells skipped', () => {
+    const { rows, warnings } = parseSiteDetailClipboard('A\t5.5-6.2\nB\tCable Length (KM)');
+    expect(rows).toEqual([{ node_id: 'A', cable_length_km: 5.5 }]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('row 2');
+  });
 });

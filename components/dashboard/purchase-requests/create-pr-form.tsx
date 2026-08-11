@@ -168,7 +168,13 @@ export function CreatePRForm({
 
   const handleNodeIdPaste = useCallback((e: React.ClipboardEvent<HTMLInputElement>) => {
     const { rows, warnings } = parseSiteDetailClipboard(e.clipboardData.getData("text/plain"));
-    if (rows.length === 0) return;
+    if (rows.length === 0) {
+      if (warnings.length) {
+        e.preventDefault();
+        toast.error(`Paste skipped — ${warnings.join("; ")}`);
+      }
+      return;
+    }
     e.preventDefault();
     setSiteDetails((prev) => {
       // If the table has no Node IDs yet, the current rows are just a pre-fill
