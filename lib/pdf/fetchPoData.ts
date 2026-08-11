@@ -50,7 +50,7 @@ export async function fetchPoData(id: string): Promise<PoData | null> {
     amount: Number(li.amount ?? li.qty * li.unit_price),
   }))
 
-  const siteDetails = (po.po_site_details ?? []).map((s: any) => ({
+  const rawSites = (po.po_site_details ?? []).map((s: any) => ({
     sn: Number(s.sn),
     region: s.region ?? '',
     area_city: s.area_city ?? '',
@@ -59,6 +59,20 @@ export async function fetchPoData(id: string): Promise<PoData | null> {
     node_id: s.node_id ?? '',
     phase: s.phase ?? '',
   }))
+  // ponytail: SUMMARY groups by place — 8 Manila rows in the issue render as 1 (NCR/Manila/8/4.621)
+  const siteDetails = (() => {
+    const m = new Map<string, typeof rawSites[0]>()
+    for (const s of rawSites) {
+      const k = `${(s.region || '').trim().toLowerCase()}::${(s.area_city || '').trim().toLowerCase()}`
+      const g = m.get(k)
+      if (!g) m.set(k, { ...s })
+      else {
+        g.no_of_nodes += s.no_of_nodes
+        g.estimated_strand_km += s.estimated_strand_km
+      }
+    }
+    return [...m.values()].map((s, i) => ({ ...s, sn: i + 1 }))
+  })()
 
   return {
     po_number: po.po_number ?? '',

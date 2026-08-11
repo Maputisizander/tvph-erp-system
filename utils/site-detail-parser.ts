@@ -9,9 +9,15 @@ export type SiteClipboardParse = {
 };
 
 function parseCableLength(raw: string): number | null {
-  const cleaned = raw.replace(/[,\s]/g, "").replace(/km$/i, "");
+  // ponytail: lenient — accept any unit suffix (m/km/kms), ranges, tildes
+  const cleaned = raw.replace(/,/g, "").trim();
   if (cleaned === "") return 0;
-  const num = Number(cleaned);
+  // strip trailing unit letters/spaces so "0.648 m" still matches
+  const withoutUnit = cleaned.replace(/\s*[a-zA-Z]+.*$/, "").trim();
+  const target = withoutUnit || cleaned;
+  const m = target.match(/-?\d+(?:\.\d+)?/);
+  if (!m) return null;
+  const num = Number(m[0]);
   return Number.isNaN(num) ? null : num;
 }
 
