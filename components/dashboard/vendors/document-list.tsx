@@ -112,8 +112,9 @@ export function DocumentList({ vendorId, documents, userRole }: { vendorId: stri
 
   const getDocStatus = (type: string) => fixedDocs.find((d) => d.doc_type === type);
 
-  const submittedCount = fixedDocs.filter((d) => d.status === 'submitted' || d.status === 'approved').length;
-  const progressPercent = Math.round((submittedCount / DOCUMENT_TYPES.length) * 100);
+  const customSubmittedCount = customDocs.filter((d) => d.status === 'submitted' || d.status === 'approved').length;
+  const submittedCount = fixedDocs.filter((d) => d.status === 'submitted' || d.status === 'approved').length + customSubmittedCount;
+  const progressPercent = Math.min(100, Math.round((submittedCount / DOCUMENT_TYPES.length) * 100));
 
   const ndaDoc = getDocStatus('signed_nda');
   const ndaApproved = ndaDoc?.status === 'approved';
