@@ -996,21 +996,12 @@ export async function uploadCustomVendorDocument(
   const { user, error: authError } = await requireCapability("vendor.write", supabase);
   if (authError || !user) return { error: authError || "Unauthorized" };
 
-  const file = formData.get("file") as File;
-  if (!file) return { error: "No file provided" };
+  const files = formData.getAll("file").filter((f): f is File => f instanceof File && f.size > 0);
+  if (files.length === 0) return { error: "No file provided" };
 
   const labelSlug = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/_+$/, "").slice(0, 40);
-  const fileExt = file.name.split(".").pop();
-  const fileName = `${labelSlug}_${Date.now()}.${fileExt}`;
-  const filePath = `vendors/${vendorId}/custom/${fileName}`;
 
-  const { error: uploadError } = await supabase.storage
-    .from("vendor-documents")
-    .upload(filePath, file, { contentType: file.type, upsert: false });
-  if (uploadError) return { error: uploadError.message };
-
-  const { data: { publicUrl } } = supabase.storage.from("vendor-documents").getPublicUrl(filePath);
-
+  // Create one doc row for this custom label; all selected files attach to it
   const { data: newDoc, error: insertError } = await supabase
     .from("vendor_documents")
     .insert({
@@ -1028,39 +1019,25 @@ export async function uploadCustomVendorDocument(
 
   if (insertError || !newDoc) return { error: insertError?.message || "Failed to create document" };
 
-  const { data: fileRow, error: fileInsertError } = await supabase
-    .from("vendor_document_files")
-    .insert({
-      document_id: newDoc.id,
-      file_url: publicUrl,
-      file_name: file.name,
-      uploaded_by: user.id,
-    })
-    .select("id")
-    .single();
+  let lastUrl = "";
+  let lastName = "";
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${labelSlug}_${Date.now()}_${i}.${fileExt}`;
+    const filePath = `vendors/${vendorId}/custom/${fileName}`;
+    const { error: uploadError } = await supabase.storage.from("vendor-documents").upload(filePath, file, { contentType: file.type, upsert: false });
+    if (uploadError) return { error: uploadError.message };
+    const { data: { publicUrl } } = supabase.storage.from("vendor-documents").getPublicUrl(filePath);
+    const { data: fileRow, error: fileInsertError } = await supabase.from("vendor_document_files").insert({ document_id: newDoc.id, file_url: publicUrl, file_name: file.name, uploaded_by: user.id }).select("id").single();
+    if (fileInsertError || !fileRow) return { error: fileInsertError?.message || "Failed to save file" };
+    const { error: versionError } = await supabase.from("vendor_document_file_versions").insert({ file_id: fileRow.id, version_number: 1, file_url: publicUrl, file_name: file.name, uploaded_by: user.id });
+    if (versionError) return { error: versionError.message };
+    lastUrl = publicUrl;
+    lastName = file.name;
+  }
 
-  if (fileInsertError || !fileRow) return { error: fileInsertError?.message || "Failed to save file" };
-
-  const { error: versionError } = await supabase
-    .from("vendor_document_file_versions")
-    .insert({
-      file_id: fileRow.id,
-      version_number: 1,
-      file_url: publicUrl,
-      file_name: file.name,
-      uploaded_by: user.id,
-    });
-
-  if (versionError) return { error: versionError.message };
-
-  await supabase
-    .from("vendor_documents")
-    .update({
-      file_url: publicUrl,
-      file_name: file.name,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", newDoc.id);
+  await supabase.from("vendor_documents").update({ file_url: lastUrl, file_name: lastName, updated_at: new Date().toISOString() }).eq("id", newDoc.id);
 
   await recordAuditLog({
     entity_type: "vendor_document",

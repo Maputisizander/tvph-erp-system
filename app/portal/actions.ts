@@ -262,6 +262,29 @@ export async function validatePortalToken(token: string) {
       .eq("vendor_id", magicLink.entity_id)
       .is("archived_at", null);
 
+    // Sign per-file URLs (bucket is private) — mirror PO pattern
+    if (documents && documents.length > 0) {
+      const entries: { file: any; path: string }[] = [];
+      for (const doc of documents as any[]) {
+        for (const f of (doc.vendor_document_files || [])) {
+          if (!f.file_url) continue;
+          const raw = f.file_url as string;
+          const after = raw.split("/object/public/vendor-documents/")[1] ?? raw.split("/vendor-documents/")[1] ?? raw;
+          const path = after.split("?")[0].replace(/^\/+/, "");
+          if (path) entries.push({ file: f, path });
+        }
+      }
+      if (entries.length > 0) {
+        const paths = entries.map((e) => e.path);
+        const { data: signed } = await supabase.storage.from("vendor-documents").createSignedUrls(paths, 3600);
+        if (signed) {
+          signed.forEach((s: any, idx: number) => {
+            if (s?.signedUrl) entries[idx].file.file_url = s.signedUrl;
+          });
+        }
+      }
+    }
+
     return {
       success: true,
       entityType: "vendor",
@@ -375,7 +398,7 @@ export async function uploadPortalDocument(
   } = supabase.storage.from(bucketName).getPublicUrl(filePath);
 
   // 6. DB Updates & File Tracking
-  let uploadedFile: { id: string; file_name: string } | null = null;
+  let uploadedFile: { id: string; file_name: string; file_url?: string } | null = null;
   if (magicLink.entity_type === "vendor") {
     const { data: existingDoc } = await supabase
       .from("vendor_documents")
@@ -418,7 +441,13 @@ export async function uploadPortalDocument(
       .single();
 
     if (fileError || !fileRow) return { error: fileError?.message || "Failed to save file" };
-    uploadedFile = { id: fileRow.id, file_name: fileName };
+    // Sign immediately so the portal can show a live view link without refresh
+    let signedForReturn = publicUrl;
+    try {
+      const { data: s } = await supabase.storage.from(bucketName).createSignedUrl(filePath, 3600);
+      if (s?.signedUrl) signedForReturn = s.signedUrl;
+    } catch {}
+    uploadedFile = { id: fileRow.id, file_name: fileName, file_url: signedForReturn };
 
     const { data: maxVer } = await supabase
       .from("vendor_document_file_versions")

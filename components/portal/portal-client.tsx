@@ -16,7 +16,7 @@ interface Document {
   file_name?: string | null;
   file_url?: string | null;
   notes?: string | null;
-  vendor_document_files?: { id: string; file_name?: string | null }[];
+  vendor_document_files?: { id: string; file_name?: string | null; file_url?: string | null; created_at?: string | null }[];
 }
 
 interface PortalClientProps {
@@ -64,7 +64,7 @@ export default function PortalClient({
   const [selectedDocType, setSelectedDocType] = useState<string | null>(null);
   
   // Form state
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [expiryDate, setExpiryDate] = useState("");
   const [notes, setNotes] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -155,81 +155,87 @@ export default function PortalClient({
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || !selectedDocType) {
-      toast.error("Please select a file first.");
+    if (files.length === 0 || !selectedDocType) {
+      toast.error("Please select at least one file.");
       return;
     }
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
-    if (expiryDate) formData.append("expiryDate", expiryDate);
-    if (notes) formData.append("notes", notes);
+    let lastOcr: any = null;
+    const newFiles: { id: string; file_name: string; file_url?: string | null }[] = [];
+    let uploadError: string | null = null;
 
-    // If signature is required, extract it from canvas
-    if (["signed_nda", "specimen_signature"].includes(selectedDocType) && hasSigned && canvasRef.current) {
-      const signatureImage = canvasRef.current.toDataURL("image/png");
-      formData.append("signatureImage", signatureImage);
-    }
-
-    try {
-      const result = await uploadPortalDocument(token, selectedDocType, formData);
-      if (result.error) {
-        toast.error(`Upload failed: ${result.error}`);
-      } else {
-        toast.success("Document uploaded successfully!", {
-          icon: <Sparkles className="h-5 w-5 text-amber-500 animate-pulse" />
-        });
-        
-        // Show AI OCR extraction feedback
-        if (result.ocrData && Object.keys(result.ocrData).length > 0) {
-          const ocr: any = result.ocrData;
-          let msg = "";
-          if (ocr.expiry_date) msg += `Expiry: ${ocr.expiry_date}. `;
-          if (ocr.tin) msg += `TIN: ${ocr.tin}. `;
-          if (ocr.amount) msg += `Amount: PHP ${Number(ocr.amount).toLocaleString()}. `;
-          
-          if (msg) {
-            toast.info(`AI OCR Extracted Details: ${msg}`, { duration: 6000 });
-          }
-        }
-
-        // Re-fetch documents
-        const newEntry: Document = {
-          doc_type: selectedDocType,
-          status: "submitted",
-          file_name: file.name,
-          expiry_date: expiryDate || null,
-          notes: notes || null,
-          vendor_document_files: [],
-        };
-        const existing = documents.find(d => d.doc_type === selectedDocType);
-        if (existing?.vendor_document_files?.length) {
-          newEntry.vendor_document_files = [...existing.vendor_document_files];
-        }
-        if (result.uploadedFile) {
-          newEntry.vendor_document_files = [
-            ...(newEntry.vendor_document_files || []),
-            { id: result.uploadedFile.id, file_name: result.uploadedFile.file_name },
-          ];
-        }
-        setDocuments(prev => {
-          const filtered = prev.filter(d => d.doc_type !== selectedDocType);
-          return [...filtered, newEntry];
-        });
-
-        // Close upload section
-        setSelectedDocType(null);
-        setFile(null);
-        setExpiryDate("");
-        setNotes("");
-        setHasSigned(false);
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      const formData = new FormData();
+      formData.append("file", f);
+      if (expiryDate) formData.append("expiryDate", expiryDate);
+      if (notes) formData.append("notes", notes);
+      if (["signed_nda", "specimen_signature"].includes(selectedDocType) && hasSigned && canvasRef.current) {
+        const signatureImage = canvasRef.current.toDataURL("image/png");
+        formData.append("signatureImage", signatureImage);
       }
-    } catch (err: any) {
-      toast.error(err.message || "An unexpected error occurred.");
-    } finally {
-      setIsUploading(false);
+      try {
+        const result = await uploadPortalDocument(token, selectedDocType, formData);
+        if ((result as any).error) {
+          uploadError = (result as any).error;
+          break;
+        }
+        if ((result as any).ocrData) lastOcr = (result as any).ocrData;
+        if ((result as any).uploadedFile) newFiles.push((result as any).uploadedFile);
+      } catch (err: any) {
+        uploadError = err.message || "An unexpected error occurred.";
+        break;
+      }
     }
+
+    if (uploadError) {
+      toast.error(`Upload failed: ${uploadError}`);
+      setIsUploading(false);
+      return;
+    }
+
+    toast.success(newFiles.length > 1 ? `${newFiles.length} files uploaded successfully!` : "Document uploaded successfully!", {
+      icon: <Sparkles className="h-5 w-5 text-amber-500 animate-pulse" />
+    });
+
+    if (lastOcr && Object.keys(lastOcr).length > 0) {
+      let msg = "";
+      if (lastOcr.expiry_date) msg += `Expiry: ${lastOcr.expiry_date}. `;
+      if (lastOcr.tin) msg += `TIN: ${lastOcr.tin}. `;
+      if (lastOcr.amount) msg += `Amount: PHP ${Number(lastOcr.amount).toLocaleString()}. `;
+      if (msg) toast.info(`AI OCR Extracted Details: ${msg}`, { duration: 6000 });
+    }
+
+    const newEntry: Document = {
+      doc_type: selectedDocType,
+      status: "submitted",
+      file_name: newFiles[0]?.file_name || files[0]?.name || null,
+      expiry_date: expiryDate || null,
+      notes: notes || null,
+      vendor_document_files: [],
+    };
+    const existing = documents.find(d => d.doc_type === selectedDocType);
+    if (existing?.vendor_document_files?.length) {
+      newEntry.vendor_document_files = [...existing.vendor_document_files];
+    }
+    for (const uf of newFiles) {
+      newEntry.vendor_document_files = [
+        ...(newEntry.vendor_document_files || []),
+        { id: uf.id, file_name: uf.file_name, file_url: (uf as any).file_url ?? null },
+      ];
+    }
+    setDocuments(prev => {
+      const filtered = prev.filter(d => d.doc_type !== selectedDocType);
+      return [...filtered, newEntry];
+    });
+
+    setSelectedDocType(null);
+    setFiles([]);
+    setExpiryDate("");
+    setNotes("");
+    setHasSigned(false);
+    setIsUploading(false);
   };
 
   return (
@@ -331,16 +337,27 @@ export default function PortalClient({
                     {label}
                   </h3>
                   
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 space-y-0.5">
                     {doc && doc.vendor_document_files && doc.vendor_document_files.length > 0 ? (
-                      <>
-                        {doc.vendor_document_files.length} file(s) uploaded
-                        {doc.vendor_document_files.length > 1 && " — click to add another"}
-                      </>
-                    ) : doc?.file_name
-                      ? `Uploaded: ${doc.file_name}`
-                      : "Click to draw signature and upload document."}
-                  </p>
+                      <div className="space-y-1">
+                        {doc.vendor_document_files.map((f) => (
+                          <div key={f.id} className="flex items-center gap-1.5 min-w-0">
+                            <FileText className="h-3 w-3 shrink-0 text-slate-400" />
+                            {f.file_url ? (
+                              <a href={f.file_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="truncate underline decoration-dotted hover:text-primary">{f.file_name || "Unnamed file"}</a>
+                            ) : (
+                              <span className="truncate">{f.file_name || "Unnamed file"}</span>
+                            )}
+                          </div>
+                        ))}
+                        <p className="text-[10px] text-slate-400">Click to add another file</p>
+                      </div>
+                    ) : doc?.file_name ? (
+                      <p className="line-clamp-2">Uploaded: {doc.file_name}</p>
+                    ) : (
+                      <p className="line-clamp-2">Click to draw signature and upload document.</p>
+                    )}
+                  </div>
                   
                   {doc?.expiry_date && (
                     <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 mt-3 border-t border-slate-100 dark:border-slate-800/50 pt-2 w-full">
@@ -380,17 +397,24 @@ export default function PortalClient({
                   <div className="relative border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 text-center hover:border-primary transition-all">
                     <input 
                       type="file" 
-                      onChange={(e) => setFile(e.target.files?.[0] || null)}
+                      multiple
+                      onChange={(e) => setFiles(Array.from(e.target.files || []))}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      required
+                      required={files.length === 0}
                     />
                     <Upload className="mx-auto h-8 w-8 text-slate-400 mb-3" />
                     <span className="block text-sm font-semibold text-slate-700 dark:text-slate-200">
-                      {file ? file.name : "Select or drag file"}
+                      {files.length === 0 ? "Select or drag files" : files.length === 1 ? files[0].name : `${files.length} files selected`}
                     </span>
+                    {files.length > 1 && (
+                      <span className="block text-xs text-slate-500 mt-1 truncate px-2">{files.map(f => f.name).join(", ")}</span>
+                    )}
                     <span className="block text-xs text-slate-400 mt-1">
-                      PDF, JPG, PNG up to 10MB
+                      PDF, JPG, PNG up to 10MB — select multiple files at once
                     </span>
+                    {files.length > 0 && (
+                      <button type="button" onClick={() => setFiles([])} className="relative z-10 mt-2 text-xs text-red-500 font-semibold hover:underline">Clear</button>
+                    )}
                   </div>
                 </div>
 

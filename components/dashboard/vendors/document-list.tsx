@@ -96,7 +96,7 @@ export function DocumentList({ vendorId, documents, userRole }: { vendorId: stri
   const [approving, setApproving] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [customLabel, setCustomLabel] = useState("");
-  const [customFile, setCustomFile] = useState<File | null>(null);
+  const [customFiles, setCustomFiles] = useState<File[]>([]);
   const [customUploading, setCustomUploading] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [historyFile, setHistoryFile] = useState<DocumentFile | null>(null);
@@ -178,17 +178,17 @@ export function DocumentList({ vendorId, documents, userRole }: { vendorId: stri
   };
 
   const handleCustomUpload = async () => {
-    if (!customFile || !customLabel.trim()) return;
+    if (customFiles.length === 0 || !customLabel.trim()) return;
     setCustomUploading(true);
     const formData = new FormData();
-    formData.append('file', customFile);
+    customFiles.forEach((f) => formData.append('file', f));
     const result = await uploadCustomVendorDocument(vendorId, customLabel.trim(), formData);
     if (result.error) { alert(result.error); }
     else { router.refresh(); }
     setCustomUploading(false);
     setShowAddForm(false);
     setCustomLabel('');
-    setCustomFile(null);
+    setCustomFiles([]);
   };
 
   const openHistory = async (file: DocumentFile, docName: string) => {
@@ -451,14 +451,16 @@ export function DocumentList({ vendorId, documents, userRole }: { vendorId: stri
                 <input
                   type="file"
                   multiple
-                  onChange={(e) => setCustomFile(e.target.files?.[0] || null)}
+                  onChange={(e) => setCustomFiles(Array.from(e.target.files || []))}
                   className="w-full text-sm text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition-all"
                 />
+                {customFiles.length > 1 && <p className="text-[10px] text-slate-400 mt-1">{customFiles.length} files selected: {customFiles.map((f) => f.name).join(", ")}</p>}
+                {customFiles.length === 1 && <p className="text-[10px] text-slate-400 mt-1">{customFiles[0].name}</p>}
               </div>
               <div className="shrink-0">
                 <button
                   onClick={handleCustomUpload}
-                  disabled={customUploading || !customFile || !customLabel.trim()}
+                  disabled={customUploading || customFiles.length === 0 || !customLabel.trim()}
                   className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-primary hover:bg-primary/90 shadow-sm"
                 >
                   {customUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
