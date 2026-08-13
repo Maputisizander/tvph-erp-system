@@ -9,8 +9,6 @@ import { PaymentRequestsTable } from "@/components/dashboard/accounting/payment-
 import { computeApAging } from "@/lib/reports/apAging";
 import { getCurrentProfile, hasCapability } from "@/lib/auth/permissions";
 
-export const unstable_instant = { prefetch: "static" };
-
 export default function AccountingPage() {
   return (
     <div className="p-6 lg:p-8 space-y-8 animate-in fade-in duration-700">

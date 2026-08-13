@@ -10,11 +10,6 @@ import { getCurrentProfile, hasCapability } from '@/lib/auth/permissions';
 import { signDocUrls } from '@/utils/storage';
 import { invoiceStatusLabel, invoiceStatusBadgeClasses } from '@/lib/invoices/status';
 
-export const unstable_instant = {
-  prefetch: 'static',
-  samples: [{ params: { id: 'sample-id' } }]
-};
-
 export default function InvoiceDetailPage(props: { params: Promise<{ id: string }> }) {
   return (
     <Suspense fallback={<InvoiceDetailSkeleton />}>

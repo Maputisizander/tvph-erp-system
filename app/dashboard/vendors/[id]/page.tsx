@@ -13,14 +13,6 @@ import { isVendorProfileComplete, getVendorMissingFields } from '@/utils/complet
 import { Tooltip } from '@/components/ui/tooltip';
 import { invoiceStatusLabel, invoiceStatusBadgeClasses } from '@/lib/invoices/status';
 
-export const unstable_instant = { 
-  prefetch: 'static',
-  samples: [{ 
-    params: { id: 'sample-id' },
-    searchParams: { tab: null }
-  }]
-};
-
 export default function VendorDetailPage(props: { 
   params: Promise<{ id: string }>,
   searchParams: Promise<{ tab?: string }> 

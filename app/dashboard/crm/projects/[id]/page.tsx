@@ -5,11 +5,6 @@ import { ArrowLeft, CalendarDays, CircleDollarSign, FileText, FolderGit2, MapPin
 import { createClient } from '@/utils/supabase/server';
 import { addOpportunityActivityFromForm, convertOpportunityToProject, markOpportunityAsLost, updateOpportunityStage } from '../../actions';
 
-export const unstable_instant = {
-  prefetch: 'static',
-  samples: [{ params: { id: 'sample-crm-id' } }],
-};
-
 const stageOptions = [
   { value: 'prospect', label: 'Prospect' },
   { value: 'site_visit', label: 'Site Visit' },

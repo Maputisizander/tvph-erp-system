@@ -5,11 +5,6 @@ import Link from "next/link";
 import { ArrowLeft, User, Phone, Mail, Shield, Briefcase, Calendar } from "lucide-react";
 import { Employee201Vault } from "@/components/dashboard/hr/employee-201-vault";
 
-export const unstable_instant = {
-  prefetch: "static",
-  samples: [{ params: { id: "00000000-0000-0000-0000-000000000000" } }],
-};
-
 export default function EmployeeDetailPage(props: {
   params: Promise<{ id: string }>;
 }) {

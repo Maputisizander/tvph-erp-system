@@ -4,11 +4,6 @@ import PortalClient from "@/components/portal/portal-client";
 import { ShieldAlert, LogIn, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
-export const unstable_instant = {
-  prefetch: "static",
-  samples: [{ params: { token: "sample-token" } }],
-};
-
 interface PageProps {
   params: Promise<{ token: string }>;
 }

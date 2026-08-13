@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { CheckCircle2, XCircle, FileText, Loader2 } from "lucide-react";
 import { reviewSignedPo } from "@/app/dashboard/purchase-orders/actions";
+import { useOptimisticAction } from "@/components/dashboard/shared/use-optimistic-action";
 
 export function PoSignedReview({
   poId,
@@ -17,8 +17,7 @@ export function PoSignedReview({
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const router = useRouter();
+  const { isPending, optimisticSuccess, run } = useOptimisticAction();
 
   function submit(decision: "approve" | "reject") {
     if (decision === "reject" && !reason.trim()) {
@@ -26,20 +25,21 @@ export function PoSignedReview({
       return;
     }
     setFeedback(null);
-    startTransition(async () => {
+    // ponytail: optimistic flip so signed-review feels instant
+    run(async () => {
       const result = await reviewSignedPo(poId, decision, reason);
       if (result?.error) {
         setFeedback({ ok: false, msg: result.error });
-      } else {
-        setFeedback({
-          ok: true,
-          msg:
-            decision === "approve"
-              ? "Signed PO approved."
-              : "Signed PO rejected. Resend the signature request to let the vendor re-upload.",
-        });
-        router.refresh();
+        return result;
       }
+      setFeedback({
+        ok: true,
+        msg:
+          decision === "approve"
+            ? "Signed PO approved."
+            : "Signed PO rejected. Resend the signature request to let the vendor re-upload.",
+      });
+      return result;
     });
   }
 
@@ -78,21 +78,21 @@ export function PoSignedReview({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={isPending}
+              disabled={isPending || optimisticSuccess}
               onClick={() => submit("approve")}
               className="inline-flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl px-4 py-2 text-sm font-semibold transition-all active:scale-95 disabled:opacity-60"
             >
-              {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-              Acknowledge Signed PO
+              {optimisticSuccess ? <CheckCircle2 className="h-4 w-4" /> : isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              {optimisticSuccess ? "Approved ✓" : "Acknowledge Signed PO"}
             </button>
             <button
               type="button"
-              disabled={isPending}
+              disabled={isPending || optimisticSuccess}
               onClick={() => (rejecting ? submit("reject") : setRejecting(true))}
               className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white rounded-xl px-4 py-2 text-sm font-semibold transition-all active:scale-95 disabled:opacity-60"
             >
               <XCircle className="h-4 w-4" />
-              {rejecting ? "Confirm Rejection" : "Reject"}
+              {optimisticSuccess && rejecting ? "Rejected ✓" : rejecting ? "Confirm Rejection" : "Reject"}
             </button>
           </div>
           {feedback && (

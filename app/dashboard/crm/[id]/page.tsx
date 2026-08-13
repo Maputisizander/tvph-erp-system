@@ -10,16 +10,6 @@ import { CustomerDocuments } from '@/components/dashboard/crm/customer-documents
 import GenerateLinkButton from '@/components/dashboard/vendors/generate-link-button';
 import { updateCustomerStatus } from '../actions';
 
-export const unstable_instant = {
-  prefetch: 'static',
-  samples: [
-    { params: { id: 'sample-customer-id' }, searchParams: { tab: null } },
-    { params: { id: 'sample-customer-id' }, searchParams: { tab: 'client-pos' } },
-    { params: { id: 'sample-customer-id' }, searchParams: { tab: 'client-invoices' } },
-    { params: { id: 'sample-customer-id' }, searchParams: { tab: 'projects' } },
-  ],
-};
-
 export default function CustomerDetailPage(props: {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ tab?: string }>;

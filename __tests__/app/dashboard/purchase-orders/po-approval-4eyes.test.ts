@@ -305,7 +305,7 @@ describe('approvePO — 4-eyes', () => {
 
     const result = await approvePO('po-waiver');
     expect(result).toEqual({
-      error: 'Cannot approve: Approve this PO waive requirement first.',
+      error: 'Cannot approve: this PO has waived requirements pending executive approval.',
     });
     expect(mockSupabase.updateChain.eq).not.toHaveBeenCalled();
   });
@@ -425,7 +425,7 @@ describe('approvePOFinance', () => {
 
     const result = await approvePOFinance('po-waiver');
     expect(result).toEqual({
-      error: 'Cannot issue: Approve this PO waive requirement first.',
+      error: 'Cannot issue: this PO has waived requirements pending executive approval.',
     });
     expect(mockSupabase.updateChain.eq).not.toHaveBeenCalled();
   });

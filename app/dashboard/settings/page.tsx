@@ -3,8 +3,6 @@ import { Settings, Building2, Users, CreditCard, ShieldCheck } from 'lucide-reac
 import { SettingsTabs } from '@/components/dashboard/settings/settings-tabs';
 import { Suspense } from 'react';
 
-export const unstable_instant = { prefetch: 'static' };
-
 export default function SettingsPage() {
   return (
     <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">

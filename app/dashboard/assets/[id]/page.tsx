@@ -5,11 +5,6 @@ import Link from "next/link";
 import { ArrowLeft, Package, User, Calendar, MapPin, Hash, DollarSign, TrendingDown } from "lucide-react";
 import { MaintenanceLog } from "@/components/dashboard/assets/maintenance-log";
 
-export const unstable_instant = {
-  prefetch: "static",
-  samples: [{ params: { id: "00000000-0000-0000-0000-000000000000" } }],
-};
-
 export default function AssetDetailPage(props: {
   params: Promise<{ id: string }>;
 }) {

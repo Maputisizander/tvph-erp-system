@@ -7,8 +7,6 @@ import {
 } from "lucide-react";
 import { GenerateReportButton } from "@/components/dashboard/reports/generate-report-button";
 
-export const unstable_instant = { prefetch: "static" };
-
 const REPORTS = [
   {
     id: "operations",

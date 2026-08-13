@@ -10,8 +10,6 @@ import {
   computeComplianceSummary,
 } from '@/lib/reports/compliance';
 
-export const unstable_instant = { prefetch: 'static' };
-
 export default function ComplianceHubPage() {
   return (
     <div className="p-6 lg:p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-700">

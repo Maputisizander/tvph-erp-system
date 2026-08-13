@@ -7,11 +7,6 @@ import { RecordClientPaymentModal } from '@/components/dashboard/client-invoices
 import { updateClientInvoiceStatus } from '../actions';
 import { statusBadgeClasses } from '@/lib/ui/status-badge';
 
-export const unstable_instant = {
-  prefetch: 'static',
-  samples: [{ params: { id: 'sample-client-invoice-id' }, searchParams: {} }],
-};
-
 export default function ClientInvoiceDetailPage(props: {
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string>>;

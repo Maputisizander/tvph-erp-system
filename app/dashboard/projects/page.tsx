@@ -9,11 +9,6 @@ import { ImportExportButtons } from "@/components/dashboard/import-export-button
 import { importProjects } from "./actions";
 import { statusBadgeClasses } from "@/lib/ui/status-badge";
 
-export const unstable_instant = {
-  prefetch: "static",
-  samples: [{ searchParams: { page: null, account_id: null } }],
-};
-
 export default function ProjectsPage(props: {
   searchParams?: Promise<{ page?: string; account_id?: string }>;
 }) {

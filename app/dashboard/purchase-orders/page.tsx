@@ -12,11 +12,6 @@ import { parsePage, pageRange } from '@/components/ui/pagination-utils';
 
 const PO_PAGE_SIZE = 8;
 
-export const unstable_instant = {
-  prefetch: 'static',
-  samples: [{ searchParams: { q: null, status: null, vendor: null, project: null, page: null } }]
-};
-
 export default function PurchaseOrdersPage(props: {
   searchParams?: Promise<{ q?: string; status?: string; vendor?: string; project?: string; page?: string }>
 }) {

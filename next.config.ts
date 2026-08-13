@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  cacheComponents: true,
+  // ponytail: cacheComponents enabled stale router.refresh() after mutations (all approval banners needed F5);
+  // disable until fixed — instant prefetch benefit was negligible vs stale UX
+  cacheComponents: false,
   experimental: {
     serverActions: { bodySizeLimit: '12mb' },
   },

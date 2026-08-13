@@ -8,11 +8,6 @@ import { Pagination } from '@/components/ui/pagination';
 import { LIST_PAGE_SIZE, parsePage, pageRange } from '@/components/ui/pagination-utils';
 import { statusBadgeClasses } from '@/lib/ui/status-badge';
 
-export const unstable_instant = {
-  prefetch: 'static',
-  samples: [{ searchParams: { q: null, status: null, page: null } }],
-};
-
 export default function ClientPOsPage(props: {
   searchParams?: Promise<{ q?: string; status?: string; page?: string }>;
 }) {

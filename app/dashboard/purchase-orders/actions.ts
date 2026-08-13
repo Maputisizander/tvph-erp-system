@@ -12,6 +12,17 @@ import { sendPoPendingApprovalEmail } from '@/lib/email/po-pending-approval';
 import { sendPoPendingFinanceEmail } from '@/lib/email/po-pending-finance';
 import { sendPoSignedAcknowledgedEmail } from '@/lib/email/po-signed-acknowledged';
 
+// ponytail: defer via next/server after() without breaking jest (which lacks Request)
+function defer(fn: () => Promise<void>) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { after } = require('next/server') as { after: (f: () => void) => void };
+    after(fn);
+  } catch {
+    void fn();
+  }
+}
+
 type POLineItem = { item_code?: string; description: string; qty: number; uom?: string; unit_price: number };
 type POSiteDetail = { region: string; area_city: string; no_of_nodes: number; cable_length_km: number; node_id?: string; phase?: string };
 
@@ -85,20 +96,13 @@ export async function createPurchaseOrderCore(input: CreatePOInput) {
     dpPercent = Math.round((dpAmount / totalAmount) * 100 * 100) / 100;
   }
 
-  const { data: ndaDoc } = await supabase
-    .from('vendor_documents')
-    .select('status')
-    .eq('vendor_id', vendor_id)
-    .eq('doc_type', 'signed_nda')
-    .eq('status', 'approved')
-    .is('archived_at', null)
-    .maybeSingle();
-
+  // ponytail: parallelize independent pre-checks (was 3 sequential round-trips)
+  const [{ data: ndaDoc }, { data: entity }, { data: vendor }] = await Promise.all([
+    supabase.from('vendor_documents').select('status').eq('vendor_id', vendor_id).eq('doc_type', 'signed_nda').eq('status', 'approved').is('archived_at', null).maybeSingle(),
+    supabase.from('internal_entities').select('id').limit(1).single(),
+    supabase.from('vendors').select('status, currency').eq('id', vendor_id).single(),
+  ]);
   const ndaFailed = !ndaDoc;
-
-  const { data: entity } = await supabase.from('internal_entities').select('id').limit(1).single();
-
-  const { data: vendor } = await supabase.from('vendors').select('status, currency').eq('id', vendor_id).single();
   const statusFailed = !vendor || vendor.status !== 'active';
   const hasBlockers = ndaFailed || statusFailed;
 
@@ -134,30 +138,47 @@ export async function createPurchaseOrderCore(input: CreatePOInput) {
     prToConvert = pr;
   }
 
-  // ── Duplicate check: prevent overlapping POs for the same node_id in the same region/area/phase ──
-  for (const site of site_details) {
-    if (!site.node_id?.trim()) continue;
+  // ── Duplicate check: single batched query instead of N per-site round-trips ──
+  // ponytail: was N×2 queries (po_site_details + purchase_orders per site); now at most 2 total
+  const sitesWithNode = site_details.filter((s) => s.node_id?.trim());
+  if (sitesWithNode.length > 0) {
+    const nodeIds = [...new Set(sitesWithNode.map((s) => s.node_id!.trim()))];
     const { data: existingRows } = await supabase
       .from('po_site_details')
-      .select('po_id')
-      .ilike('region', site.region || '')
-      .ilike('area_city', site.area_city || '')
-      .ilike('node_id', site.node_id)
-      .ilike('phase', site.phase || '');
+      .select('po_id, region, area_city, node_id, phase')
+      .in('node_id', nodeIds);
 
     if (existingRows && existingRows.length > 0) {
-      const poIds = [...new Set(existingRows.map(r => r.po_id))];
-      const { data: activePOs } = await supabase
-        .from('purchase_orders')
-        .select('po_number')
-        .in('id', poIds)
-        .neq('status', 'cancelled')
-        .is('deleted_at', null);
-
-      if (activePOs && activePOs.length > 0) {
-        return {
-          error: `Duplicate site detected: Node ID "${site.node_id}" in ${site.region}, ${site.area_city} (Phase: "${site.phase || 'N/A'}") already exists in ${activePOs.map(p => p.po_number).join(', ')}. Please check and avoid duplicate entries.`,
-        };
+      // Match in JS on all four fields case-insensitively
+      const norm = (v: string | null) => (v || '').toLowerCase();
+      const matched = new Map<string, typeof sitesWithNode[0]>();
+      for (const row of existingRows) {
+        for (const site of sitesWithNode) {
+          if (
+            norm(row.node_id) === norm(site.node_id!.trim()) &&
+            norm(row.region) === norm(site.region || '') &&
+            norm(row.area_city) === norm(site.area_city || '') &&
+            norm(row.phase) === norm(site.phase || '')
+          ) {
+            matched.set(site.node_id!.trim().toLowerCase(), site);
+            break;
+          }
+        }
+      }
+      if (matched.size > 0) {
+        const poIds = [...new Set(existingRows.filter((r) => matched.has(r.node_id.toLowerCase())).map((r) => r.po_id))];
+        const { data: activePOs } = await supabase
+          .from('purchase_orders')
+          .select('po_number')
+          .in('id', poIds)
+          .neq('status', 'cancelled')
+          .is('deleted_at', null);
+        if (activePOs && activePOs.length > 0) {
+          const firstDup = [...matched.values()][0]!;
+          return {
+            error: `Duplicate site detected: Node ID "${firstDup.node_id}" in ${firstDup.region}, ${firstDup.area_city} (Phase: "${firstDup.phase || 'N/A'}") already exists in ${activePOs.map((p) => p.po_number).join(', ')}. Please check and avoid duplicate entries.`,
+          };
+        }
       }
     }
   }
@@ -711,21 +732,23 @@ export async function submitPOForApproval(poId: string, approverIds: string[] = 
     created_by: user.id,
   });
 
-  // Best-effort: email the chosen approvers. A failed send must NOT fail the
-  // submit (mirrors approvePO's contract) — surface a broadcast warning instead.
-  const emailResult = await sendPoPendingApprovalEmail(poId, { actorId: user.id });
-  if (emailResult.status === 'failed') {
-    await createNotification({
-      type: 'po',
-      title: '⚠️ Approval email not sent',
-      message: `A PO was submitted for approval but the notification email to the selected approvers could not be sent. ${emailResult.error ?? ''}`.trim(),
-      link: `/dashboard/purchase-orders/${poId}`,
-      created_by: user.id,
-    });
-  }
-
   revalidatePath(`/dashboard/purchase-orders/${poId}`);
   revalidatePath('/dashboard/purchase-orders');
+
+  // ponytail: email deferred via after() so submit returns before SMTP/PDF work
+  defer(async () => {
+    const emailResult = await sendPoPendingApprovalEmail(poId, { actorId: user.id });
+    if (emailResult.status === 'failed') {
+      await createNotification({
+        type: 'po',
+        title: '⚠️ Approval email not sent',
+        message: `A PO was submitted for approval but the notification email to the selected approvers could not be sent. ${emailResult.error ?? ''}`.trim(),
+        link: `/dashboard/purchase-orders/${poId}`,
+        created_by: user.id,
+      });
+    }
+  });
+
   return { success: true };
 }
 
@@ -778,21 +801,24 @@ export async function approvePO(poId: string) {
     created_by: user.id,
   });
 
-  // Best-effort: notify the finance pool. A failed send never blocks approval.
-  const financeEmailResult = await sendPoPendingFinanceEmail(poId, { actorId: user.id });
-  if (financeEmailResult.status === 'failed') {
-    await createNotification({
-      type: 'po',
-      title: '⚠️ Finance email not sent',
-      message: `A PO passed the admin stage but the finance notification email could not be sent. ${financeEmailResult.error ?? ''}`.trim(),
-      link: `/dashboard/purchase-orders/${poId}`,
-      created_by: user.id,
-    });
-  }
-
   revalidatePath(`/dashboard/purchase-orders/${poId}`);
   revalidatePath('/dashboard/purchase-orders');
-  return { success: true, emailWarning: financeEmailResult.status === 'failed' ? financeEmailResult.error : undefined };
+
+  // ponytail: finance email deferred via after(); failure surfaced as in-app notification only (no emailWarning)
+  defer(async () => {
+    const financeEmailResult = await sendPoPendingFinanceEmail(poId, { actorId: user.id });
+    if (financeEmailResult.status === 'failed') {
+      await createNotification({
+        type: 'po',
+        title: '⚠️ Finance email not sent',
+        message: `A PO passed the admin stage but the finance notification email could not be sent. ${financeEmailResult.error ?? ''}`.trim(),
+        link: `/dashboard/purchase-orders/${poId}`,
+        created_by: user.id,
+      });
+    }
+  });
+
+  return { success: true };
 }
 
 export async function approvePOFinance(poId: string) {
@@ -845,36 +871,39 @@ export async function approvePOFinance(poId: string) {
     performed_by: user.id,
   });
 
-  let emailWarning: string | undefined;
+  revalidatePath(`/dashboard/purchase-orders/${poId}`);
+  revalidatePath('/dashboard/purchase-orders');
+
   if ('error' in linkResult) {
-    emailWarning = linkResult.error;
+    // Link creation failed — surface immediately (no email to send)
     await createNotification({
       type: 'po',
       title: '⚠️ Signature link not created',
-      message: `${emailWarning} Open the PO to resend the signature request.`,
+      message: `${linkResult.error} Open the PO to resend the signature request.`,
       link: `/dashboard/purchase-orders/${poId}`,
       created_by: user.id,
     });
-  } else {
+    return { success: true, emailWarning: linkResult.error };
+  }
+
+  // ponytail: PDF render + SMTP deferred via after() — finance approval returns before the heavy work
+  defer(async () => {
     const emailResult = await sendPoForSignatureEmail(poId, {
       signUrl: linkResult.portalUrl,
       actorId: user.id,
     });
     if (emailResult.status === 'failed') {
-      emailWarning = emailResult.error || 'The PO was issued but the email could not be sent.';
       await createNotification({
         type: 'po',
         title: '⚠️ PO email not sent',
-        message: `${emailWarning} Open the PO to resend it to the vendor.`,
+        message: `${emailResult.error || 'The PO was issued but the email could not be sent.'} Open the PO to resend it to the vendor.`,
         link: `/dashboard/purchase-orders/${poId}`,
         created_by: user.id,
       });
     }
-  }
+  });
 
-  revalidatePath(`/dashboard/purchase-orders/${poId}`);
-  revalidatePath('/dashboard/purchase-orders');
-  return { success: true, emailWarning };
+  return { success: true };
 }
 
 export async function rejectPO(poId: string, reason: string) {
@@ -1106,21 +1135,25 @@ export async function reviewSignedPo(
     created_by: user.id,
   });
 
-  if (decision === 'approve') {
-    const emailResult = await sendPoSignedAcknowledgedEmail(poId, { actorId: user.id });
-    if (emailResult.status === 'failed') {
-      await createNotification({
-        type: 'po',
-        title: '⚠️ Acknowledgment email not sent',
-        message: `The signed-PO acknowledgment email for ${po.po_number || 'the PO'} could not be sent.${emailResult.error ? ` ${emailResult.error}` : ''}`,
-        link: `/dashboard/purchase-orders/${poId}`,
-        created_by: user.id,
-      });
-    }
-  }
-
   revalidatePath(`/dashboard/purchase-orders/${poId}`);
   revalidatePath('/dashboard/purchase-orders');
+
+  if (decision === 'approve') {
+    // ponytail: acknowledgment email deferred via after()
+    defer(async () => {
+      const emailResult = await sendPoSignedAcknowledgedEmail(poId, { actorId: user.id });
+      if (emailResult.status === 'failed') {
+        await createNotification({
+          type: 'po',
+          title: '⚠️ Acknowledgment email not sent',
+          message: `The signed-PO acknowledgment email for ${po.po_number || 'the PO'} could not be sent.${emailResult.error ? ` ${emailResult.error}` : ''}`,
+          link: `/dashboard/purchase-orders/${poId}`,
+          created_by: user.id,
+        });
+      }
+    });
+  }
+
   return { success: true };
 }
 
@@ -1693,20 +1726,12 @@ export async function createPaymentRequest(
   const { user, error: authError } = await requireCapability('payment_request.create', supabase);
   if (authError || !user) return { error: authError || 'Unauthorized' };
 
-  const { data: po } = await supabase
-    .from('purchase_orders')
-    .select('id, po_number, amount, project_id, vendor_id, vendors(name)')
-    .eq('id', poId)
-    .single();
+  // ponytail: po + active-request check in parallel (was 2 sequential round-trips)
+  const [{ data: po }, { data: activePR }] = await Promise.all([
+    supabase.from('purchase_orders').select('id, po_number, amount, project_id, vendor_id, vendors(name)').eq('id', poId).single(),
+    supabase.from('payment_requests').select('id').eq('po_id', poId).in('status', ['pending', 'approved']).limit(1).maybeSingle(),
+  ]);
   if (!po) return { error: 'PO not found' };
-
-  const { data: activePR } = await supabase
-    .from('payment_requests')
-    .select('id')
-    .eq('po_id', poId)
-    .in('status', ['pending', 'approved'])
-    .limit(1)
-    .maybeSingle();
   if (activePR) return { error: 'An active Payment Request already exists for this PO.' };
 
   let percentComplete: number | null = null;
@@ -1757,20 +1782,24 @@ export async function createPaymentRequest(
     created_by: user.id,
   });
 
-  const { sendPaymentRequestNotification } = await import('@/lib/email/payment-request');
-  await sendPaymentRequestNotification(
-    poId,
-    po.vendor_id,
-    amount,
-    dueInDays ?? 30,
-    notes || null,
-    user.id,
-    po.po_number as string,
-    vendorName,
-  );
-
   revalidatePath(`/dashboard/purchase-orders/${poId}`);
   revalidatePath('/dashboard/accounting');
+
+  // ponytail: payment-request email deferred via after()
+  defer(async () => {
+    const { sendPaymentRequestNotification } = await import('@/lib/email/payment-request');
+    await sendPaymentRequestNotification(
+      poId,
+      po.vendor_id,
+      amount,
+      dueInDays ?? 30,
+      notes || null,
+      user.id,
+      po.po_number as string,
+      vendorName,
+    );
+  });
+
   return { success: true };
 }
 

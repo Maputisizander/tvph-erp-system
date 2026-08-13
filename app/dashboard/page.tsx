@@ -24,8 +24,6 @@ import {
 import Link from "next/link";
 import { Suspense } from "react";
 
-export const unstable_instant = { prefetch: "static" };
-
 export default function DashboardPage() {
   return (
     <div className="p-6 lg:p-8 space-y-8 animate-in fade-in duration-700">

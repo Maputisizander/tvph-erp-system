@@ -1,35 +1,23 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { approvePR, approvePRFinance, rejectPR } from "@/app/dashboard/purchase-requests/actions";
+import { useOptimisticAction } from "@/components/dashboard/shared/use-optimistic-action";
 
 export function PrApprovalActions({ prId, stage = "admin" }: { prId: string; stage?: "admin" | "finance" }) {
   const [isRejecting, setIsRejecting] = useState(false);
   const [reason, setReason] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const router = useRouter();
+  const { error, setError, isPending, optimisticSuccess, run } = useOptimisticAction();
 
   function handleApprove() {
-    setError(null);
-    startTransition(async () => {
-      const result = stage === "finance" ? await approvePRFinance(prId) : await approvePR(prId);
-      if (result?.error) setError(result.error);
-      else router.refresh();
-    });
+    run(() => (stage === "finance" ? approvePRFinance(prId) : approvePR(prId)));
   }
 
   function handleReject() {
     if (!isRejecting) { setIsRejecting(true); return; }
     if (!reason.trim()) { setError("Rejection reason is required."); return; }
-    setError(null);
-    startTransition(async () => {
-      const result = await rejectPR(prId, reason);
-      if (result?.error) setError(result.error);
-      else router.refresh();
-    });
+    run(() => rejectPR(prId, reason));
   }
 
   return (
@@ -47,20 +35,20 @@ export function PrApprovalActions({ prId, stage = "admin" }: { prId: string; sta
         <button
           type="button"
           onClick={handleApprove}
-          disabled={isPending || isRejecting}
+          disabled={isPending || optimisticSuccess || isRejecting}
           className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-95 disabled:opacity-60"
         >
-          {isPending && !isRejecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-          {stage === "finance" ? "Approve (Budget Check)" : "Approve"}
+          {optimisticSuccess ? <CheckCircle2 className="h-4 w-4" /> : isPending && !isRejecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+          {optimisticSuccess ? "Approved ✓" : stage === "finance" ? "Approve (Budget Check)" : "Approve"}
         </button>
         <button
           type="button"
           onClick={handleReject}
-          disabled={isPending && isRejecting}
+          disabled={isPending || optimisticSuccess}
           className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-95 disabled:opacity-60"
         >
-          {isPending && isRejecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
-          {isRejecting ? "Confirm Rejection" : "Reject"}
+          {optimisticSuccess && isRejecting ? <CheckCircle2 className="h-4 w-4" /> : isPending && isRejecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+          {optimisticSuccess && isRejecting ? "Rejected ✓" : isRejecting ? "Confirm Rejection" : "Reject"}
         </button>
         {isRejecting && (
           <button

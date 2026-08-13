@@ -4,8 +4,6 @@ import { DashboardShell } from '@/components/dashboard/shell'
 import { ApprovalToastListener } from '@/components/dashboard/shared/approval-toast-listener'
 import { Suspense } from 'react'
 
-export const unstable_instant = { prefetch: 'static' };
-
 export default async function DashboardLayout({
   children,
 }: {

@@ -4,11 +4,6 @@ import { PoSignForm } from "@/components/portal/po-sign-form";
 import { ShieldAlert, LogIn, ArrowRight, CheckCircle2, FileText } from "lucide-react";
 import Link from "next/link";
 
-export const unstable_instant = {
-  prefetch: "static",
-  samples: [{ params: { token: "sample-token" } }],
-};
-
 interface PageProps {
   params: Promise<{ token: string }>;
 }
