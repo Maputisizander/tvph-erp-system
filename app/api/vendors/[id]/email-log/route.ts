@@ -49,7 +49,7 @@ export async function GET(
   const senderNames = new Map((senders ?? []).map((p) => [p.id, p.full_name]));
 
   const data = logs.map((r) => ({
-    "Date Sent": new Date(r.created_at).toLocaleString(),
+    "Date Sent": new Date(r.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" }),
     Type: EMAIL_KIND_LABELS[r.kind] ?? r.kind,
     Reference: emailReference(r as { kind: string; ref_id: string | null; meta: Record<string, unknown> | null }, poNumbers),
     To: (r.to_addresses ?? []).join("; "),

@@ -25,7 +25,7 @@ export interface EmailLogRow {
 const PAGE_SIZE = 10;
 
 function fmt(ts: string) {
-  return new Date(ts).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return new Date(ts).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" });
 }
 
 function StatusBadge({ row }: { row: EmailLogRow }) {
@@ -121,7 +121,7 @@ export function EmailHistoryTable({
                 {paged.map((row) => (
                   <tr key={row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors align-top">
                     <td className="px-3 sm:px-4 py-3 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                      {new Date(row.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                      {new Date(row.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" })}
                     </td>
                     <td className="px-3 sm:px-4 py-3">
                       <div className="font-medium text-slate-900 dark:text-white text-xs leading-tight">{EMAIL_KIND_LABELS[row.kind] ?? row.kind}</div>
