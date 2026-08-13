@@ -1,4 +1,7 @@
-import { Mail, Download, CheckCircle2, XCircle, MailCheck, MailOpen, MailX } from "lucide-react";
+"use client";
+
+import { useState, useMemo } from "react";
+import { Mail, Download, CheckCircle2, XCircle, MailCheck, MailOpen, MailX, ChevronLeft, ChevronRight } from "lucide-react";
 import { EMAIL_KIND_LABELS, emailReference } from "@/lib/email/kinds";
 
 export interface EmailLogRow {
@@ -18,6 +21,8 @@ export interface EmailLogRow {
   opened_at: string | null;
   bounced_at: string | null;
 }
+
+const PAGE_SIZE = 10;
 
 function fmt(ts: string) {
   return new Date(ts).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -68,21 +73,26 @@ export function EmailHistoryTable({
   subtitle?: string;
   emptyText?: string;
 }) {
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paged = useMemo(() => rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE), [rows, safePage]);
+
   return (
     <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm animate-in fade-in duration-300">
-      <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
-        <div>
+      <div className="px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-            <Mail className="h-5 w-5 text-primary" /> {title}
+            <Mail className="h-5 w-5 text-primary shrink-0" /> {title}
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
             {subtitle ?? `Record of emails. ${rows.length} entr${rows.length === 1 ? "y" : "ies"}.`}
           </p>
         </div>
         {csvHref && rows.length > 0 && (
           <a
             href={csvHref}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all"
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all"
           >
             <Download className="h-3.5 w-3.5" />
             Download CSV
@@ -93,41 +103,69 @@ export function EmailHistoryTable({
       {rows.length === 0 ? (
         <div className="px-6 py-12 text-center text-slate-400 italic">{emptyText}</div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/20 border-b border-slate-200 dark:border-slate-800">
-              <tr>
-                <th className="px-6 py-3 font-semibold">Sent</th>
-                <th className="px-6 py-3 font-semibold">Type</th>
-                <th className="px-6 py-3 font-semibold">Recipient</th>
-                <th className="px-6 py-3 font-semibold">Subject</th>
-                <th className="px-6 py-3 font-semibold">Status</th>
-                <th className="px-6 py-3 font-semibold">Receipt ID</th>
-                <th className="px-6 py-3 font-semibold">By</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {rows.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors align-top">
-                  <td className="px-6 py-4 whitespace-nowrap text-slate-700 dark:text-slate-300">
-                    {new Date(row.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="font-medium text-slate-900 dark:text-white">{EMAIL_KIND_LABELS[row.kind] ?? row.kind}</div>
-                    <div className="text-xs text-slate-500">{emailReference(row, poNumbers)}</div>
-                  </td>
-                  <td className="px-6 py-4 text-slate-700 dark:text-slate-300">{(row.to_addresses ?? []).join(", ") || "—"}</td>
-                  <td className="px-6 py-4 text-slate-700 dark:text-slate-300 max-w-[260px]">
-                    <span className="line-clamp-2">{row.subject || "—"}</span>
-                  </td>
-                  <td className="px-6 py-4"><StatusBadge row={row} /></td>
-                  <td className="px-6 py-4 font-mono text-xs text-slate-400">{row.resend_id || "—"}</td>
-                  <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{(row.created_by && senderNames.get(row.created_by)) || "System"}</td>
+        <>
+          <div className="overflow-hidden">
+            <table className="w-full text-sm text-left table-fixed">
+              <thead className="text-[11px] text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/20 border-b border-slate-200 dark:border-slate-800">
+                <tr>
+                  <th className="px-3 sm:px-4 py-3 font-semibold w-[132px]">Sent</th>
+                  <th className="px-3 sm:px-4 py-3 font-semibold w-[148px]">Type</th>
+                  <th className="px-3 sm:px-4 py-3 font-semibold">Recipient</th>
+                  <th className="px-3 sm:px-4 py-3 font-semibold">Subject</th>
+                  <th className="px-3 sm:px-4 py-3 font-semibold w-[112px]">Status</th>
+                  <th className="hidden lg:table-cell px-3 sm:px-4 py-3 font-semibold w-[140px]">Receipt ID</th>
+                  <th className="px-3 sm:px-4 py-3 font-semibold w-[110px]">By</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {paged.map((row) => (
+                  <tr key={row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors align-top">
+                    <td className="px-3 sm:px-4 py-3 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                      {new Date(row.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                    </td>
+                    <td className="px-3 sm:px-4 py-3">
+                      <div className="font-medium text-slate-900 dark:text-white text-xs leading-tight">{EMAIL_KIND_LABELS[row.kind] ?? row.kind}</div>
+                      <div className="text-[11px] text-slate-500 truncate">{emailReference(row, poNumbers)}</div>
+                    </td>
+                    <td className="px-3 sm:px-4 py-3 text-xs text-slate-700 dark:text-slate-300 break-all leading-tight">
+                      {(row.to_addresses ?? []).join(", ") || "—"}
+                    </td>
+                    <td className="px-3 sm:px-4 py-3 text-xs text-slate-700 dark:text-slate-300">
+                      <span className="line-clamp-2 break-words">{row.subject || "—"}</span>
+                    </td>
+                    <td className="px-3 sm:px-4 py-3"><StatusBadge row={row} /></td>
+                    <td className="hidden lg:table-cell px-3 sm:px-4 py-3 font-mono text-[11px] text-slate-400 truncate max-w-[140px]">{row.resend_id || "—"}</td>
+                    <td className="px-3 sm:px-4 py-3 text-xs text-slate-600 dark:text-slate-400 truncate">{(row.created_by && senderNames.get(row.created_by)) || "System"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-[#0a0a0a]/30">
+              <span className="text-xs text-slate-500">
+                Page {safePage} of {totalPages} · {rows.length} total
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border bg-white dark:bg-[#071F15] border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" /> Prev
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border bg-white dark:bg-[#071F15] border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
