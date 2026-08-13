@@ -8,7 +8,7 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id: vendorId } = await params;
+  const { id: poId } = await params;
   const { searchParams } = new URL(request.url);
   const format = searchParams.get("format") === "xlsx" ? "xlsx" : "csv";
 
@@ -18,12 +18,12 @@ export async function GET(
     return NextResponse.json({ error: authError }, { status: authError === "Unauthorized" ? 401 : 403 });
   }
 
-  const [{ data: vendor }, { data: rows, error }] = await Promise.all([
-    supabase.from("vendors").select("name").eq("id", vendorId).maybeSingle(),
+  const [{ data: po }, { data: rows, error }] = await Promise.all([
+    supabase.from("purchase_orders").select("po_number").eq("id", poId).maybeSingle(),
     supabase
       .from("email_log")
       .select("kind, ref_id, to_addresses, cc_addresses, subject, status, resend_id, error, meta, created_at, created_by")
-      .eq("vendor_id", vendorId)
+      .eq("ref_id", poId)
       .order("created_at", { ascending: false }),
   ]);
 
@@ -32,20 +32,14 @@ export async function GET(
   }
 
   const logs = rows ?? [];
-  const poKinds = new Set(["po_issued", "po_for_signature", "po_pending_approval", "po_pending_finance", "po_signed_acknowledged", "payment_request_notification"]);
-  const poIds = logs.filter((r) => poKinds.has(r.kind) && r.ref_id).map((r) => r.ref_id as string);
   const senderIds = Array.from(new Set(logs.map((r) => r.created_by).filter(Boolean))) as string[];
 
-  const [{ data: poRows }, { data: senders }] = await Promise.all([
-    poIds.length
-      ? supabase.from("purchase_orders").select("id, po_number").in("id", poIds)
-      : Promise.resolve({ data: [] as { id: string; po_number: string }[] }),
-    senderIds.length
-      ? supabase.from("profiles").select("id, full_name").in("id", senderIds)
-      : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
-  ]);
+  const { data: senders } = senderIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", senderIds)
+    : { data: [] as { id: string; full_name: string }[] };
 
-  const poNumbers = new Map((poRows ?? []).map((p) => [p.id, p.po_number]));
+  const poNumbers = new Map<string, string>();
+  if (po?.po_number) poNumbers.set(poId, po.po_number);
   const senderNames = new Map((senders ?? []).map((p) => [p.id, p.full_name]));
 
   const data = logs.map((r) => ({
@@ -61,7 +55,6 @@ export async function GET(
     Error: r.error ?? "",
   }));
 
-  // Ensure a header row exists even when there are no emails yet.
   const exportRows = data.length
     ? data
     : [
@@ -80,8 +73,8 @@ export async function GET(
       ];
 
   const blob = generateExportBuffer(exportRows, format);
-  const safeName = (vendor?.name || "vendor").replace(/[^a-zA-Z0-9-]/g, "_");
-  const filename = `vendor-emails_${safeName}_${new Date().toISOString().split("T")[0]}.${format}`;
+  const safeName = (po?.po_number || "po").replace(/[^a-zA-Z0-9-]/g, "_");
+  const filename = `po-emails_${safeName}_${new Date().toISOString().split("T")[0]}.${format}`;
 
   return new NextResponse(blob, {
     headers: {

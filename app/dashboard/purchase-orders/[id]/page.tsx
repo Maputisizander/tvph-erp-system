@@ -43,6 +43,7 @@ import { PODetailsEditor } from "@/components/dashboard/purchase-orders/po-detai
 import { POLineItemsEditor } from "@/components/dashboard/purchase-orders/po-line-items-editor";
 import { POSiteDetailsEditor } from "@/components/dashboard/purchase-orders/po-site-details-editor";
 import { POEditHistory } from "@/components/dashboard/purchase-orders/po-edit-history";
+import { PoEmailHistory } from "@/components/dashboard/purchase-orders/po-email-history";
 import { PoSignedReview } from "@/components/dashboard/purchase-orders/po-signed-review";
 import { getCurrentProfile, hasCapability } from "@/lib/auth/permissions";
 import { signDocUrls } from "@/utils/storage";
@@ -1101,7 +1102,8 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
             </PoCollapsibleCard>
           )}
 
-          <section id="history" className="scroll-mt-28 flex flex-col flex-1">
+          <section id="history" className="scroll-mt-28 flex flex-col flex-1 space-y-8">
+            <PoEmailHistory poId={po.id} poNumber={po.po_number} />
             <PoCollapsibleCard title="Edit History" icon={<History className="h-5 w-5 text-primary" />} className="flex-1">
               <POEditHistory poId={po.id} embedded />
             </PoCollapsibleCard>
