@@ -3,11 +3,6 @@ import { Activity } from 'lucide-react';
 import { AuditLogToolbar } from '@/components/dashboard/audit-logs/audit-log-toolbar';
 import { Suspense } from 'react';
 
-export const unstable_instant = { 
-  prefetch: 'static',
-  samples: [{ searchParams: { action: null, entity: null } }]
-};
-
 export default function AuditLogsPage(props: { searchParams?: Promise<{ [key: string]: string | string[] | undefined }> }) {
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">

@@ -13,11 +13,6 @@ import { importVendors } from "@/app/dashboard/vendors/actions";
 
 const VENDORS_PAGE_SIZE = 10;
 
-export const unstable_instant = {
-  prefetch: "static",
-  samples: [{ searchParams: { q: null, status: null, sort: null, page: null } }],
-};
-
 export default function VendorsPage(props: {
   searchParams?: Promise<{ q?: string; status?: string; sort?: string; page?: string }>;
 }) {

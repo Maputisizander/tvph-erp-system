@@ -52,11 +52,6 @@ const menuItemClass = "flex items-center gap-2 px-4 py-2.5 text-sm font-medium t
 const DRAFT_OR_PENDING = ["draft", "pending_approval", "pending_finance"];
 const ISSUED_OR_LATER = ["issued", "pending_signature", "signed", "paid", "overpaid"];
 
-export const unstable_instant = {
-  prefetch: 'static',
-  samples: [{ params: { id: 'sample-id' } }]
-};
-
 export default function PurchaseOrderDetailPage(props: {
   params: Promise<{ id: string }>;
 }) {

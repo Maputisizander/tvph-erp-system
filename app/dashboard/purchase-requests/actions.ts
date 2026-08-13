@@ -3,6 +3,17 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
+
+// ponytail: defer via next/server after() without breaking jest (which lacks Request)
+function defer(fn: () => Promise<void>) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { after } = require('next/server') as { after: (f: () => void) => void };
+    after(fn);
+  } catch {
+    void fn();
+  }
+}
 import { createNotification } from '@/utils/notifications';
 import { recordAuditLog } from '@/utils/audit';
 import { requireCapability, getCurrentProfile, hasCapability } from '@/lib/auth/permissions';
@@ -369,20 +380,23 @@ export async function submitPRForApproval(prId: string, approverIds: string[] = 
     created_by: user.id,
   });
 
-  // Best-effort: a failed send must NOT fail the submit (mirrors submitPOForApproval).
-  const emailResult = await sendPrPendingApprovalEmail(prId, { actorId: user.id });
-  if (emailResult.status === 'failed') {
-    await createNotification({
-      type: 'pr',
-      title: '⚠️ Approval email not sent',
-      message: `A PR was submitted for approval but the notification email to the selected approvers could not be sent. ${emailResult.error ?? ''}`.trim(),
-      link: `/dashboard/purchase-requests/${prId}`,
-      created_by: user.id,
-    });
-  }
-
   revalidatePath(`/dashboard/purchase-requests/${prId}`);
   revalidatePath('/dashboard/purchase-requests');
+
+  // ponytail: email deferred via defer() so submit returns before SMTP/PDF work
+  defer(async () => {
+    const emailResult = await sendPrPendingApprovalEmail(prId, { actorId: user.id });
+    if (emailResult.status === 'failed') {
+      await createNotification({
+        type: 'pr',
+        title: '⚠️ Approval email not sent',
+        message: `A PR was submitted for approval but the notification email to the selected approvers could not be sent. ${emailResult.error ?? ''}`.trim(),
+        link: `/dashboard/purchase-requests/${prId}`,
+        created_by: user.id,
+      });
+    }
+  });
+
   return { success: true };
 }
 
@@ -431,21 +445,24 @@ export async function approvePR(prId: string) {
     created_by: user.id,
   });
 
-  // Best-effort: notify the finance pool. A failed send never blocks approval.
-  const emailResult = await sendPrPendingFinanceEmail(prId, { actorId: user.id });
-  if (emailResult.status === 'failed') {
-    await createNotification({
-      type: 'pr',
-      title: '⚠️ Finance email not sent',
-      message: `A PR passed the admin stage but the finance notification email could not be sent. ${emailResult.error ?? ''}`.trim(),
-      link: `/dashboard/purchase-requests/${prId}`,
-      created_by: user.id,
-    });
-  }
-
   revalidatePath(`/dashboard/purchase-requests/${prId}`);
   revalidatePath('/dashboard/purchase-requests');
-  return { success: true, emailWarning: emailResult.status === 'failed' ? emailResult.error : undefined };
+
+  // ponytail: finance email deferred via defer()
+  defer(async () => {
+    const emailResult = await sendPrPendingFinanceEmail(prId, { actorId: user.id });
+    if (emailResult.status === 'failed') {
+      await createNotification({
+        type: 'pr',
+        title: '⚠️ Finance email not sent',
+        message: `A PR passed the admin stage but the finance notification email could not be sent. ${emailResult.error ?? ''}`.trim(),
+        link: `/dashboard/purchase-requests/${prId}`,
+        created_by: user.id,
+      });
+    }
+  });
+
+  return { success: true };
 }
 
 export async function approvePRFinance(prId: string) {
@@ -493,23 +510,24 @@ export async function approvePRFinance(prId: string) {
     created_by: user.id,
   });
 
-  // Best-effort: notify procurement. A failed send never blocks approval.
-  const emailResult = await sendPrApprovedEmail(prId, { actorId: user.id });
-  let emailWarning: string | undefined;
-  if (emailResult.status === 'failed') {
-    emailWarning = emailResult.error || 'The PR was approved but the procurement email could not be sent.';
-    await createNotification({
-      type: 'pr',
-      title: '⚠️ Procurement email not sent',
-      message: `${emailWarning} Open the PR to convert it manually.`,
-      link: `/dashboard/purchase-requests/${prId}`,
-      created_by: user.id,
-    });
-  }
-
   revalidatePath(`/dashboard/purchase-requests/${prId}`);
   revalidatePath('/dashboard/purchase-requests');
-  return { success: true, emailWarning };
+
+  // ponytail: procurement email deferred via defer()
+  defer(async () => {
+    const emailResult = await sendPrApprovedEmail(prId, { actorId: user.id });
+    if (emailResult.status === 'failed') {
+      await createNotification({
+        type: 'pr',
+        title: '⚠️ Procurement email not sent',
+        message: `${emailResult.error || 'The PR was approved but the procurement email could not be sent.'} Open the PR to convert it manually.`,
+        link: `/dashboard/purchase-requests/${prId}`,
+        created_by: user.id,
+      });
+    }
+  });
+
+  return { success: true };
 }
 
 export async function rejectPR(prId: string, reason: string) {
@@ -693,13 +711,14 @@ export async function deletePurchaseRequest(prId: string) {
 
   if (error) return { error: error.message };
 
-  await recordAuditLog({
+  revalidatePath('/dashboard/purchase-requests');
+  // ponytail: audit is non-critical for UX, defer so delete returns without waiting for audit insert
+  defer(() => recordAuditLog({
     entity_type: 'purchase_request',
     entity_id: prId,
     action: 'DELETE',
     performed_by: user.id
-  });
+  }).catch(() => {}));
 
-  revalidatePath('/dashboard/purchase-requests');
   return { success: true };
 }

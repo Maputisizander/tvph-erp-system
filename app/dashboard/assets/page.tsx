@@ -5,11 +5,6 @@ import { Suspense } from "react";
 import { SearchInput } from "@/components/ui/search-input";
 import { StatusSelect } from "@/components/ui/status-select";
 
-export const unstable_instant = {
-  prefetch: "static",
-  samples: [{ searchParams: { q: null, status: null } }],
-};
-
 export default function AssetsPage(props: {
   searchParams?: Promise<{ q?: string; status?: string }>;
 }) {

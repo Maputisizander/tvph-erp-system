@@ -288,7 +288,8 @@ describe('approvePR — 4-eyes', () => {
     mockSendPrPendingFinanceEmail.mockResolvedValue({ status: 'failed', error: 'SMTP down' });
 
     const result = await approvePR('pr-email');
-    expect(result).toEqual({ success: true, emailWarning: 'SMTP down' });
+    // ponytail: email now deferred via defer() — approval returns success immediately, failure becomes in-app notification
+    expect(result).toEqual({ success: true });
   });
 });
 

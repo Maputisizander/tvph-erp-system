@@ -14,11 +14,6 @@ import { PrTableRow } from '@/components/dashboard/purchase-requests/pr-table-ro
 import { PrDeleteRowButton } from '@/components/dashboard/purchase-requests/pr-cancel-button';
 import { getCurrentProfile, hasCapability } from '@/lib/auth/permissions';
 
-export const unstable_instant = {
-  prefetch: 'static',
-  samples: [{ searchParams: { q: null, status: null, vendor: null, project: null, page: null } }]
-};
-
 const STATUS_BADGE: Record<string, string> = {
   draft: 'bg-slate-400 text-center text-white border-slate-200 dark:bg-slate-800 dark:text-slate-400',
   pending_approval: 'bg-amber-400 text-white text-center border-none dark:bg-amber-900/20 dark:text-amber-400',

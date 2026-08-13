@@ -3,13 +3,6 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { VendorEditForm } from '@/components/dashboard/vendors/vendor-edit-form';
 
-export const unstable_instant = {
-  prefetch: 'static',
-  samples: [{
-    params: { id: 'sample-id' },
-  }]
-};
-
 export default function VendorEditPage(props: {
   params: Promise<{ id: string }>,
 }) {

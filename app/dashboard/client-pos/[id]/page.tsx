@@ -6,11 +6,6 @@ import { Suspense } from 'react';
 import { updateClientPOStatus } from '../actions';
 import { statusBadgeClasses } from '@/lib/ui/status-badge';
 
-export const unstable_instant = {
-  prefetch: 'static',
-  samples: [{ params: { id: 'sample-client-po-id' }, searchParams: {} }],
-};
-
 export default function ClientPODetailPage(props: {
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string>>;

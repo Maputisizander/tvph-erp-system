@@ -4,11 +4,6 @@ import { createClient } from "@/utils/supabase/server";
 import { getCurrentProfile, hasCapability } from "@/lib/auth/permissions";
 import { SendPaymentRequestPanel } from "@/components/dashboard/purchase-orders/send-payment-request-panel";
 
-export const unstable_instant = {
-  prefetch: "static",
-  samples: [{ params: { id: "sample-id" } }],
-};
-
 export default function SendPaymentRequestPage(props: {
   params: Promise<{ id: string }>;
 }) {

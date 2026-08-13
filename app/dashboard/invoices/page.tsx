@@ -8,11 +8,6 @@ import { Pagination } from '@/components/ui/pagination';
 import { LIST_PAGE_SIZE, parsePage, pageRange } from '@/components/ui/pagination-utils';
 import { invoiceStatusLabel, invoiceStatusBadgeClasses } from '@/lib/invoices/status';
 
-export const unstable_instant = {
-  prefetch: 'static',
-  samples: [{ searchParams: { q: null, status: null, page: null } }]
-};
-
 export default function InvoicesPage(props: {
   searchParams?: Promise<{ q?: string; status?: string; page?: string }>
 }) {

@@ -6,11 +6,6 @@ import { redirect, notFound } from 'next/navigation';
 import { CreatePRForm } from '@/components/dashboard/purchase-requests/create-pr-form';
 import { REGION_NAMES, REGIONS } from '@/lib/constants/philippine-regions';
 
-export const unstable_instant = {
-  prefetch: 'static',
-  samples: [{ params: { id: 'sample-pr-id' } }],
-};
-
 function EditPRSkeleton() {
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8 animate-pulse">

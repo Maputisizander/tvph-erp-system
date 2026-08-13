@@ -70,18 +70,27 @@ export function PrReviveButton({ prId }: { prId: string }) {
 export function PrDeleteButton({ prId }: { prId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [optimisticDeleting, setOptimisticDeleting] = useState(false);
   const router = useRouter();
 
   function handleDelete() {
     if (!window.confirm("Permanently delete this purchase request?")) return;
     setError(null);
+    // ponytail: flip instantly so delete feels immediate, rollback on error/throw
+    setOptimisticDeleting(true);
     startTransition(async () => {
-      const result = await deletePurchaseRequest(prId);
-      if (result?.error) {
-        setError(result.error);
-      } else {
-        router.push("/dashboard/purchase-requests");
-        router.refresh();
+      try {
+        const result = await deletePurchaseRequest(prId);
+        if (result?.error) {
+          setOptimisticDeleting(false);
+          setError(result.error);
+        } else {
+          router.push("/dashboard/purchase-requests");
+          router.refresh();
+        }
+      } catch {
+        setOptimisticDeleting(false);
+        setError("Something went wrong. Please try again.");
       }
     });
   }
@@ -91,11 +100,11 @@ export function PrDeleteButton({ prId }: { prId: string }) {
       <button
         type="button"
         onClick={handleDelete}
-        disabled={isPending}
+        disabled={isPending || optimisticDeleting}
         className="inline-flex items-center gap-2 bg-white dark:bg-[#0a0a0a] border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-sm active:scale-95 disabled:opacity-60"
       >
-        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-        Delete Draft
+        {optimisticDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+        {optimisticDeleting ? "Deleting…" : "Delete Draft"}
       </button>
       {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
     </div>
@@ -105,17 +114,25 @@ export function PrDeleteButton({ prId }: { prId: string }) {
 export function PrDeleteRowButton({ prId }: { prId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [optimisticDeleting, setOptimisticDeleting] = useState(false);
   const router = useRouter();
 
   function handleDelete() {
     if (!window.confirm("Permanently delete this purchase request?")) return;
     setError(null);
+    setOptimisticDeleting(true);
     startTransition(async () => {
-      const result = await deletePurchaseRequest(prId);
-      if (result?.error) {
-        setError(result.error);
-      } else {
-        router.refresh();
+      try {
+        const result = await deletePurchaseRequest(prId);
+        if (result?.error) {
+          setOptimisticDeleting(false);
+          setError(result.error);
+        } else {
+          router.refresh();
+        }
+      } catch {
+        setOptimisticDeleting(false);
+        setError("Something went wrong. Please try again.");
       }
     });
   }
@@ -125,11 +142,11 @@ export function PrDeleteRowButton({ prId }: { prId: string }) {
       <button
         type="button"
         onClick={handleDelete}
-        disabled={isPending}
+        disabled={isPending || optimisticDeleting}
         title="Delete draft"
         className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all active:scale-95 disabled:opacity-60"
       >
-        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+        {optimisticDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
       </button>
       {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
     </span>

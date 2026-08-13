@@ -25,11 +25,6 @@ import { PrCancelButton, PrDeleteButton, PrReviveButton } from "@/components/das
 import { getCurrentProfile, hasCapability } from "@/lib/auth/permissions";
 import { LiveListRefresh } from "@/components/dashboard/shared/live-list-refresh";
 
-export const unstable_instant = {
-  prefetch: 'static',
-  samples: [{ params: { id: 'sample-id' } }]
-};
-
 export default function PurchaseRequestDetailPage(props: {
   params: Promise<{ id: string }>;
 }) {

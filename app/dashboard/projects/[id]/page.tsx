@@ -4,13 +4,6 @@ import { ProjectDetailContent } from '@/components/dashboard/projects/project-de
 import { Suspense } from 'react';
 import { signDocUrl } from '@/utils/storage';
 
-export const unstable_instant = {
-  prefetch: 'static',
-  samples: [{
-    params: { id: 'sample-project-id' }
-  }]
-};
-
 export default function ProjectPage(props: { params: Promise<{ id: string }> }) {
   return (
     <Suspense fallback={<ProjectDetailSkeleton />}>

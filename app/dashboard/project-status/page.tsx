@@ -14,11 +14,6 @@ import { Pagination } from "@/components/ui/pagination";
 import { LIST_PAGE_SIZE, parsePage, pageRange } from "@/components/ui/pagination-utils";
 import { statusBadgeClasses } from "@/lib/ui/status-badge";
 
-export const unstable_instant = {
-  prefetch: "static",
-  samples: [{ searchParams: { page: null, status: null, project_id: null } }],
-};
-
 const STALE_MS = 30 * 60 * 1000;
 
 export default function ProjectStatusPage(props: {

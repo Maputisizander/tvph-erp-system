@@ -8,11 +8,6 @@ import { CustomersTableBody } from '@/components/dashboard/crm/customers-table-b
 import { ImportExportButtons } from '@/components/dashboard/import-export-buttons';
 import { importCustomers } from '@/app/dashboard/crm/actions';
 
-export const unstable_instant = {
-  prefetch: 'static',
-  samples: [{ searchParams: { q: null, status: null } }],
-};
-
 export default function CrmPage(props: { searchParams?: Promise<{ q?: string; status?: string }> }) {
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">

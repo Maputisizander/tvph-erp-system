@@ -13,11 +13,6 @@ import { POSiteDetailsEditor } from "@/components/dashboard/purchase-orders/po-s
 import { AddDownpayment } from "@/components/dashboard/purchase-orders/po-add-downpayment";
 import { PoCcRecipients } from "@/components/dashboard/purchase-orders/po-cc-recipients";
 
-export const unstable_instant = {
-  prefetch: "static",
-  samples: [{ params: { id: "sample-id" } }],
-};
-
 const STEPS = ["CC Recipients", "PO Details", "Line Items", "T&C", "Payment Terms", "Sites & Details"];
 
 export default function POEditorPage(props: {

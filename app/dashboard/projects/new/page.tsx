@@ -3,11 +3,6 @@ import { ArrowLeft } from 'lucide-react';
 import { NewProjectForm } from '@/components/dashboard/projects/new-project-form';
 import { Suspense } from 'react';
 
-export const unstable_instant = {
-  prefetch: 'static',
-  samples: [{ searchParams: { account_id: null } }],
-};
-
 export default function NewProjectPage(props: {
   searchParams?: Promise<{ account_id?: string }>;
 }) {

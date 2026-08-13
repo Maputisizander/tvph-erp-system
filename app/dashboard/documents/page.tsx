@@ -4,11 +4,6 @@ import { DocumentsClient } from '@/components/dashboard/documents/documents-clie
 import { Suspense } from 'react';
 import { signDocUrls } from '@/utils/storage';
 
-export const unstable_instant = { 
-  prefetch: 'static',
-  samples: [{ searchParams: { search: null } }]
-};
-
 export default function DocumentsPage(props: { 
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }> 
 }) {

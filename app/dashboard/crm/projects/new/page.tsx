@@ -4,11 +4,6 @@ import { Suspense } from 'react';
 import { createClient } from '@/utils/supabase/server';
 import { CreateOpportunityForm } from '@/components/dashboard/crm/create-opportunity-form';
 
-export const unstable_instant = {
-  prefetch: 'static',
-  samples: [{ searchParams: { accountId: null } }],
-};
-
 export default function NewCrmOpportunityPage(props: { searchParams?: Promise<{ accountId?: string }> }) {
   return (
     <Suspense fallback={<NewCustomerProjectSkeleton />}>
