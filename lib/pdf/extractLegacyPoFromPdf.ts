@@ -22,7 +22,8 @@ export async function extractLegacyPoFromPdf(buffer: ArrayBuffer | Buffer): Prom
     buffer instanceof ArrayBuffer
       ? new Uint8Array(buffer)
       : new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-  const loadingTask = getDocument({ data });
+  // ponytail: Vercel Node has no worker file at /var/task/.../pdf.worker.mjs; text extraction doesn't need a worker
+  const loadingTask = getDocument({ data, ...( { disableWorker: true } as any), verbosity: 0 } as any);
   const doc = await loadingTask.promise;
   const items: PdfTextItem[] = [];
   try {
