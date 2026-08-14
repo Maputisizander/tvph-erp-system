@@ -3,13 +3,15 @@
 import { useState, useTransition, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Trash2, AlertTriangle, X } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { deleteVendor } from '@/app/dashboard/vendors/actions'
 
-export function DeleteVendorButton({ vendorId, vendorName }: { vendorId: string; vendorName: string }) {
+export function DeleteVendorButton({ vendorId, vendorName, onDeleted }: { vendorId: string; vendorName: string; onDeleted?: (id: string) => void }) {
   const [showConfirm, setShowConfirm] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
+  const router = useRouter()
 
   useEffect(() => setMounted(true), [])
 
@@ -19,7 +21,9 @@ export function DeleteVendorButton({ vendorId, vendorName }: { vendorId: string;
       if (result.error) {
         setError(result.error)
       } else {
+        onDeleted?.(vendorId)
         setShowConfirm(false)
+        router.refresh()
       }
     })
   }

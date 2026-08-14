@@ -3,13 +3,15 @@
 import { useState, useTransition, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Trash2, AlertTriangle, X } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { deletePurchaseOrder } from '@/app/dashboard/purchase-orders/actions'
 
-export function DeletePOButton({ poId, poNumber }: { poId: string; poNumber: string }) {
+export function DeletePOButton({ poId, poNumber, onDeleted }: { poId: string; poNumber: string; onDeleted?: (id: string) => void }) {
   const [showConfirm, setShowConfirm] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
+  const router = useRouter()
 
   useEffect(() => setMounted(true), [])
 
@@ -19,7 +21,9 @@ export function DeletePOButton({ poId, poNumber }: { poId: string; poNumber: str
       if (result.error) {
         setError(result.error)
       } else {
+        onDeleted?.(poId)
         setShowConfirm(false)
+        router.refresh()
       }
     })
   }
