@@ -33,10 +33,11 @@ async function ImportLegacyPOContent() {
     redirect('/dashboard/purchase-orders');
   }
 
-  const [{ data: vendors }, { data: projects }] = await Promise.all([
-    supabase.from('vendors').select('id, name, currency').is('deleted_at', null).order('name'),
-    supabase.from('projects').select('id, name').is('deleted_at', null).order('name'),
-  ]);
+  const { data: vendors } = await supabase
+    .from('vendors')
+    .select('id, name, currency')
+    .is('deleted_at', null)
+    .order('name');
 
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -58,7 +59,7 @@ async function ImportLegacyPOContent() {
         </div>
       </div>
 
-      <LegacyPoImportForm vendors={vendors || []} projects={projects || []} />
+      <LegacyPoImportForm vendors={vendors || []} />
     </div>
   );
 }

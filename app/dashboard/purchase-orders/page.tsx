@@ -100,14 +100,14 @@ async function PurchaseOrdersContent({ searchParams: searchParamsPromise }: { se
         </div>
         <div className="flex items-center gap-2">
           <ExportDropdown exportBaseUrl="/api/export/purchase-orders" />
-          <Link 
+          <Link
             href="/dashboard/purchase-orders/import"
             className="inline-flex items-center gap-2 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 px-4 py-2.5 rounded-xl font-medium transition-all active:scale-95"
           >
             <FileUp className="h-5 w-5" />
-            Import Legacy PO
+            Import PO
           </Link>
-          <Link 
+          <Link
             href="/dashboard/purchase-orders/new"
             className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2.5 rounded-xl font-medium transition-all hover:shadow-lg hover:shadow-primary/20 active:scale-95"
           >
@@ -147,8 +147,8 @@ async function PurchaseOrdersContent({ searchParams: searchParamsPromise }: { se
           <div className="flex-1 min-w-[200px]">
             <SearchInput placeholder="Search POs..." paramName="q" />
           </div>
-          
-          <StatusSelect 
+
+          <StatusSelect
             paramName="status"
             options={[
               { value: 'all', label: 'All Statuses' },
