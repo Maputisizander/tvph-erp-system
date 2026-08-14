@@ -11,6 +11,21 @@ import { createPortalLink } from '@/lib/portal/links';
 import { sendPoPendingApprovalEmail } from '@/lib/email/po-pending-approval';
 import { sendPoPendingFinanceEmail } from '@/lib/email/po-pending-finance';
 import { sendPoSignedAcknowledgedEmail } from '@/lib/email/po-signed-acknowledged';
+import { docTypeLabel } from '@/lib/vendors/document-types';
+
+const PAYMENT_REQUIRED_DOC_TYPES = [
+  "signed_nda",
+  "statement_of_commitment",
+  "company_profile",
+  "products_services_list",
+  "vendor_information_summary",
+  "general_information_sheet",
+  "audited_financial_statements",
+  "sec_registration",
+  "secretary_certificate",
+  "safety_drug_policy",
+  "dole_174",
+];
 
 // ponytail: defer via next/server after() without breaking jest (which lacks Request)
 function defer(fn: () => Promise<void>) {
@@ -1733,6 +1748,29 @@ export async function createPaymentRequest(
   ]);
   if (!po) return { error: 'PO not found' };
   if (activePR) return { error: 'An active Payment Request already exists for this PO.' };
+
+  const { data: vendorDocs } = await supabase
+    .from('vendor_documents')
+    .select('doc_type, status')
+    .eq('vendor_id', po.vendor_id)
+    .in('doc_type', PAYMENT_REQUIRED_DOC_TYPES)
+    .is('archived_at', null);
+
+  const satisfiedDocTypes = new Set(
+    (vendorDocs || [])
+      .filter((d) => d.status === 'submitted' || d.status === 'approved')
+      .map((d) => d.doc_type),
+  );
+  const missingRequiredDocs = PAYMENT_REQUIRED_DOC_TYPES.filter(
+    (t) => !satisfiedDocTypes.has(t),
+  );
+  if (missingRequiredDocs.length > 0) {
+    return {
+      error: `Blocked: required accreditation document${missingRequiredDocs.length > 1 ? 's' : ''} ${missingRequiredDocs
+        .map((t) => docTypeLabel(t))
+        .join(', ')} ${missingRequiredDocs.length > 1 ? 'are' : 'is'} missing or not submitted. Complete vendor accreditation before sending a payment request.`,
+    };
+  }
 
   let percentComplete: number | null = null;
 
