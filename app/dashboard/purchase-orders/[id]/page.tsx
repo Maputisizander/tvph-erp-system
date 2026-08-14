@@ -55,16 +55,19 @@ const ISSUED_OR_LATER = ["issued", "pending_signature", "signed", "paid", "overp
 
 export default function PurchaseOrderDetailPage(props: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   return (
     <Suspense fallback={<PODetailSkeleton />}>
-      <PODetailContent paramsPromise={props.params} />
+      <PODetailContent paramsPromise={props.params} searchParamsPromise={props.searchParams} />
     </Suspense>
   );
 }
 
-async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id: string }> }) {
+async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsPromise: Promise<{ id: string }>; searchParamsPromise: Promise<{ tab?: string }> }) {
   const params = await paramsPromise;
+  const searchParams = await searchParamsPromise;
+  const tab = searchParams.tab || "overview";
   const supabase = await createClient();
 
   const [{ data: po, error }, { user: currentUser, role: currentRole }] = await Promise.all([
@@ -640,29 +643,39 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
         </div>
       )}
 
-      {/* Section nav */}
-      <nav className="sticky top-0 z-30 flex items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#071F15]/90 backdrop-blur px-3 py-2 shadow-sm">
-        {[
-          { href: "#overview", label: "Overview" },
-          { href: "#certificates", label: "Certificates" },
-          { href: "#invoices", label: "Invoices" },
-          { href: "#details", label: "Details" },
-          { href: "#history", label: "History" },
-          { href: "#vendor", label: "Vendor" },
-        ].map((item) => (
-          <a
-            key={item.href}
-            href={item.href}
-            className="px-3 py-1.5 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors whitespace-nowrap"
-          >
-            {item.label}
-          </a>
-        ))}
-      </nav>
+      {/* Tabs — copied from vendor details page */}
+      <div className="border-b border-slate-200 dark:border-slate-800">
+        <nav className="-mb-px flex space-x-8 overflow-x-auto" aria-label="Tabs">
+          {[
+            { id: "overview", label: "Overview" },
+            { id: "certificates", label: "Certificates" },
+            { id: "invoices", label: "Invoices" },
+            { id: "details", label: "Details" },
+            { id: "history", label: "History" },
+            { id: "vendor", label: "Vendor" },
+          ].map((t) => (
+            <Link
+              key={t.id}
+              href={`/dashboard/purchase-orders/${po.id}?tab=${t.id}`}
+              className={`
+                whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                ${tab === t.id
+                  ? "border-primary text-primary"
+                  : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300 dark:hover:border-slate-700"
+                }
+              `}
+            >
+              {t.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
 
-      {/* Financial Summary */}
-      <section id="overview" className="scroll-mt-28">
-        <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-6">
+      {/* Tab Content */}
+      <div className="py-4">
+        {tab === "overview" && (
+          <div className="space-y-8 animate-in fade-in duration-300">
+            <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <CreditCard className="h-4 w-4 text-primary" /> Financial Summary
@@ -850,10 +863,8 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               </div>
             </div>
           )}
-        </div>
-      </section>
-
-      {/* Payment Request */}
+            </div>
+      {/* Payment Request stays inside overview tab */}
       <PaymentRequestButton
         poId={po.id}
         poAmount={poAmount}
@@ -875,10 +886,13 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
         canAcknowledge={canAcknowledge}
         projectCompletionPct={project ? Number((project as any).completion_pct ?? 0) : null}
       />
+          </div>
+        )}
 
-      {/* Completion Certificates */}
-      {(signedCerts.length > 0 || canSubmitCert) && (
-        <section id="certificates" className="scroll-mt-28 bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+        {tab === "certificates" && (
+          <div className="animate-in fade-in duration-300">
+            {(signedCerts.length > 0 || canSubmitCert) && (
+              <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
           <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
             <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
               <ClipboardCheck className="h-5 w-5 text-primary" /> Completion Certificates
@@ -958,11 +972,14 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               <PoCertUpload poId={po.id} vendorId={po.vendor_id} />
             )}
           </div>
-        </section>
-      )}
+          </div>
+            )}
+          </div>
+        )}
 
-      {/* Linked Invoices */}
-      <section id="invoices" className="scroll-mt-28 bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+        {tab === "invoices" && (
+          <div className="animate-in fade-in duration-300">
+            <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <h2 className="font-semibold text-slate-900 dark:text-white">
             Linked Invoices
@@ -1050,11 +1067,12 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
             </tbody>
           </table>
         </div>
-      </section>
+            </div>
+          </div>
+        )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 lg:auto-rows-fr">
-        {/* Left Column: Details */}
-        <div id="details" className="lg:col-span-2 space-y-8 scroll-mt-28 flex flex-col">
+        {tab === "details" && (
+          <div className="space-y-8 animate-in fade-in duration-300">
           <PoCollapsibleCard title="Terms & Conditions" icon={<FileText className="h-5 w-5 text-primary" />} defaultOpen>
             <PoTermsCard
               poId={po.id}
@@ -1101,17 +1119,20 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               />
             </PoCollapsibleCard>
           )}
+          </div>
+        )}
 
-          <section id="history" className="scroll-mt-28 flex flex-col flex-1 space-y-8">
+        {tab === "history" && (
+          <div className="space-y-8 animate-in fade-in duration-300">
             <PoEmailHistory poId={po.id} poNumber={po.po_number} />
-            <PoCollapsibleCard title="Edit History" icon={<History className="h-5 w-5 text-primary" />} className="flex-1">
+            <PoCollapsibleCard title="Edit History" icon={<History className="h-5 w-5 text-primary" />}>
               <POEditHistory poId={po.id} embedded />
             </PoCollapsibleCard>
-          </section>
-        </div>
+          </div>
+        )}
 
-        {/* Right Column: Vendor Info */}
-        <div id="vendor" className="space-y-8 scroll-mt-28 flex flex-col">
+        {tab === "vendor" && (
+          <div className="space-y-8 animate-in fade-in duration-300">
           <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
             <h3 className="font-semibold text-slate-900 dark:text-white mb-4">
               Vendor Information
@@ -1152,7 +1173,7 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
             />
           </div>
 
-          <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-2xl p-6 flex-1">
+          <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-2xl p-6">
             <h3 className="font-semibold text-primary dark:text-primary mb-2">
               Internal Note
             </h3>
@@ -1161,7 +1182,8 @@ async function PODetailContent({ paramsPromise }: { paramsPromise: Promise<{ id:
               invoices against this PO.&quot;
             </p>
           </div>
-        </div>
+          </div>
+        )}
       </div>
         <LiveListRefresh />
     </div>
