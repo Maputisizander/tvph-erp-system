@@ -48,6 +48,7 @@ import { PoSignedReview } from "@/components/dashboard/purchase-orders/po-signed
 import { getCurrentProfile, hasCapability } from "@/lib/auth/permissions";
 import { signDocUrls } from "@/utils/storage";
 import { LiveListRefresh } from "@/components/dashboard/shared/live-list-refresh";
+import PoTabbedNav from "@/components/dashboard/po-details/po-tabbed-nav";
 
 const menuItemClass = "flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors";
 const DRAFT_OR_PENDING = ["draft", "pending_approval", "pending_finance"];
@@ -643,38 +644,20 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
         </div>
       )}
 
-      {/* Tabs — copied from vendor details page */}
-      <div className="border-b border-slate-200 dark:border-slate-800">
-        <nav className="-mb-px flex space-x-8 overflow-x-auto" aria-label="Tabs">
-          {[
-            { id: "overview", label: "Overview" },
-            { id: "certificates", label: "Certificates" },
-            { id: "invoices", label: "Invoices" },
-            { id: "details", label: "Details" },
-            { id: "history", label: "History" },
-            { id: "vendor", label: "Vendor" },
-          ].map((t) => (
-            <Link
-              key={t.id}
-              href={`/dashboard/purchase-orders/${po.id}?tab=${t.id}`}
-              className={`
-                whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
-                ${tab === t.id
-                  ? "border-primary text-primary"
-                  : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300 dark:hover:border-slate-700"
-                }
-              `}
-            >
-              {t.label}
-            </Link>
-          ))}
-        </nav>
-      </div>
-
-      {/* Tab Content */}
-      <div className="py-4">
-        {tab === "overview" && (
-          <div className="space-y-8 animate-in fade-in duration-300">
+      <PoTabbedNav
+        defaultTab={tab}
+        basePath={`/dashboard/purchase-orders/${po.id}`}
+        tabs={[
+          { id: "overview", label: "Overview" },
+          { id: "certificates", label: "Certificates" },
+          { id: "invoices", label: "Invoices" },
+          { id: "details", label: "Details" },
+          { id: "history", label: "History" },
+          { id: "vendor", label: "Vendor" },
+        ]}
+        sections={{
+          overview: (
+            <div className="space-y-8">
             <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -886,12 +869,10 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
         canAcknowledge={canAcknowledge}
         projectCompletionPct={project ? Number((project as any).completion_pct ?? 0) : null}
       />
-          </div>
-        )}
-
-        {tab === "certificates" && (
-          <div className="animate-in fade-in duration-300">
-            {(signedCerts.length > 0 || canSubmitCert) && (
+            </div>
+          ),
+          certificates: (
+            (signedCerts.length > 0 || canSubmitCert) && (
               <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
           <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0a0a0a]/50 flex items-center justify-between">
             <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
@@ -972,13 +953,10 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
               <PoCertUpload poId={po.id} vendorId={po.vendor_id} />
             )}
           </div>
-          </div>
-            )}
-          </div>
-        )}
-
-        {tab === "invoices" && (
-          <div className="animate-in fade-in duration-300">
+           </div>
+            )
+          ),
+          invoices: (
             <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <h2 className="font-semibold text-slate-900 dark:text-white">
@@ -1068,11 +1046,9 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
           </table>
         </div>
             </div>
-          </div>
-        )}
-
-        {tab === "details" && (
-          <div className="space-y-8 animate-in fade-in duration-300">
+          ),
+          details: (
+            <div className="space-y-8">
           <PoCollapsibleCard title="Terms & Conditions" icon={<FileText className="h-5 w-5 text-primary" />} defaultOpen>
             <PoTermsCard
               poId={po.id}
@@ -1119,20 +1095,18 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
               />
             </PoCollapsibleCard>
           )}
-          </div>
-        )}
-
-        {tab === "history" && (
-          <div className="space-y-8 animate-in fade-in duration-300">
+            </div>
+          ),
+          history: (
+            <div className="space-y-8">
             <PoEmailHistory poId={po.id} poNumber={po.po_number} />
             <PoCollapsibleCard title="Edit History" icon={<History className="h-5 w-5 text-primary" />}>
               <POEditHistory poId={po.id} embedded />
             </PoCollapsibleCard>
-          </div>
-        )}
-
-        {tab === "vendor" && (
-          <div className="space-y-8 animate-in fade-in duration-300">
+            </div>
+          ),
+          vendor: (
+            <div className="space-y-8">
           <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
             <h3 className="font-semibold text-slate-900 dark:text-white mb-4">
               Vendor Information
@@ -1182,10 +1156,11 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
               invoices against this PO.&quot;
             </p>
           </div>
-          </div>
-        )}
-      </div>
-        <LiveListRefresh />
+            </div>
+          ),
+        }}
+      />
+      <LiveListRefresh />
     </div>
   );
 }
