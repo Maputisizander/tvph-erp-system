@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/server';
-import { Plus, Search, FileText, TrendingUp } from 'lucide-react';
+import { Plus, Search, FileText, TrendingUp, FileUp } from 'lucide-react';
 import { Suspense } from 'react';
 import { SearchInput } from '@/components/ui/search-input';
 import { StatusSelect } from '@/components/ui/status-select';
@@ -100,6 +100,13 @@ async function PurchaseOrdersContent({ searchParams: searchParamsPromise }: { se
         </div>
         <div className="flex items-center gap-2">
           <ExportDropdown exportBaseUrl="/api/export/purchase-orders" />
+          <Link 
+            href="/dashboard/purchase-orders/import"
+            className="inline-flex items-center gap-2 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 px-4 py-2.5 rounded-xl font-medium transition-all active:scale-95"
+          >
+            <FileUp className="h-5 w-5" />
+            Import Legacy PO
+          </Link>
           <Link 
             href="/dashboard/purchase-orders/new"
             className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2.5 rounded-xl font-medium transition-all hover:shadow-lg hover:shadow-primary/20 active:scale-95"

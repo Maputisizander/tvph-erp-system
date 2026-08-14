@@ -19,7 +19,7 @@ export async function GET(
     const supabase = createServiceRoleClient()
     const { data: po } = await supabase
       .from('purchase_orders')
-      .select('signed_doc_status')
+      .select('signed_doc_status, po_number')
       .eq('id', id)
       .single()
 
@@ -51,6 +51,33 @@ export async function GET(
             })
           }
         }
+      }
+    }
+
+    // Imported/legacy POs store the real document as their issued_pdf artifact;
+    // serve it instead of regenerating an empty skeleton.
+    const { data: artifact } = await supabase
+      .from('purchase_order_artifacts')
+      .select('storage_path')
+      .eq('po_id', id)
+      .eq('artifact_type', 'issued_pdf')
+      .maybeSingle()
+
+    if (artifact?.storage_path) {
+      const { data: file, error: downloadError } = await supabase.storage
+        .from('po-artifacts')
+        .download(artifact.storage_path)
+      if (!downloadError && file) {
+        const buffer = Buffer.from(await file.arrayBuffer())
+        return new Response(buffer as unknown as BodyInit, {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `inline; filename="${po?.po_number || id}.pdf"`,
+            'Content-Length': String(buffer.byteLength),
+            'Cache-Control': 'no-store',
+          },
+        })
       }
     }
 
