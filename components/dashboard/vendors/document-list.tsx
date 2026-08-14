@@ -88,7 +88,7 @@ interface VersionInfo {
   profiles?: { full_name: string; email: string } | { full_name: string; email: string }[];
 }
 
-export function DocumentList({ vendorId, documents, userRole }: { vendorId: string; documents: Document[]; userRole?: string }) {
+export function DocumentList({ vendorId, documents, userRole, optionalDocTypes = [] }: { vendorId: string; documents: Document[]; userRole?: string; optionalDocTypes?: string[] }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [approvingDoc, setApprovingDoc] = useState<string | null>(null);
   const [approveExpiryDate, setApproveExpiryDate] = useState("");
@@ -113,8 +113,9 @@ export function DocumentList({ vendorId, documents, userRole }: { vendorId: stri
   const getDocStatus = (type: string) => fixedDocs.find((d) => d.doc_type === type);
 
   const customSubmittedCount = customDocs.filter((d) => d.status === 'submitted' || d.status === 'approved').length;
-  const submittedCount = fixedDocs.filter((d) => d.status === 'submitted' || d.status === 'approved').length + customSubmittedCount;
-  const progressPercent = Math.min(100, Math.round((submittedCount / DOCUMENT_TYPES.length) * 100));
+  const submittedCount = fixedDocs.filter((d) => (d.status === 'submitted' || d.status === 'approved') && !optionalDocTypes.includes(d.doc_type)).length + customSubmittedCount;
+  const requiredDocTypes = DOCUMENT_TYPES.length - optionalDocTypes.filter((t) => DOCUMENT_TYPES.some((dt) => dt.id === t)).length;
+  const progressPercent = Math.min(100, Math.round((submittedCount / requiredDocTypes) * 100));
 
   const ndaDoc = getDocStatus('signed_nda');
   const ndaApproved = ndaDoc?.status === 'approved';
@@ -404,7 +405,7 @@ export function DocumentList({ vendorId, documents, userRole }: { vendorId: stri
       <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
         <div className="flex items-center justify-between mb-2">
           <div className="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-wider">Accreditation Progress</div>
-          <div className="text-sm font-bold text-primary">{submittedCount} of {DOCUMENT_TYPES.length} Completed ({progressPercent}%)</div>
+          <div className="text-sm font-bold text-primary">{submittedCount} of {requiredDocTypes} Completed ({progressPercent}%)</div>
         </div>
         <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5">
           <div className="bg-primary h-2.5 rounded-full transition-all duration-1000" style={{ width: `${progressPercent}%` }} />
@@ -498,6 +499,11 @@ export function DocumentList({ vendorId, documents, userRole }: { vendorId: stri
                         </div>
                         <div className="min-w-0">
                           <span className={`font-medium ${isSubmitted ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>{type.label}</span>
+                          {optionalDocTypes.includes(type.id) && (
+                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                              Optional
+                            </span>
+                          )}
                           {fileCount > 0 && (
                             <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                               {fileCount} file{fileCount > 1 ? 's' : ''}

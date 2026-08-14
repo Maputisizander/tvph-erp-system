@@ -11,6 +11,7 @@ import { calculatePaymentDueDate } from '@/lib/payment-terms';
 
 const ALLOWED_MIME = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_TOTAL_SIZE = 20 * 1024 * 1024; // 20MB combined
 
 const EXT_TO_MIME: Record<string, string> = {
   pdf: 'application/pdf',
@@ -491,6 +492,11 @@ export async function recordPayment(prevState: any, formData: FormData) {
     const mime = resolveFileMime(f);
     if (!ALLOWED_MIME.includes(mime)) return { error: `${label} must be a PDF or image file.` };
     if (f.size > MAX_FILE_SIZE) return { error: `${label} exceeds the 10MB limit.` };
+  }
+
+  const totalSize = (voucherFile?.size ?? 0) + (proofFile?.size ?? 0);
+  if (totalSize > MAX_TOTAL_SIZE) {
+    return { error: 'Attachments exceed the 20MB combined limit. Please compress or split the files.' };
   }
 
   // Fetch invoice for vendor_id (needed for storage path)
