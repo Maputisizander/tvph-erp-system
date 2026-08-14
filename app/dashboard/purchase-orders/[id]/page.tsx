@@ -93,6 +93,8 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
     notFound();
   }
 
+  const isLegacy = po.source === "legacy";
+
   // Fetch all projects to allow assignment (many-to-many architecture)
   const { data: allProjects } = await supabase
     .from("projects")
@@ -367,6 +369,11 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
 <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${statusBadgeClasses(po.status)}`}>
                 {po.status === "pending_signature" ? "AWAITING SIGNED PO" : po.status.replace(/_/g, " ").toUpperCase()}
               </span>
+              {isLegacy && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                  LEGACY
+                </span>
+              )}
               {dpAmount > 0 && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/50 text-sm font-bold">
                   DP — ₱{dpAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
@@ -411,7 +418,7 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
           )}
           <PODownloadDropdown poId={po.id} />
           {(canEditAny ||
-            (ISSUED_OR_LATER.includes(po.status) && canSendEmail) ||
+            (!isLegacy && ISSUED_OR_LATER.includes(po.status) && canSendEmail) ||
             (canCreatePR &&
               (!paymentRequest ||
                 paymentRequest.status === "rejected" ||
@@ -438,7 +445,7 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
                   Edit PO
                 </Link>
               )}
-              {ISSUED_OR_LATER.includes(po.status) && canSendEmail && (
+              {!isLegacy && ISSUED_OR_LATER.includes(po.status) && canSendEmail && (
                 <PoResendButton poId={po.id} menu />
               )}
               {canCreatePR &&

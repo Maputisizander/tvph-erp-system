@@ -29,11 +29,12 @@ const SIGNED_URL = "https://x.supabase.co/storage/v1/object/public/po-artifacts/
 function mockClient({
   poDocStatus = "approved",
   signedFileUrl = SIGNED_URL,
-}: { poDocStatus?: string | null; signedFileUrl?: string | null } = {}) {
+  artifactStoragePath = null,
+}: { poDocStatus?: string | null; signedFileUrl?: string | null; artifactStoragePath?: string | null } = {}) {
   const poChain = {
     select: jest.fn(() => poChain),
     eq: jest.fn(() => poChain),
-    single: jest.fn(async () => ({ data: { signed_doc_status: poDocStatus }, error: null })),
+    single: jest.fn(async () => ({ data: { signed_doc_status: poDocStatus, po_number: "PO-2026000027" }, error: null })),
   };
   const sigChain = {
     select: jest.fn(() => sigChain),
@@ -44,11 +45,20 @@ function mockClient({
       signedFileUrl ? { data: { signed_file_url: signedFileUrl }, error: null } : { data: null, error: null },
     ),
   };
+  const artifactChain = {
+    select: jest.fn(() => artifactChain),
+    eq: jest.fn(() => artifactChain),
+    maybeSingle: jest.fn(async () =>
+      artifactStoragePath ? { data: { storage_path: artifactStoragePath }, error: null } : { data: null, error: null },
+    ),
+  };
   const bucket = {
     download: jest.fn(async () => ({ data: new Blob(["pdf-bytes"]), error: null })),
   };
   const client = {
-    from: jest.fn((table: string) => (table === "po_signatures" ? sigChain : poChain)),
+    from: jest.fn((table: string) =>
+      table === "po_signatures" ? sigChain : table === "purchase_order_artifacts" ? artifactChain : poChain,
+    ),
     storage: { from: jest.fn(() => bucket) },
   };
   createServiceRoleClientMock.mockReturnValue(client);
@@ -75,5 +85,16 @@ describe("GET /api/purchase-orders/[id]/pdf", () => {
     expect(res.status).toBe(200);
     const body = Buffer.from(await res.arrayBuffer()).toString();
     expect(body).toBe("generated");
+  });
+
+  it("serves the stored issued_pdf artifact for legacy POs", async () => {
+    mockClient({ poDocStatus: null, signedFileUrl: null, artifactStoragePath: "legacy/po-1/PO-2026000027.pdf" });
+    const res = await GET(new Request("http://localhost/api/purchase-orders/po-1/pdf") as unknown as RouteParams, {
+      params: Promise.resolve({ id: "po-1" }),
+    });
+    expect(res.status).toBe(200);
+    const body = Buffer.from(await res.arrayBuffer()).toString();
+    expect(body).toBe("pdf-bytes");
+    expect(res.headers.get("Content-Disposition")).toContain("PO-2026000027.pdf");
   });
 });

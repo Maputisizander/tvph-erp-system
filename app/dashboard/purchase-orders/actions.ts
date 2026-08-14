@@ -12,6 +12,8 @@ import { sendPoPendingApprovalEmail } from '@/lib/email/po-pending-approval';
 import { sendPoPendingFinanceEmail } from '@/lib/email/po-pending-finance';
 import { sendPoSignedAcknowledgedEmail } from '@/lib/email/po-signed-acknowledged';
 import { docTypeLabel } from '@/lib/vendors/document-types';
+import { createHash } from 'crypto';
+import { parsePoSequenceNumber } from '@/lib/dashboard/po-sequence';
 
 const PAYMENT_REQUIRED_DOC_TYPES = [
   "signed_nda",
@@ -1916,4 +1918,108 @@ export async function rejectPaymentRequest(requestId: string, reason: string) {
   revalidatePath(`/dashboard/purchase-orders/${pr.po_id}`);
   revalidatePath('/dashboard/accounting');
   return { success: true };
+}
+
+// ── Legacy (pre-ERP) PO import ─────────────────────────────────────────────
+// Uploads a PO PDF that predates the ERP. The PO is created already 'issued'
+// (skipping the approval/signature/email flow) and the file is stored as its
+// issued_pdf artifact, so the detail-page PDF download serves the real
+// document instead of a regenerated skeleton. amount is the billing ceiling
+// enforced by the invoice flow, so it must match the PDF.
+
+export async function importLegacyPurchaseOrder(prevState: any, formData: FormData) {
+  const supabase = await createClient();
+  const { user, error: authError } = await requireCapability('po.create', supabase);
+  if (authError || !user) return { error: authError || 'Unauthorized' };
+
+  const vendor_id = String(formData.get('vendor_id') || '').trim();
+  const po_number = String(formData.get('po_number') || '').trim();
+  const issued_date = String(formData.get('issued_date') || '').trim();
+  const currency = String(formData.get('currency') || 'PHP').trim();
+  const project_id = String(formData.get('project_id') || '').trim() || null;
+  const amount = Number(formData.get('amount'));
+  const file = formData.get('file') as File | null;
+
+  if (!vendor_id) return { error: 'Vendor is required.' };
+  if (!po_number) return { error: 'PO number is required.' };
+  if (!issued_date || Number.isNaN(Date.parse(issued_date))) return { error: 'A valid issued date is required.' };
+  if (!Number.isFinite(amount) || amount <= 0) return { error: 'Total amount must be greater than zero.' };
+  if (currency !== 'PHP' && currency !== 'USD') return { error: 'Currency must be PHP or USD.' };
+  if (!file || file.size === 0) return { error: 'Upload the legacy PO PDF.' };
+  if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+    return { error: 'The document must be a PDF.' };
+  }
+  if (file.size > 10 * 1024 * 1024) return { error: 'The PDF must be 10 MB or smaller.' };
+
+  const { data: existing } = await supabase
+    .from('purchase_orders')
+    .select('id')
+    .eq('po_number', po_number)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (existing) return { error: `A PO with number ${po_number} already exists.` };
+
+  const { data: newPO, error: insertError } = await supabase
+    .from('purchase_orders')
+    .insert({
+      vendor_id,
+      project_id,
+      po_number,
+      amount,
+      issued_date,
+      currency,
+      status: 'issued',
+      source: 'legacy',
+      created_by: user.id,
+    })
+    .select('id, po_number')
+    .single();
+  if (insertError) return { error: insertError.message };
+
+  // Legacy numbers share the ERP's PO-YYYYNNNNNN scheme: advance the shared
+  // sequence so a future ERP PO can never regenerate this number.
+  const seq = parsePoSequenceNumber(po_number);
+  if (seq !== null) {
+    const { error: rpcError } = await supabase.rpc('ensure_po_sequence', { min_seq: seq });
+    if (rpcError) console.error('ensure_po_sequence failed:', rpcError);
+  }
+
+  const filePath = `legacy/${newPO.id}/${po_number}.pdf`;
+  const checksum_sha256 = createHash('sha256').update(Buffer.from(await file.arrayBuffer())).digest('hex');
+  const { error: uploadError } = await supabase.storage
+    .from('po-artifacts')
+    .upload(filePath, file, { contentType: 'application/pdf', upsert: false });
+  if (uploadError) {
+    await supabase.from('purchase_orders').delete().eq('id', newPO.id);
+    return { error: uploadError.message };
+  }
+  const { data: { publicUrl } } = supabase.storage.from('po-artifacts').getPublicUrl(filePath);
+
+  const { error: artifactError } = await supabase.from('purchase_order_artifacts').insert({
+    po_id: newPO.id,
+    artifact_type: 'issued_pdf',
+    storage_bucket: 'po-artifacts',
+    storage_path: filePath,
+    file_url: publicUrl,
+    content_type: 'application/pdf',
+    file_size: file.size,
+    checksum_sha256,
+    generated_by: user.id,
+  });
+  if (artifactError) {
+    await supabase.storage.from('po-artifacts').remove([filePath]);
+    await supabase.from('purchase_orders').delete().eq('id', newPO.id);
+    return { error: artifactError.message };
+  }
+
+  await recordAuditLog({
+    entity_type: 'purchase_order',
+    entity_id: newPO.id,
+    action: 'CREATE',
+    changes: { after: { vendor_id, po_number, amount, status: 'issued', source: 'legacy', currency } },
+    performed_by: user.id,
+  });
+
+  revalidatePath('/dashboard/purchase-orders');
+  return { id: newPO.id, success: true, message: `Legacy PO ${newPO.po_number} imported and marked issued.` };
 }
