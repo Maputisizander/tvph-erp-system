@@ -39,7 +39,14 @@ export function PurchaseOrdersTableBody({ pos, error }: { pos: any[] | null; err
             className="cursor-pointer group hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors"
           >
             <td className="px-6 py-4">
-              <div className="font-bold text-slate-900 dark:text-white">{po.po_number}</div>
+              <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                {po.po_number}
+                {po.source === 'legacy' && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/20 dark:text-violet-300 dark:border-violet-800/50">
+                    LEGACY
+                  </span>
+                )}
+              </div>
               <div className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">{new Date(po.issued_date).toLocaleDateString()}</div>
             </td>
             <td className="px-6 py-4">
@@ -49,6 +56,10 @@ export function PurchaseOrdersTableBody({ pos, error }: { pos: any[] | null; err
               {po.projects ? (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/5 text-primary text-xs font-semibold border border-primary/10">
                   {po.projects.name}
+                </span>
+              ) : po.legacy_project ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 text-xs font-semibold border border-violet-200 dark:border-violet-800/50" title={po.legacy_project}>
+                  {po.legacy_project.length > 30 ? po.legacy_project.slice(0, 30) + '…' : po.legacy_project}
                 </span>
               ) : (
                 <span className="text-xs text-slate-400 italic">No Project</span>

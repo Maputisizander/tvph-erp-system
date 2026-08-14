@@ -63,7 +63,7 @@ async function PurchaseOrdersContent({ searchParams: searchParamsPromise }: { se
     supabase
       .from('purchase_orders')
       .select(
-        'id, po_number, issued_date, amount, dp_amount, status, requirements_waived, waiver_approved, vendors(name), projects(name)',
+        'id, po_number, issued_date, amount, dp_amount, status, source, legacy_project, requirements_waived, waiver_approved, vendors(name), projects(name)',
         { count: 'exact' },
       )
       .is('deleted_at', null)
