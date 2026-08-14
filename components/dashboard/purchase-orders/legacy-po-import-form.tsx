@@ -1,26 +1,94 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Building2, Calendar, CircleDollarSign, FileUp, FolderGit2, Hash, Loader2 } from "lucide-react";
-import { importLegacyPurchaseOrder } from "@/app/dashboard/purchase-orders/actions";
+import {
+  AlertTriangle,
+  Building2,
+  Calendar,
+  CircleDollarSign,
+  FileUp,
+  FolderGit2,
+  Hash,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
+import { extractLegacyPoDetails, importLegacyPurchaseOrder } from "@/app/dashboard/purchase-orders/actions";
 
 const inputClass =
   "w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all";
 
-interface LegacyPoImportFormProps {
-  vendors: { id: string; name: string; currency: string }[];
-  projects: { id: string; name: string }[];
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+function toDateInput(value: string): string {
+  const text = value.trim();
+  const dmy = /^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/.exec(text);
+  if (dmy) {
+    const month = MONTHS.indexOf(dmy[2].toLowerCase().slice(0, 3)) + 1;
+    if (month)
+      return `${dmy[3]}-${String(month).padStart(2, "0")}-${String(+dmy[1]).padStart(2, "0")}`;
+  }
+  const mdy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text);
+  if (mdy) return `${mdy[3]}-${mdy[1].padStart(2, "0")}-${mdy[2].padStart(2, "0")}`;
+  return "";
 }
 
-export function LegacyPoImportForm({ vendors, projects }: LegacyPoImportFormProps) {
+interface LegacyPoImportFormProps {
+  vendors: { id: string; name: string; currency: string }[];
+}
+
+export function LegacyPoImportForm({ vendors }: LegacyPoImportFormProps) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, dispatch, isPending] = useActionState(importLegacyPurchaseOrder, null);
+  const [file, setFile] = useState<File | null>(null);
+
+  const [vendorId, setVendorId] = useState("");
+  const [poNumber, setPoNumber] = useState("");
+  const [issuedDate, setIssuedDate] = useState("");
+  const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState("PHP");
+  const [project, setProject] = useState("");
+  const [detectError, setDetectError] = useState<string | null>(null);
+
+  const [isDetecting, startDetecting] = useTransition();
 
   useEffect(() => {
     if (state?.success) router.push(`/dashboard/purchase-orders/${state.id}`);
   }, [state, router]);
+
+  const matchVendor = (name: string) => {
+    const lower = name.trim().toLowerCase();
+    return (
+      vendors.find((v) => v.name.toLowerCase() === lower) ||
+      vendors.find((v) => v.name.toLowerCase().includes(lower) || lower.includes(v.name.toLowerCase())) ||
+      null
+    );
+  };
+
+  const detectFromPdf = () => {
+    if (!file || isPending || isDetecting) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    startDetecting(async () => {
+      const res = await extractLegacyPoDetails(null, fd);
+      if (!res?.success || !res.extract) {
+        setDetectError(res?.error || "Could not read the PDF.");
+        return;
+      }
+      const ex = res.extract;
+      const vendor = ex.vendorName ? matchVendor(ex.vendorName) : null;
+      if (ex.poNumber) setPoNumber(ex.poNumber);
+      if (ex.poDate) setIssuedDate((prev) => toDateInput(ex.poDate || "") || prev);
+      if (ex.amount != null) setAmount(String(ex.amount));
+      if (ex.currency) setCurrency(ex.currency);
+      if (ex.project) setProject(ex.project);
+      if (vendor) setVendorId(vendor.id);
+      setDetectError(
+        ex.vendorName && !vendor ? `Detected vendor "${ex.vendorName}" isn't in the list — select it manually.` : null,
+      );
+    });
+  };
 
   return (
     <form ref={formRef} action={dispatch} className="space-y-6">
@@ -30,6 +98,12 @@ export function LegacyPoImportForm({ vendors, projects }: LegacyPoImportFormProp
           <p className="text-sm text-red-700 dark:text-red-300">{state.error}</p>
         </div>
       )}
+      {detectError && (
+        <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50">
+          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-700 dark:text-amber-300">{detectError}</p>
+        </div>
+      )}
 
       <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm divide-y divide-slate-200 dark:divide-slate-800">
         <div className="p-6">
@@ -37,7 +111,13 @@ export function LegacyPoImportForm({ vendors, projects }: LegacyPoImportFormProp
             <Building2 className="h-4 w-4 inline -mt-0.5 mr-1.5" />
             Vendor
           </label>
-          <select name="vendor_id" required className={inputClass} defaultValue="">
+          <select
+            name="vendor_id"
+            required
+            className={inputClass}
+            value={vendorId}
+            onChange={(e) => setVendorId(e.target.value)}
+          >
             <option value="" disabled>
               Select the vendor on the PO
             </option>
@@ -55,28 +135,56 @@ export function LegacyPoImportForm({ vendors, projects }: LegacyPoImportFormProp
               <Hash className="h-4 w-4 inline -mt-0.5 mr-1.5" />
               PO Number
             </label>
-            <input name="po_number" required placeholder="PO-2026000027" className={inputClass} />
+            <input
+              name="po_number"
+              required
+              placeholder="PO-2026000027"
+              className={inputClass}
+              value={poNumber}
+              onChange={(e) => setPoNumber(e.target.value)}
+            />
           </div>
           <div>
             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">
               <Calendar className="h-4 w-4 inline -mt-0.5 mr-1.5" />
               Issued Date
             </label>
-            <input name="issued_date" type="date" required className={inputClass} />
+            <input
+              name="issued_date"
+              type="date"
+              required
+              className={inputClass}
+              value={issuedDate}
+              onChange={(e) => setIssuedDate(e.target.value)}
+            />
           </div>
           <div>
             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">
               <CircleDollarSign className="h-4 w-4 inline -mt-0.5 mr-1.5" />
               Total Amount
             </label>
-            <input name="amount" type="number" required min="0" step="0.01" className={inputClass} />
+            <input
+              name="amount"
+              type="number"
+              required
+              min="0"
+              step="0.01"
+              className={inputClass}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Copy from the PDF — it caps what can be invoiced against this PO.
+              Read from the PDF automatically — it caps what can be invoiced against this PO.
             </p>
           </div>
           <div>
             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Currency</label>
-            <select name="currency" className={inputClass} defaultValue="PHP">
+            <select
+              name="currency"
+              className={inputClass}
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+            >
               <option value="PHP">PHP</option>
               <option value="USD">USD</option>
             </select>
@@ -84,16 +192,18 @@ export function LegacyPoImportForm({ vendors, projects }: LegacyPoImportFormProp
           <div className="sm:col-span-2">
             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">
               <FolderGit2 className="h-4 w-4 inline -mt-0.5 mr-1.5" />
-              Project <span className="font-normal text-slate-400">(optional)</span>
+              Project <span className="font-normal text-slate-400">(optional, free text)</span>
             </label>
-            <select name="project_id" className={inputClass} defaultValue="">
-              <option value="">No project</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <input
+              name="legacy_project"
+              placeholder="e.g. Extraction of Coaxial Cables and Pole-Equipment"
+              className={inputClass}
+              value={project}
+              onChange={(e) => setProject(e.target.value)}
+            />
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Legacy POs predate the ERP, so the project is recorded as text rather than linked to a project record.
+            </p>
           </div>
         </div>
 
@@ -108,10 +218,20 @@ export function LegacyPoImportForm({ vendors, projects }: LegacyPoImportFormProp
             accept="application/pdf,.pdf"
             required
             className="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-white file:font-medium file:cursor-pointer hover:file:bg-primary/90"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             The uploaded PDF becomes the PO&apos;s document — it should look like the PDF this system generates.
           </p>
+          <button
+            type="button"
+            disabled={!file || isPending || isDetecting}
+            onClick={detectFromPdf}
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-primary/40 text-primary hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isDetecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {isDetecting ? "Reading PDF…" : "Detect details from PDF"}
+          </button>
         </div>
       </div>
 

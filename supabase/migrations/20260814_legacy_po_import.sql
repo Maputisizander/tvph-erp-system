@@ -10,7 +10,12 @@ alter table public.purchase_orders
   add column if not exists source text not null default 'erp'
   check (source = any (array['erp', 'legacy']));
 
--- 2. Legacy numbers use the same PO-YYYYNNNNNN format as the ERP generator.
+-- 2. Legacy POs belong to pre-ERP projects, so they are never linked to an
+--    ERP project (project_id stays null). Keep the name as free text.
+alter table public.purchase_orders
+  add column if not exists legacy_project text;
+
+-- 3. Legacy numbers use the same PO-YYYYNNNNNN format as the ERP generator.
 --    Bump the shared po_number_seq so a future ERP PO can never regenerate an
 --    imported number (unique constraint on po_number). SECURITY DEFINER so the
 --    authenticated caller can advance the sequence.

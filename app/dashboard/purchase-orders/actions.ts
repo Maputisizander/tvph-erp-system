@@ -14,6 +14,7 @@ import { sendPoSignedAcknowledgedEmail } from '@/lib/email/po-signed-acknowledge
 import { docTypeLabel } from '@/lib/vendors/document-types';
 import { createHash } from 'crypto';
 import { parsePoSequenceNumber } from '@/lib/dashboard/po-sequence';
+import { extractLegacyPoFromPdf } from '@/lib/pdf/extractLegacyPoFromPdf';
 
 const PAYMENT_REQUIRED_DOC_TYPES = [
   "signed_nda",
@@ -1936,7 +1937,7 @@ export async function importLegacyPurchaseOrder(prevState: any, formData: FormDa
   const po_number = String(formData.get('po_number') || '').trim();
   const issued_date = String(formData.get('issued_date') || '').trim();
   const currency = String(formData.get('currency') || 'PHP').trim();
-  const project_id = String(formData.get('project_id') || '').trim() || null;
+  const legacy_project = String(formData.get('legacy_project') || '').trim() || null;
   const amount = Number(formData.get('amount'));
   const file = formData.get('file') as File | null;
 
@@ -1963,7 +1964,7 @@ export async function importLegacyPurchaseOrder(prevState: any, formData: FormDa
     .from('purchase_orders')
     .insert({
       vendor_id,
-      project_id,
+      legacy_project,
       po_number,
       amount,
       issued_date,
@@ -2016,10 +2017,33 @@ export async function importLegacyPurchaseOrder(prevState: any, formData: FormDa
     entity_type: 'purchase_order',
     entity_id: newPO.id,
     action: 'CREATE',
-    changes: { after: { vendor_id, po_number, amount, status: 'issued', source: 'legacy', currency } },
+    changes: { after: { vendor_id, po_number, amount, status: 'issued', source: 'legacy', currency, legacy_project } },
     performed_by: user.id,
   });
 
   revalidatePath('/dashboard/purchase-orders');
   return { id: newPO.id, success: true, message: `Legacy PO ${newPO.po_number} imported and marked issued.` };
+}
+
+export async function extractLegacyPoDetails(prevState: any, formData: FormData) {
+  const supabase = await createClient();
+  const { user, error: authError } = await requireCapability('po.create', supabase);
+  if (authError || !user) return { error: authError || 'Unauthorized' };
+
+  const file = formData.get('file') as File | null;
+  if (!file || file.size === 0) return { error: 'Choose the legacy PO PDF first.' };
+  if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+    return { error: 'The document must be a PDF.' };
+  }
+  if (file.size > 10 * 1024 * 1024) return { error: 'The PDF must be 10 MB or smaller.' };
+
+  try {
+    const extract = await extractLegacyPoFromPdf(await file.arrayBuffer());
+    return { success: true, extract };
+  } catch {
+    return {
+      error:
+        'Could not read the PDF. It may be a scanned image or password-protected — fill the fields manually.',
+    };
+  }
 }

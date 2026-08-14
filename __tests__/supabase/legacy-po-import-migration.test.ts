@@ -12,6 +12,10 @@ describe("legacy po import migration", () => {
     expect(sql).toMatch(/check \(source = any \(array\['erp', 'legacy'\]\)\)/);
   });
 
+  it("records the legacy project as free text instead of a project_id link", () => {
+    expect(sql).toMatch(/add column if not exists legacy_project text/);
+  });
+
   it("bumps the shared po_number_seq via a security definer rpc", () => {
     expect(sql).toMatch(/create or replace function public\.ensure_po_sequence\(min_seq bigint\)/);
     expect(sql).toMatch(/security definer/);

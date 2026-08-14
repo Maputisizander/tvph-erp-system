@@ -1147,11 +1147,20 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
             <h3 className="font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
               <FolderGit2 className="h-4 w-4 text-primary" /> Associated Project
             </h3>
-            <POProjectAssigner
-              poId={po.id}
-              currentProjectId={po.project_id}
-              projects={allProjects || []}
-            />
+            {isLegacy && po.legacy_project ? (
+              <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-medium px-2 py-0.5 text-slate-500 dark:text-slate-400 mr-1">
+                  LEGACY
+                </span>
+                {po.legacy_project}
+              </div>
+            ) : (
+              <POProjectAssigner
+                poId={po.id}
+                currentProjectId={po.project_id}
+                projects={allProjects || []}
+              />
+            )}
           </div>
 
           <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-2xl p-6">
