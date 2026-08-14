@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidatePath } from 'next/cache';
+import { refresh, revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
 import { createNotification } from '@/utils/notifications';
 import { recordAuditLog } from '@/utils/audit';
@@ -803,6 +803,7 @@ export async function approvePO(poId: string) {
 
   revalidatePath(`/dashboard/purchase-orders/${poId}`);
   revalidatePath('/dashboard/purchase-orders');
+  refresh();
 
   // ponytail: finance email deferred via after(); failure surfaced as in-app notification only (no emailWarning)
   defer(async () => {
@@ -873,6 +874,7 @@ export async function approvePOFinance(poId: string) {
 
   revalidatePath(`/dashboard/purchase-orders/${poId}`);
   revalidatePath('/dashboard/purchase-orders');
+  refresh();
 
   if ('error' in linkResult) {
     // Link creation failed — surface immediately (no email to send)
@@ -958,6 +960,7 @@ export async function rejectPO(poId: string, reason: string) {
 
   revalidatePath(`/dashboard/purchase-orders/${poId}`);
   revalidatePath('/dashboard/purchase-orders');
+  refresh();
   return { success: true };
 }
 
@@ -1137,6 +1140,7 @@ export async function reviewSignedPo(
 
   revalidatePath(`/dashboard/purchase-orders/${poId}`);
   revalidatePath('/dashboard/purchase-orders');
+  refresh();
 
   if (decision === 'approve') {
     // ponytail: acknowledgment email deferred via after()
