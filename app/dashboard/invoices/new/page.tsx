@@ -18,7 +18,7 @@ export default async function NewInvoicePage() {
   const { data: pos } = await supabase
     .from('purchase_orders')
     .select('id, po_number, vendor_id, amount, expense_category, net_days')
-    .in('status', ['issued', 'partially_paid'])
+    .in('status', ['issued', 'pending_signature', 'signed', 'partially_paid'])
     .is('deleted_at', null)
     .order('po_number');
 
