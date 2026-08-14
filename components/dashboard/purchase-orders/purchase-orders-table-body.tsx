@@ -1,12 +1,15 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { FileText, Download, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { DeletePOButton } from './delete-po-button'
 import { statusBadgeClasses } from '@/lib/ui/status-badge'
 
 export function PurchaseOrdersTableBody({ pos, error }: { pos: any[] | null; error: any }) {
   const router = useRouter()
+  const [rows, setRows] = useState(pos || [])
+  useEffect(() => setRows(pos || []), [pos])
 
   return (
     <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -29,7 +32,7 @@ export function PurchaseOrdersTableBody({ pos, error }: { pos: any[] | null; err
           </td>
         </tr>
       ) : (
-        pos?.map((po: any) => (
+        rows?.map((po: any) => (
           <tr
             key={po.id}
             onClick={() => router.push(`/dashboard/purchase-orders/${po.id}`)}
@@ -97,7 +100,7 @@ export function PurchaseOrdersTableBody({ pos, error }: { pos: any[] | null; err
                 >
                   <Download className="h-4 w-4" />
                 </a>
-                <DeletePOButton poId={po.id} poNumber={po.po_number} />
+                <DeletePOButton poId={po.id} poNumber={po.po_number} onDeleted={(id) => setRows((prev) => prev.filter((r: any) => r.id !== id))} />
               </div>
             </td>
           </tr>
