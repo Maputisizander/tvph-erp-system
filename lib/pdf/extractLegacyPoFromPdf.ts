@@ -18,14 +18,12 @@ export async function extractLegacyPoFromPdf(buffer: ArrayBuffer | Buffer): Prom
   // ponytail: lazy so Jest never parses pdfjs-dist's .mjs (Jest is CJS-only);
   // the dependency only loads when the server action actually runs.
   const pdfjs: any = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  // ponytail: Vercel bundles pdf.mjs but leaves pdf.worker.mjs as external dynamic import;
-  // point workerSrc to the actual file so fake-worker setup can import it via file://
-  try {
-    if (pdfjs.GlobalWorkerOptions && !pdfjs.GlobalWorkerOptions.workerSrc) {
-      // file:// URL works for ESM dynamic import in Node (Vercel /var/task)
-      pdfjs.GlobalWorkerOptions.workerSrc = `file://${process.cwd()}/node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs`;
-    }
-  } catch {}
+  // ponytail: pdfjs fake-worker resolves workerSrc via import.meta.url, which breaks
+  // when bundled (looks in .next chunks) and on Vercel (/var/task has no file).
+  // Importing the worker module ourselves and setting globalThis.pdfjsWorker makes
+  // PDFWorker use the main-thread handler directly — no workerSrc resolution at all.
+  // @ts-expect-error - the worker build ships no type declarations
+  (globalThis as any).pdfjsWorker ??= await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
   const { getDocument } = pdfjs;
   const data =
     buffer instanceof ArrayBuffer
