@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidatePath } from 'next/cache';
+import { refresh, revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 
@@ -447,6 +447,7 @@ export async function approvePR(prId: string) {
 
   revalidatePath(`/dashboard/purchase-requests/${prId}`);
   revalidatePath('/dashboard/purchase-requests');
+  refresh();
 
   // ponytail: finance email deferred via defer()
   defer(async () => {
@@ -512,6 +513,7 @@ export async function approvePRFinance(prId: string) {
 
   revalidatePath(`/dashboard/purchase-requests/${prId}`);
   revalidatePath('/dashboard/purchase-requests');
+  refresh();
 
   // ponytail: procurement email deferred via defer()
   defer(async () => {
@@ -582,6 +584,7 @@ export async function rejectPR(prId: string, reason: string) {
 
   revalidatePath(`/dashboard/purchase-requests/${prId}`);
   revalidatePath('/dashboard/purchase-requests');
+  refresh();
   return { success: true };
 }
 
