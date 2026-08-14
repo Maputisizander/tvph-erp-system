@@ -2039,8 +2039,18 @@ export async function extractLegacyPoDetails(prevState: any, formData: FormData)
 
   try {
     const extract = await extractLegacyPoFromPdf(await file.arrayBuffer());
+    // ponytail: scanned PDFs have no text — surface as error so the UI shows a banner instead of silently filling nothing
+    const hasAny =
+      extract.poNumber || extract.poDate || extract.vendorName || extract.amount != null || extract.project;
+    if (!hasAny) {
+      return {
+        error:
+          'Could not read the PDF. It may be a scanned image or password-protected — fill the fields manually.',
+      };
+    }
     return { success: true, extract };
-  } catch {
+  } catch (e) {
+    console.error('[extractLegacyPoDetails]', e);
     return {
       error:
         'Could not read the PDF. It may be a scanned image or password-protected — fill the fields manually.',
