@@ -135,7 +135,7 @@ export async function extractInvoiceFromFile(formData: FormData) {
       .select('id, vendor_id')
       .ilike('po_number', (extracted.po_number as string).trim())
       .is('deleted_at', null)
-      .in('status', ['issued', 'partially_paid'])
+      .in('status', ['issued', 'pending_signature', 'signed', 'partially_paid'])
       .limit(1)
       .maybeSingle();
     if (po) poMatch = { id: po.id, vendor_id: po.vendor_id };
@@ -605,7 +605,7 @@ export async function recordPayment(prevState: any, formData: FormData) {
 
     const totalPaidOnPO = poPayments?.reduce((sum, p) => sum + Number(p.amount_paid), 0) || 0;
 
-    let poStatus = 'issued';
+    let poStatus = 'signed';
     if (totalPaidOnPO >= po_amount) {
       poStatus = totalPaidOnPO > po_amount ? 'overpaid' : 'paid';
     } else if (totalPaidOnPO > 0) {

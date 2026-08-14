@@ -11,6 +11,8 @@ import { createPurchaseOrderCore } from "@/app/dashboard/purchase-orders/actions
 const poStatusSchema = z.enum([
   "draft",
   "issued",
+  "pending_signature",
+  "signed",
   "partially_paid",
   "paid",
   "overpaid",

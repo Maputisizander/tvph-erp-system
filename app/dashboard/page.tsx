@@ -174,7 +174,7 @@ export async function DashboardContent() {
       ? supabase.from("vendors").select("*", { count: "exact", head: true }).eq("status", "pending")
       : Promise.resolve({ count: 0 }),
     canOps || isAdminUp
-      ? supabase.from("purchase_orders").select("amount", { count: "exact" }).in("status", ["issued", "partially_paid"])
+      ? supabase.from("purchase_orders").select("amount", { count: "exact" }).in("status", ["issued", "pending_signature", "signed", "partially_paid"])
       : Promise.resolve({ count: 0, data: [] }),
     canOps || isAdminUp
       ? supabase.from("vendor_documents").select("*", { count: "exact", head: true }).lte("expiry_date", futureStr).gte("expiry_date", todayStr).is("archived_at", null)
@@ -183,7 +183,7 @@ export async function DashboardContent() {
       ? supabase.from("service_invoices").select("id, amount, due_date, vendors(name)").neq("status", "paid").is("deleted_at", null).gte("due_date", todayStr).lte("due_date", fourteenDayStr).order("due_date", { ascending: true })
       : Promise.resolve({ data: [] }),
     canOps || isAdminUp
-      ? supabase.from("purchase_orders")      .select("id, po_number, description, amount, due_date, vendors(name)").in("status", ["issued", "partially_paid"]).is("deleted_at", null).gte("due_date", todayStr).lte("due_date", fourteenDayStr).order("due_date", { ascending: true })
+      ? supabase.from("purchase_orders")      .select("id, po_number, description, amount, due_date, vendors(name)").in("status", ["issued", "pending_signature", "signed", "partially_paid"]).is("deleted_at", null).gte("due_date", todayStr).lte("due_date", fourteenDayStr).order("due_date", { ascending: true })
       : Promise.resolve({ data: [] }),
     canAudit
       ? supabase.from("audit_logs").select("id, action, entity_type, created_at, profiles(full_name)").order("created_at", { ascending: false }).limit(5)
