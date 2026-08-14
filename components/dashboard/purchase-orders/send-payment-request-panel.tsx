@@ -246,8 +246,11 @@ export function SendPaymentRequestPanel({
                 checked={isDownpayment}
                 onChange={(e) => {
                   setIsDownpayment(e.target.checked);
-                  if (e.target.checked && poDpAmount > 0) {
-                    setAmount(String(poDpAmount));
+                  if (e.target.checked) {
+                    setDueInDays("10");
+                    if (poDpAmount > 0) {
+                      setAmount(String(poDpAmount));
+                    }
                   }
                 }}
                 className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
