@@ -466,6 +466,51 @@ export async function approvePR(prId: string) {
   return { success: true };
 }
 
+export async function resendPrFinanceEmail(prId: string, financeApproverIds?: string[]) {
+  const supabase = await createClient();
+  const { user, error: authError } = await requireCapability('pr.approve', supabase);
+  if (authError || !user) return { error: authError || 'Unauthorized' };
+
+  const { data: pr } = await supabase
+    .from('purchase_requests')
+    .select('status, finance_approval_requested_from')
+    .eq('id', prId)
+    .single();
+  if (!pr) return { error: 'Purchase request not found.' };
+  if (pr.status !== 'pending_finance') return { error: 'Only PRs pending finance approval can be resent to finance.' };
+
+  // If caller supplied new approvers (e.g. stuck PR with empty list), validate and persist them.
+  let targetIds = (pr.finance_approval_requested_from as string[] | null) || [];
+  if (financeApproverIds !== undefined) {
+    const unique = [...new Set(financeApproverIds)].filter(Boolean);
+    if (unique.length === 0) return { error: 'Select at least one finance or superadmin to approve this PR.' };
+    const { data: profiles } = await supabase.from('profiles').select('id, role').in('id', unique);
+    const valid = (profiles || []).filter((p) => p.role === 'superadmin' || p.role === 'finance').map((p) => p.id);
+    if (valid.length !== unique.length) return { error: 'Every selected finance approver must be a finance or superadmin user.' };
+    targetIds = unique;
+    const { error: updErr } = await supabase
+      .from('purchase_requests')
+      .update({ finance_approval_requested_from: unique, updated_at: new Date().toISOString() })
+      .eq('id', prId);
+    if (updErr) return { error: updErr.message };
+  }
+
+  if (targetIds.length === 0) return { error: 'No finance approvers are assigned to this PR. Provide finance approver(s) to resend.' };
+
+  const emailResult = await sendPrPendingFinanceEmail(prId, { actorId: user.id });
+  if (emailResult.status === 'failed') return { error: emailResult.error || 'Failed to send finance notification email.' };
+
+  await recordAuditLog({
+    entity_type: 'purchase_request',
+    entity_id: prId,
+    action: 'UPDATE',
+    changes: { after: { resent_to_finance: targetIds } },
+    performed_by: user.id,
+  });
+
+  return { success: true };
+}
+
 export async function approvePRFinance(prId: string) {
   const supabase = await createClient();
   const { user, error: authError } = await requireCapability('pr.approve_finance', supabase);

@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
-import { approvePR, approvePRFinance, rejectPR } from "@/app/dashboard/purchase-requests/actions";
+import { approvePR, approvePRFinance, rejectPR, resendPrFinanceEmail } from "@/app/dashboard/purchase-requests/actions";
 import { useOptimisticAction } from "@/components/dashboard/shared/use-optimistic-action";
 
 export function PrApprovalActions({ prId, stage = "admin" }: { prId: string; stage?: "admin" | "finance" }) {
   const [isRejecting, setIsRejecting] = useState(false);
   const [reason, setReason] = useState("");
+  const [resendOk, setResendOk] = useState(false);
   const { error, setError, isPending, optimisticSuccess, run } = useOptimisticAction();
 
   function handleApprove() {
@@ -32,6 +33,22 @@ export function PrApprovalActions({ prId, stage = "admin" }: { prId: string; sta
         />
       )}
       <div className="flex items-center gap-2">
+        {stage === "finance" && (
+          <button
+            type="button"
+            onClick={async () => {
+              setError(null); setResendOk(false);
+              const res = await resendPrFinanceEmail(prId);
+              if ((res as any)?.error) setError((res as any).error);
+              else setResendOk(true);
+            }}
+            disabled={isPending}
+            className="inline-flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 rounded-xl text-sm font-medium transition-all active:scale-95 disabled:opacity-60"
+            title="Resend the finance notification email to assigned approvers"
+          >
+            {resendOk ? "Sent ✓" : "Resend to finance"}
+          </button>
+        )}
         <button
           type="button"
           onClick={handleApprove}
