@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
     // truncates multi-file Server Action uploads (2 required docs, up to 10MB each)
     proxyClientMaxBodySize: '25mb',
   },
-  serverExternalPackages: ["pdfkit", "pdfjs-dist", "@napi-rs/canvas"],
+  serverExternalPackages: ["pdfkit"],
   turbopack: {
     root: process.cwd(),
   },
