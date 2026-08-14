@@ -15,6 +15,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { createPaymentRequest } from "@/app/dashboard/purchase-orders/actions";
+import { docTypeLabel } from "@/lib/vendors/document-types";
 import { DocumentList } from "@/components/dashboard/vendors/document-list";
 
 const COMPLIANCE_DOC_TYPES = [
@@ -33,6 +34,16 @@ const COMPLIANCE_DOC_TYPES = [
   "dole_174",
   "other_licenses",
 ];
+
+const OPTIONAL_COMPLIANCE_DOC_TYPES = [
+  "iso_certification",
+  "pcab_license",
+  "other_licenses",
+];
+
+const REQUIRED_COMPLIANCE_DOC_TYPES = COMPLIANCE_DOC_TYPES.filter(
+  (t) => !OPTIONAL_COMPLIANCE_DOC_TYPES.includes(t),
+);
 
 interface VendorDoc {
   id: string;
@@ -89,20 +100,22 @@ export function SendPaymentRequestPanel({
     docStatusMap[doc.doc_type] = doc;
   }
 
-  const approvedDocs = COMPLIANCE_DOC_TYPES.filter(
+  const approvedDocs = REQUIRED_COMPLIANCE_DOC_TYPES.filter(
     (t) => docStatusMap[t]?.status === "approved",
   ).length;
-  const submittedDocs = COMPLIANCE_DOC_TYPES.filter(
+  const submittedDocs = REQUIRED_COMPLIANCE_DOC_TYPES.filter(
     (t) =>
       docStatusMap[t]?.status === "submitted" ||
       docStatusMap[t]?.status === "approved",
   ).length;
-  const totalDocs = COMPLIANCE_DOC_TYPES.length;
+  const totalDocs = REQUIRED_COMPLIANCE_DOC_TYPES.length;
   const progressPercent = Math.round((submittedDocs / totalDocs) * 100);
-  const missingOrPending = COMPLIANCE_DOC_TYPES.filter(
+  const missingOrPending = REQUIRED_COMPLIANCE_DOC_TYPES.filter(
     (t) =>
-      !docStatusMap[t] || docStatusMap[t]?.status === "submitted",
+      docStatusMap[t]?.status !== "submitted" &&
+      docStatusMap[t]?.status !== "approved",
   );
+  const missingLabels = missingOrPending.map((t) => docTypeLabel(t));
   const hasComplianceGaps = missingOrPending.length > 0;
 
   function handleSubmit() {
@@ -155,11 +168,11 @@ export function SendPaymentRequestPanel({
             <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-                Accreditation Compliance &mdash; {approvedDocs} of {totalDocs} approved
+                Accreditation Compliance &mdash; {approvedDocs} of {totalDocs} required approved
               </p>
               <p className="text-xs text-amber-600/80 dark:text-amber-400/60 mt-1">
-                Some accreditation documents are not yet approved. You can still proceed, but ensure
-                compliance is resolved before final payment.
+                Payment requests are blocked until all required accreditation documents are
+                submitted or approved. Missing: {missingLabels.length > 0 ? missingLabels.join(", ") : "..."}
               </p>
             </div>
           </div>
@@ -193,6 +206,7 @@ export function SendPaymentRequestPanel({
               vendorId={vendorId}
               documents={vendorDocuments}
               userRole={userRole}
+              optionalDocTypes={OPTIONAL_COMPLIANCE_DOC_TYPES}
             />
           </div>
         </div>
@@ -303,7 +317,8 @@ export function SendPaymentRequestPanel({
             <div className="flex items-center gap-3 pt-2">
               <button
                 onClick={handleSubmit}
-                disabled={isPending || !amount}
+                disabled={isPending || !amount || hasComplianceGaps}
+                title={hasComplianceGaps ? "Submit missing required accreditation documents first" : undefined}
                 className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-xl text-sm font-medium transition-all active:scale-95 disabled:opacity-60 shadow-sm"
               >
                 {isPending ? (

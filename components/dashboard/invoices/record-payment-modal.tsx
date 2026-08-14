@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 const ALLOWED_MIME = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_TOTAL_SIZE = 20 * 1024 * 1024;
 const EXT_TO_MIME: Record<string, string> = { pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
 
 function resolveFileMime(file: File): string {
@@ -51,6 +52,12 @@ export function RecordPaymentModal({ invoiceId, remainingBalance }: { invoiceId:
         setClientError(`${label} must be a PDF or image file.`);
         return;
       }
+    }
+
+    const totalSize = (voucher?.size ?? 0) + (proof?.size ?? 0);
+    if (totalSize > MAX_TOTAL_SIZE) {
+      e.preventDefault();
+      setClientError("Attachments exceed the 20MB combined limit. Please compress or split the files.");
     }
   }
 

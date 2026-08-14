@@ -5,7 +5,10 @@ const nextConfig: NextConfig = {
   // disable until fixed — instant prefetch benefit was negligible vs stale UX
   cacheComponents: false,
   experimental: {
-    serverActions: { bodySizeLimit: '12mb' },
+    serverActions: { bodySizeLimit: '25mb' },
+    // proxy.ts buffers request bodies while cloning for the proxy; default 10MB
+    // truncates multi-file Server Action uploads (2 required docs, up to 10MB each)
+    proxyClientMaxBodySize: '25mb',
   },
   serverExternalPackages: ["pdfkit"],
   turbopack: {
