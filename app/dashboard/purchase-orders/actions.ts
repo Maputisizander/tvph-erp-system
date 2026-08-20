@@ -22,10 +22,8 @@ const PAYMENT_REQUIRED_DOC_TYPES = [
   "company_profile",
   "products_services_list",
   "vendor_information_summary",
-  "general_information_sheet",
   "audited_financial_statements",
   "sec_registration",
-  "secretary_certificate",
   "safety_drug_policy",
   "dole_174",
 ];

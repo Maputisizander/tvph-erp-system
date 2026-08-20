@@ -36,6 +36,8 @@ const COMPLIANCE_DOC_TYPES = [
 ];
 
 const OPTIONAL_COMPLIANCE_DOC_TYPES = [
+  "general_information_sheet",
+  "secretary_certificate",
   "iso_certification",
   "pcab_license",
   "other_licenses",
