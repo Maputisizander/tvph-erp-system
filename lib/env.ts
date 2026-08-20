@@ -29,6 +29,12 @@ const envSchema = z.object({
   TELEGRAM_WEBHOOK_SECRET: z.string().min(1).optional(),
   // Resend webhook signing secret (whsec_...). Required for /api/resend/webhook.
   RESEND_WEBHOOK_SECRET: z.string().min(1).optional(),
+  // Supabase management API (personal access token) + project ref, used by the
+  // System panel Logs API proxy. Optional; panel shows "not configured" if unset.
+  SUPABASE_ACCESS_TOKEN: z.string().min(1).optional(),
+  SUPABASE_PROJECT_REF: z.string().min(1).optional(),
+  // Vercel API token for the System panel Vercel runtime-logs proxy. Optional.
+  VERCEL_TOKEN: z.string().min(1).optional(),
 });
 
 const rawEnv = {
@@ -47,6 +53,9 @@ const rawEnv = {
   TELEGRAM_ADMIN_CHAT_ID: process.env.TELEGRAM_ADMIN_CHAT_ID,
   TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET,
   RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET,
+  SUPABASE_ACCESS_TOKEN: process.env.SUPABASE_ACCESS_TOKEN,
+  SUPABASE_PROJECT_REF: process.env.SUPABASE_PROJECT_REF,
+  VERCEL_TOKEN: process.env.VERCEL_TOKEN,
 };
 
 // A `.env` file left as `KEY=` yields an empty string, which would fail

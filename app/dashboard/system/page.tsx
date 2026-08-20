@@ -8,6 +8,7 @@ import packageJson from "@/package.json";
 import { StoragePanel, type StorageQuota } from "@/components/dashboard/system/storage-panel";
 import { VersionPanel } from "@/components/dashboard/system/version-panel";
 import { HealthPanel } from "@/components/dashboard/system/health-panel";
+import { LogsPanel } from "@/components/dashboard/system/logs-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,8 @@ export default async function SystemPage() {
       </div>
 
       <HealthPanel checks={health} />
+
+      <LogsPanel />
     </div>
   );
 }
