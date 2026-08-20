@@ -83,7 +83,7 @@ export function PurchaseOrdersTableBody({ pos, error }: { pos: any[] | null; err
             <td className="px-6 py-4">
               <div className="flex flex-wrap items-center gap-1.5">
 <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadgeClasses(po.status)}`}>
-                  {po.status === 'pending_approval' ? 'For Approval' : po.status === 'pending_finance' ? 'Finance Approval' : po.status === 'signed' ? 'Signed' : po.status === 'pending_signature' ? 'Awaiting Signed PO' : po.status.replace('_', ' ').charAt(0).toUpperCase() + po.status.replace('_', ' ').slice(1)}
+                  {po.status === 'pending_approval' ? 'For Approval' : po.status === 'pending_finance' ? 'Finance Approval' : po.status === 'signed' ? 'Signed' : po.status === 'pending_signature' ? 'Awaiting Signed PO' : po.status === 'signed_received' ? 'Signed PO Received' : po.status.replace('_', ' ').charAt(0).toUpperCase() + po.status.replace('_', ' ').slice(1)}
                 </span>
                 {po.requirements_waived && !po.waiver_approved && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/50">

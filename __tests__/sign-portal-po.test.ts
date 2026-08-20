@@ -102,7 +102,7 @@ describe("signPortalPO", () => {
     });
   });
 
-  it("uploads the file, inserts the signature, and keeps the PO in pending_signature", async () => {
+  it("uploads the file, inserts the signature, and moves the PO to signed_received", async () => {
     const { chain, client } = mockClient();
     chain.maybeSingle
       .mockResolvedValueOnce({ data: MAGIC, error: null })
@@ -124,7 +124,7 @@ describe("signPortalPO", () => {
       expect.objectContaining({ po_id: "po-1", signer_name: "Jane Doe", signer_title: "MD", ip_address: "1.2.3.4" }),
     );
     expect(chain.update).toHaveBeenCalledWith(
-      expect.objectContaining({ status: "pending_signature", signed_doc_status: "pending_approval" }),
+      expect.objectContaining({ status: "signed_received", signed_doc_status: "pending_approval" }),
       { count: "exact" },
     );
     expect(res).toHaveProperty("success", true);

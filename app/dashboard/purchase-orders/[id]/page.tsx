@@ -52,7 +52,7 @@ import TabbedNav from "@/components/dashboard/tabbed-nav";
 
 const menuItemClass = "flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors";
 const DRAFT_OR_PENDING = ["draft", "pending_approval", "pending_finance"];
-const ISSUED_OR_LATER = ["issued", "pending_signature", "signed", "paid", "overpaid"];
+const ISSUED_OR_LATER = ["issued", "pending_signature", "signed_received", "signed", "paid", "overpaid"];
 
 export default function PurchaseOrderDetailPage(props: {
   params: Promise<{ id: string }>;
@@ -367,7 +367,7 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
                 {po.po_number}
               </h1>
 <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${statusBadgeClasses(po.status)}`}>
-                {po.status === "pending_signature" ? "AWAITING SIGNED PO" : po.status.replace(/_/g, " ").toUpperCase()}
+                {po.status === "pending_signature" ? "AWAITING SIGNED PO" : po.status === "signed_received" ? "SIGNED PO RECEIVED" : po.status.replace(/_/g, " ").toUpperCase()}
               </span>
               {isLegacy && (
                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
@@ -513,7 +513,7 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
         </div>
       )}
 
-      {po.status === "pending_signature" && poSignature?.signed_at && poSignature?.signed_file_url && (
+      {["pending_signature", "signed_received"].includes(po.status) && poSignature?.signed_at && poSignature?.signed_file_url && (
         <PoSignedReview
           poId={po.id}
           signedFileUrl={signedSig?.file_url ?? poSignature.signed_file_url}

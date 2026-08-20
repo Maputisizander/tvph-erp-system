@@ -136,7 +136,7 @@ export async function extractInvoiceFromFile(formData: FormData) {
       .select('id, vendor_id')
       .ilike('po_number', (extracted.po_number as string).trim())
       .is('deleted_at', null)
-      .in('status', ['issued', 'pending_signature', 'signed', 'partially_paid'])
+      .in('status', ['issued', 'pending_signature', 'signed_received', 'signed', 'partially_paid'])
       .limit(1)
       .maybeSingle();
     if (po) poMatch = { id: po.id, vendor_id: po.vendor_id };

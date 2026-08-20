@@ -6,6 +6,7 @@ export const EMAIL_KIND_LABELS: Record<string, string> = {
   po_pending_approval: "Approval Request",
   po_pending_finance: "Finance Review",
   po_signed_acknowledged: "Signed PO Acknowledged",
+  po_signed_received: "Signed PO Received",
   payment_request_notification: "Payment Request",
   doc_reminder: "Document Reminder",
   doc_request: "Document Request",
@@ -24,6 +25,7 @@ const PO_KINDS = new Set([
   "po_pending_approval",
   "po_pending_finance",
   "po_signed_acknowledged",
+  "po_signed_received",
   "payment_request_notification",
 ]);
 

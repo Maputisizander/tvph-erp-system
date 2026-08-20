@@ -157,6 +157,7 @@ async function PurchaseOrdersContent({ searchParams: searchParamsPromise }: { se
               { value: 'pending_finance', label: 'Pending Finance Approval' },
               { value: 'issued', label: 'Issued' },
               { value: 'pending_signature', label: 'Awaiting Signed PO' },
+              { value: 'signed_received', label: 'Signed PO Received' },
               { value: 'signed', label: 'Signed' },
               { value: 'partially_paid', label: 'Partially Paid' },
               { value: 'paid', label: 'Paid' },

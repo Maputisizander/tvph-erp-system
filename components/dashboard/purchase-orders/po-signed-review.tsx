@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, XCircle, FileText, Loader2 } from "lucide-react";
+import { CheckCircle2, XCircle, FileText, Loader2, Signature  } from "lucide-react";
 import { reviewSignedPo } from "@/app/dashboard/purchase-orders/actions";
 import { useOptimisticAction } from "@/components/dashboard/shared/use-optimistic-action";
 
@@ -61,7 +61,7 @@ export function PoSignedReview({
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-primary hover:underline"
         >
-          <FileText className="h-4 w-4" /> Download signed PDF
+          <Signature  className="h-4 w-4" /> Download signed PDF
         </a>
       )}
       {canReview && (

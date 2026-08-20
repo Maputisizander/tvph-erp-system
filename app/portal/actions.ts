@@ -6,6 +6,18 @@ import { extractDocumentMetadata } from "@/app/actions/ocr";
 import { createNotification } from "@/utils/notifications";
 import { revalidatePath } from "next/cache";
 import { combineImagesToPdf } from "@/lib/pdf/combineImagesToPdf";
+import { sendPoSignedReceivedEmail } from "@/lib/email/po-signed-received";
+
+// ponytail: defer via next/server after() without breaking jest (which lacks Request)
+function defer(fn: () => Promise<void>) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { after } = require("next/server") as { after: (f: () => void) => void };
+    after(fn);
+  } catch {
+    void fn();
+  }
+}
 
 async function findValidMagicLink(supabase: Awaited<ReturnType<typeof createServiceRoleClient>>, token: string) {
   return supabase
@@ -76,8 +88,9 @@ export async function validatePoPortalToken(token: string) {
 
 /**
  * Records a vendor e-signature for a PO: uploads the executed PDF to
- * po-artifacts, inserts a po_signatures row (with the file URL), and keeps
- * the PO in 'pending_signature' awaiting requisitioner approval. Idempotent —
+ * po-artifacts, inserts a po_signatures row (with the file URL), moves the PO
+ * to 'signed_received' awaiting requisitioner review, and emails the
+ * requestor. Idempotent —
  * re-signing replaces the latest signature. Anonymous portal access uses the
  * service-role client, so recordAuditLog (user-scoped) is skipped here; the
  * po_signatures row IS the audit trail.
@@ -205,7 +218,7 @@ export async function signPortalPO(
     .from("purchase_orders")
     .update(
       {
-        status: "pending_signature",
+        status: "signed_received",
         signed_doc_status: "pending_approval",
         signed_at: now,
         updated_at: now,
@@ -214,6 +227,11 @@ export async function signPortalPO(
     )
     .eq("id", po.id);
   if (poError) return { error: poError.message };
+
+  // Notify the requestor that the signed copy arrived; never blocks the upload.
+  defer(async () => {
+    await sendPoSignedReceivedEmail(po.id);
+  });
 
   // Keep success visible for ~15 mins so refresh still shows "This Purchase Order Has Been Signed"
   // instead of "Access Expired" (issue #115), then let the link expire naturally.

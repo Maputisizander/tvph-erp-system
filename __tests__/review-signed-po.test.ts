@@ -16,7 +16,9 @@ jest.mock("@/utils/supabase/server", () => ({
 
 const { createClient } = require("@/utils/supabase/server") as { createClient: jest.Mock };
 
-jest.mock("next/cache", () => ({ revalidatePath: jest.fn() }));
+jest.mock("next/cache", () => ({ revalidatePath: jest.fn(), refresh: jest.fn() }));
+jest.mock("@/utils/notifications", () => ({ createNotification: jest.fn(async () => {}) }));
+jest.mock("@/utils/audit", () => ({ recordAuditLog: jest.fn(async () => {}) }));
 
 function mockClient() {
   const chain = {
@@ -49,5 +51,22 @@ describe("reviewSignedPo", () => {
     const res = await reviewSignedPo("po-1", "approve");
 
     expect(res).toEqual({ error: "This purchase order has no signed document awaiting review." });
+  });
+
+  it("accepts a PO in signed_received and approves it", async () => {
+    requireCapabilityMock.mockResolvedValue({ user: { id: "user-1" }, error: null });
+    const chain = mockClient();
+    chain.single.mockResolvedValue({
+      data: { id: "po-1", po_number: "PO-1", status: "signed_received", signed_doc_status: "pending_approval", vendors: { name: "Acme" } },
+      error: null,
+    });
+    chain.update.mockReturnValue({ eq: jest.fn().mockResolvedValue({ error: null }) });
+
+    const res = await reviewSignedPo("po-1", "approve");
+
+    expect(res).toEqual({ success: true });
+    expect(chain.update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "signed", signed_doc_status: "approved" }),
+    );
   });
 });

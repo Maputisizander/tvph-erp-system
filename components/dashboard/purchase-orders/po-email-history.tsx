@@ -14,8 +14,7 @@ export async function PoEmailHistory({ poId, poNumber }: { poId: string; poNumbe
       "id, kind, ref_id, to_addresses, cc_addresses, subject, status, resend_id, error, meta, created_at, created_by, delivered_at, opened_at, bounced_at",
     )
     .eq("ref_id", poId)
-    .order("created_at", { ascending: false })
-    .limit(100);
+    .order("created_at", { ascending: false });
 
   const logs = (rows ?? []) as EmailLogRow[];
 

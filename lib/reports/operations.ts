@@ -51,7 +51,7 @@ export async function getOperationsSummary(
     supabase
       .from("purchase_orders")
       .select("id, amount, status")
-      .in("status", ["issued", "pending_signature", "signed", "partially_paid"]),
+      .in("status", ["issued", "pending_signature", "signed_received", "signed", "partially_paid"]),
     supabase.from("service_invoices").select("id, amount").neq("status", "paid"),
     supabase
       .from("vendor_documents")

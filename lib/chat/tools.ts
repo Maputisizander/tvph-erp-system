@@ -12,6 +12,7 @@ const poStatusSchema = z.enum([
   "draft",
   "issued",
   "pending_signature",
+  "signed_received",
   "signed",
   "partially_paid",
   "paid",

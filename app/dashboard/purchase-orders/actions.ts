@@ -1078,7 +1078,8 @@ export async function resendPurchaseOrderEmail(poId: string) {
 /**
  * Requisitioner approves or rejects a vendor-signed PO: moves it to 'signed'
  * (signed_doc_status 'approved') or back to 'pending_signature' with a reason
- * (signed_doc_status 'rejected') so the vendor can re-sign.
+ * (signed_doc_status 'rejected') so the vendor can re-sign. Reviewable from
+ * 'signed_received' (new flow) or legacy 'pending_signature'.
  */
 export async function reviewSignedPo(
   poId: string,
@@ -1096,7 +1097,7 @@ export async function reviewSignedPo(
     .single();
 
   if (!po) return { error: 'Purchase order not found.' };
-  if (po.status !== 'pending_signature' || po.signed_doc_status !== 'pending_approval') {
+  if (!['pending_signature', 'signed_received'].includes(po.status) || po.signed_doc_status !== 'pending_approval') {
     return { error: 'This purchase order has no signed document awaiting review.' };
   }
 
