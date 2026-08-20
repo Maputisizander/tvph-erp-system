@@ -17,6 +17,7 @@ import {
   Building2,
   ChevronDown,
   FileBarChart,
+  Settings2,
 } from "lucide-react";
 import { ROLE_LABELS } from "@/lib/auth/roles";
 
@@ -139,6 +140,13 @@ const MODULE_CONFIG: ModuleItem[] = [
     label: "Audit Logs",
     icon: AlertCircle,
     href: "/dashboard/audit-logs",
+    roles: ["superadmin"],
+  },
+  {
+    id: "system",
+    label: "System",
+    icon: Settings2,
+    href: "/dashboard/system",
     roles: ["superadmin"],
   },
 ];
