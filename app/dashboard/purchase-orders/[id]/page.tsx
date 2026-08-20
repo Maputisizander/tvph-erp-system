@@ -194,7 +194,13 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
   }
 
   // Resolve PO creator and approver names
-  const poProfileIds = [po.created_by, po.approved_by_user_id, po.finance_approved_by_user_id].filter(Boolean) as string[];
+  const poProfileIds = [
+    po.created_by,
+    po.approved_by_user_id,
+    po.finance_approved_by_user_id,
+    ...((po.approval_requested_from as string[] | null) || []),
+    ...((po.finance_approval_requested_from as string[] | null) || []),
+  ].filter(Boolean) as string[];
   const poProfiles: Record<string, { full_name: string; role: string }> = {};
   if (poProfileIds.length > 0) {
     const { data: profiles } = await supabase
@@ -222,10 +228,22 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
       ? "Pending finance budget check"
       : "Not yet approved";
 
+  // Names of the users selected to approve at submit time — shown on the
+  // "awaiting approval" banners so everyone knows who is expected to act.
+  const adminApproversLabel = ((po.approval_requested_from as string[] | null) || [])
+    .map((id) => poProfiles[id]?.full_name)
+    .filter(Boolean)
+    .join(", ");
+  const financeApproversLabel = ((po.finance_approval_requested_from as string[] | null) || [])
+    .map((id) => poProfiles[id]?.full_name)
+    .filter(Boolean)
+    .join(", ");
+
   // Eligible approvers for the submit-for-approval picker: admins/superadmins
-  // other than the current user (the 4-eyes rule blocks self-approval). Only
-  // needed while the PO is a draft.
+  // and finance/superadmin users other than the current user (the 4-eyes rule
+  // blocks self-approval). Only needed while the PO is a draft.
   let eligibleApprovers: { id: string; full_name: string; email: string }[] = [];
+  let eligibleFinanceApprovers: { id: string; full_name: string; email: string }[] = [];
   if (po.status === "draft" && currentUser) {
     const { data: admins } = await supabase
       .from("profiles")
@@ -234,6 +252,14 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
       .neq("id", currentUser.id)
       .order("full_name");
     eligibleApprovers = admins || [];
+
+    const { data: financeUsers } = await supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .in("role", ["superadmin", "finance"])
+      .neq("id", currentUser.id)
+      .order("full_name");
+    eligibleFinanceApprovers = financeUsers || [];
   }
 
   // Fetch completion certificates for this PO
@@ -403,7 +429,7 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
 
         <div className="flex items-center gap-2 md:ml-auto">
           {po.status === "draft" && hasCapability(currentRole, "po.status") && (
-            <PoIssueButton poId={po.id} eligibleApprovers={eligibleApprovers} />
+            <PoIssueButton poId={po.id} eligibleApprovers={eligibleApprovers} eligibleFinanceApprovers={eligibleFinanceApprovers} />
           )}
           {!DRAFT_OR_PENDING.includes(po.status) && (
             <a
@@ -533,6 +559,11 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
               <p className="text-xs text-amber-600/80 dark:text-amber-400/60 mt-1">
                 This PO has been submitted for approval and <span className="font-semibold">cannot be sent to the vendor</span> until an admin approves it.
               </p>
+              {adminApproversLabel && (
+                <p className="text-xs text-amber-600/80 dark:text-amber-400/60 mt-1">
+                  Awaiting approval from: <span className="font-semibold">{adminApproversLabel}</span>.
+                </p>
+              )}
             </div>
           </div>
           {canApprovePO && po.submitted_for_approval_by !== currentUser?.id ? (
@@ -556,6 +587,11 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
               <p className="text-xs text-violet-600/80 dark:text-violet-400/60 mt-1">
                 This PO has been approved by admin and <span className="font-semibold">cannot be sent to the vendor</span> until finance completes the budget check.
               </p>
+              {financeApproversLabel && (
+                <p className="text-xs text-violet-600/80 dark:text-violet-400/60 mt-1">
+                  Awaiting finance review from: <span className="font-semibold">{financeApproversLabel}</span>.
+                </p>
+              )}
             </div>
           </div>
           {canApprovePOFinance && po.approved_by_user_id !== currentUser?.id ? (

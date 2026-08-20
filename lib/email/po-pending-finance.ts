@@ -19,10 +19,12 @@ function formatAmount(amount: number | null | undefined, currency: string) {
 }
 
 /**
- * Emails the finance pool (finance-role users + superadmin) that a PO passed
- * the admin stage and is pending the finance budget check before issuance.
- * Decoupled from the approve action — always resolves to a result so a failed
- * send never blocks the transition.
+ * Emails the finance users recorded in `finance_approval_requested_from` that a
+ * PO passed the admin stage and is pending the finance budget check before
+ * issuance. POs submitted before finance-approver selection existed fall back
+ * to the finance pool (finance-role users + superadmin). Decoupled from the
+ * approve action — always resolves to a result so a failed send never blocks
+ * the transition.
  */
 export async function sendPoPendingFinanceEmail(
   poId: string,
@@ -32,7 +34,7 @@ export async function sendPoPendingFinanceEmail(
 
   const { data: po, error } = await supabase
     .from("purchase_orders")
-    .select("po_number, amount, currency, dp_amount, dp_percent, submitted_for_approval_by, approved_by_user_id, vendors ( name )")
+    .select("po_number, amount, currency, dp_amount, dp_percent, submitted_for_approval_by, approved_by_user_id, finance_approval_requested_from, vendors ( name )")
     .eq("id", poId)
     .single();
 
@@ -40,15 +42,27 @@ export async function sendPoPendingFinanceEmail(
     return { status: "failed", error: error?.message || "Purchase order not found." };
   }
 
-  // Recipients mirror CAPABILITY_ROLES["po.approve_finance"] — keep in sync.
-  const { data: financeUsers } = await supabase
-    .from("profiles")
-    .select("email")
-    .in("role", ["finance", "superadmin"]);
-
-  const to = (financeUsers || [])
-    .map((u) => u.email as string | null)
-    .filter((e): e is string => !!e);
+  const financeApproverIds = (po.finance_approval_requested_from as string[] | null) || [];
+  let to: string[];
+  if (financeApproverIds.length > 0) {
+    const { data: financeUsers } = await supabase
+      .from("profiles")
+      .select("email")
+      .in("id", financeApproverIds);
+    to = (financeUsers || [])
+      .map((u) => u.email as string | null)
+      .filter((e): e is string => !!e);
+  } else {
+    // Legacy POs predate finance-approver selection — email the finance pool.
+    // Recipients mirror CAPABILITY_ROLES["po.approve_finance"] — keep in sync.
+    const { data: financeUsers } = await supabase
+      .from("profiles")
+      .select("email")
+      .in("role", ["finance", "superadmin"]);
+    to = (financeUsers || [])
+      .map((u) => u.email as string | null)
+      .filter((e): e is string => !!e);
+  }
 
   if (to.length === 0) {
     return { status: "failed", error: "No finance email addresses found." };
