@@ -28,9 +28,39 @@ function formatDate(iso: string | null | undefined) {
 }
 
 /**
+ * Resolves the Cc list for a vendor-facing PO email: requestor, approver(s),
+ * vendor secondary contacts, and the PO's manual cc_emails. Approver emails are
+ * kept under the internalCc toggle so sandbox testing (EMAIL_CC_INTERNAL=false)
+ * doesn't fail on non-account-owner addresses.
+ */
+async function resolvePoCcEmails(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  po: { approved_by_user_id?: string | null; finance_approved_by_user_id?: string | null },
+  creatorEmail?: string | null,
+  secondaryEmails: string[] = [],
+  poCcEmails: string[] = [],
+): Promise<string[]> {
+  const approverIds = [po.approved_by_user_id, po.finance_approved_by_user_id].filter(
+    (id): id is string => !!id,
+  );
+  const approverEmails = approverIds.length
+    ? ((await supabase.from("profiles").select("email").in("id", approverIds)).data || [])
+        .map((a) => a.email as string)
+        .filter((e): e is string => !!e)
+    : [];
+  return [
+    ...internalCc(creatorEmail),
+    ...approverEmails.flatMap((e) => internalCc(e)),
+    ...secondaryEmails,
+    ...poCcEmails,
+  ];
+}
+
+/**
  * Renders the PO PDF and emails it to the vendor's primary contact, Cc'ing the
- * PO creator. Decoupled from the issue action — always resolves to a result so
- * a failed send never blocks issuing. Used by both auto-send and manual resend.
+ * requestor, the approver(s), and the vendor's secondary contacts. Decoupled
+ * from the issue action — always resolves to a result so a failed send never
+ * blocks issuing. Used by both auto-send and manual resend.
  */
 export async function sendPoIssuedEmail(
   poId: string,
@@ -42,7 +72,8 @@ export async function sendPoIssuedEmail(
     .from("purchase_orders")
     .select(
       `po_number, amount, currency, issued_date, created_by, vendor_id, cc_emails,
-       vendors ( name, contact_person, contact_email ),
+       approved_by_user_id, finance_approved_by_user_id,
+       vendors ( name, contact_person, contact_email, secondary_contacts ),
        creator:profiles!created_by ( full_name, email, phone ),
        projects ( name ),
        po_site_details ( area_city )`,
@@ -58,12 +89,20 @@ export async function sendPoIssuedEmail(
     name?: string;
     contact_person?: string | null;
     contact_email?: string | null;
+    secondary_contacts?: { email?: string | null }[] | null;
   };
   const creator = (po.creator ?? {}) as {
     full_name?: string | null;
     email?: string | null;
     phone?: string | null;
   };
+  const ccEmails = await resolvePoCcEmails(
+    supabase,
+    po,
+    creator.email,
+    (vendor.secondary_contacts || []).map((c) => c.email || ""),
+    (po.cc_emails as string[] | null) || [],
+  );
 
   const rendered = await renderPoDocument(poId);
   if (!rendered) {
@@ -84,7 +123,7 @@ export async function sendPoIssuedEmail(
     kind: "po_issued",
     refId: poId,
     to: [vendor.contact_email || ""],
-    cc: [...internalCc(creator.email), ...((po.cc_emails as string[] | null) || [])],
+    cc: ccEmails,
     subject: `Purchase Order ${subjectParts.join(" - ")}`,
     react: PoIssuedEmail({
       vendorName: vendor.name || "Vendor",
@@ -105,7 +144,8 @@ export async function sendPoIssuedEmail(
 
 /**
  * Emails the vendor a magic link to e-sign an issued PO, with the PO PDF
- * attached so the vendor can review it before signing. Decoupled from the
+ * attached so the vendor can review it before signing, Cc'ing the requestor,
+ * the approver(s), and the vendor's secondary contacts. Decoupled from the
  * action that sets status to 'pending_signature' — always resolves to a result.
  */
 export async function sendPoForSignatureEmail(
@@ -118,7 +158,8 @@ export async function sendPoForSignatureEmail(
     .from("purchase_orders")
     .select(
       `po_number, amount, currency, issued_date, created_by, vendor_id, cc_emails,
-       vendors ( name, contact_person, contact_email ),
+       approved_by_user_id, finance_approved_by_user_id,
+       vendors ( name, contact_person, contact_email, secondary_contacts ),
        creator:profiles!created_by ( full_name, email )`,
     )
     .eq("id", poId)
@@ -132,11 +173,19 @@ export async function sendPoForSignatureEmail(
     name?: string;
     contact_person?: string | null;
     contact_email?: string | null;
+    secondary_contacts?: { email?: string | null }[] | null;
   };
   const creator = (po.creator ?? {}) as {
     full_name?: string | null;
     email?: string | null;
   };
+  const ccEmails = await resolvePoCcEmails(
+    supabase,
+    po,
+    creator.email,
+    (vendor.secondary_contacts || []).map((c) => c.email || ""),
+    (po.cc_emails as string[] | null) || [],
+  );
 
   const currency = (po.currency as string) || "PHP";
 
@@ -149,7 +198,7 @@ export async function sendPoForSignatureEmail(
     kind: "po_for_signature",
     refId: poId,
     to: [vendor.contact_email || ""],
-    cc: [...internalCc(creator.email), ...((po.cc_emails as string[] | null) || [])],
+    cc: ccEmails,
     subject: `E-Sign Purchase Order ${po.po_number as string} — TVPH`,
     react: PoForSignatureEmail({
       vendorName: vendor.name || "Vendor",
