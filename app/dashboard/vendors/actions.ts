@@ -97,6 +97,9 @@ export async function uploadDocument(
 
   if (files.length === 0) return { error: "No file provided" };
 
+  const oversized = files.find((f) => f.size > 50 * 1024 * 1024);
+  if (oversized) return { error: `${oversized.name} exceeds the 50MB limit.` };
+
   const { data: existingDocument, error: existingError } = await supabase
     .from("vendor_documents")
     .select("id")

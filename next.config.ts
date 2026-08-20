@@ -5,10 +5,12 @@ const nextConfig: NextConfig = {
   // disable until fixed — instant prefetch benefit was negligible vs stale UX
   cacheComponents: false,
   experimental: {
-    serverActions: { bodySizeLimit: '25mb' },
-    // proxy.ts buffers request bodies while cloning for the proxy; default 10MB
-    // truncates multi-file Server Action uploads (2 required docs, up to 10MB each)
-    proxyClientMaxBodySize: '25mb',
+    // 60mb keeps the proxy's silent body truncation and the Server Action body
+    // limit above the 50MB-per-file cap enforced in the upload actions, so an
+    // oversized file reaches the action and returns a clear error instead of
+    // being silently truncated (the old 25mb limit corrupted >25MB uploads).
+    serverActions: { bodySizeLimit: '60mb' },
+    proxyClientMaxBodySize: '60mb',
   },
   serverExternalPackages: ["pdfkit"],
   turbopack: {

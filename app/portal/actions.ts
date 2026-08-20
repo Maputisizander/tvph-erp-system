@@ -358,6 +358,10 @@ export async function uploadPortalDocument(
 
   if (!file) return { error: "No file provided" };
 
+  if (file.size > 50 * 1024 * 1024) {
+    return { error: `File exceeds the 50MB limit.` };
+  }
+
   let fileBuffer = await file.arrayBuffer();
   const fileName = file.name;
   const finalMimeType = file.type;

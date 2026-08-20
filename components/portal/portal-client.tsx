@@ -167,6 +167,10 @@ export default function PortalClient({
 
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
+      if (f.size > 50 * 1024 * 1024) {
+        uploadError = `${f.name} exceeds the 50MB limit.`;
+        break;
+      }
       const formData = new FormData();
       formData.append("file", f);
       if (expiryDate) formData.append("expiryDate", expiryDate);
@@ -410,7 +414,7 @@ export default function PortalClient({
                       <span className="block text-xs text-slate-500 mt-1 truncate px-2">{files.map(f => f.name).join(", ")}</span>
                     )}
                     <span className="block text-xs text-slate-400 mt-1">
-                      PDF, JPG, PNG up to 10MB — select multiple files at once
+                      PDF, JPG, PNG up to 50MB — select multiple files at once
                     </span>
                     {files.length > 0 && (
                       <button type="button" onClick={() => setFiles([])} className="relative z-10 mt-2 text-xs text-red-500 font-semibold hover:underline">Clear</button>
