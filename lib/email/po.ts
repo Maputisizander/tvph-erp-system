@@ -2,7 +2,7 @@ import "server-only";
 
 import { createServiceRoleClient } from "@/utils/supabase/service";
 import { renderPoDocument } from "@/lib/pdf/renderPoDocument";
-import { sendEmail, internalCc, type SendEmailResult } from "./send";
+import { sendEmail, type SendEmailResult } from "./send";
 import { PoIssuedEmail } from "./templates/po-issued";
 import { PoForSignatureEmail } from "./templates/po-for-signature";
 
@@ -29,9 +29,8 @@ function formatDate(iso: string | null | undefined) {
 
 /**
  * Resolves the Cc list for a vendor-facing PO email: requestor, approver(s),
- * vendor secondary contacts, and the PO's manual cc_emails. Approver emails are
- * kept under the internalCc toggle so sandbox testing (EMAIL_CC_INTERNAL=false)
- * doesn't fail on non-account-owner addresses.
+ * vendor secondary contacts, and the PO's manual cc_emails. All cc'd
+ * unconditionally.
  */
 async function resolvePoCcEmails(
   supabase: ReturnType<typeof createServiceRoleClient>,
@@ -49,8 +48,8 @@ async function resolvePoCcEmails(
         .filter((e): e is string => !!e)
     : [];
   return [
-    ...internalCc(creatorEmail),
-    ...approverEmails.flatMap((e) => internalCc(e)),
+    ...(creatorEmail ? [creatorEmail] : []),
+    ...approverEmails,
     ...secondaryEmails,
     ...poCcEmails,
   ];
@@ -91,6 +90,12 @@ export async function sendPoIssuedEmail(
     contact_email?: string | null;
     secondary_contacts?: { email?: string | null }[] | null;
   };
+  if (!vendor.contact_email) {
+    return {
+      status: "failed",
+      error: "Vendor has no contact email on file. Add a contact email to the vendor before the PO can be sent.",
+    };
+  }
   const creator = (po.creator ?? {}) as {
     full_name?: string | null;
     email?: string | null;
@@ -175,6 +180,12 @@ export async function sendPoForSignatureEmail(
     contact_email?: string | null;
     secondary_contacts?: { email?: string | null }[] | null;
   };
+  if (!vendor.contact_email) {
+    return {
+      status: "failed",
+      error: "Vendor has no contact email on file. Add a contact email to the vendor before the PO can be sent.",
+    };
+  }
   const creator = (po.creator ?? {}) as {
     full_name?: string | null;
     email?: string | null;
