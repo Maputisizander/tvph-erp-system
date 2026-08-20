@@ -678,7 +678,7 @@ export async function overridePurchaseOrderPenalty(poId: string, formData: FormD
   return { success: true };
 }
 
-export async function submitPOForApproval(poId: string, approverIds: string[] = []) {
+export async function submitPOForApproval(poId: string, approverIds: string[] = [], financeApproverIds: string[] = []) {
   const supabase = await createClient();
   const { user, role, error: authError } = await requireCapability('po.status', supabase);
   if (authError || !user) return { error: authError || 'Unauthorized' };
@@ -717,6 +717,28 @@ export async function submitPOForApproval(poId: string, approverIds: string[] = 
     return { error: 'Every selected approver must be an admin or superadmin.' };
   }
 
+  // Finance approvers follow the same rules, scoped to finance/superadmin roles.
+  const uniqueFinanceApproverIds = [...new Set(financeApproverIds)].filter(Boolean);
+  if (uniqueFinanceApproverIds.length === 0) {
+    return { error: 'Select at least one finance or superadmin to approve this PO.' };
+  }
+  if (uniqueFinanceApproverIds.includes(user.id)) {
+    return { error: 'You cannot select yourself as a finance approver.' };
+  }
+
+  const { data: financeApproverProfiles } = await supabase
+    .from('profiles')
+    .select('id, role')
+    .in('id', uniqueFinanceApproverIds);
+
+  const validFinanceApproverIds = (financeApproverProfiles || [])
+    .filter((p) => p.role === 'superadmin' || p.role === 'finance')
+    .map((p) => p.id);
+
+  if (validFinanceApproverIds.length !== uniqueFinanceApproverIds.length) {
+    return { error: 'Every selected finance approver must be a finance or superadmin user.' };
+  }
+
   const { error } = await supabase
     .from('purchase_orders')
     .update({
@@ -724,6 +746,7 @@ export async function submitPOForApproval(poId: string, approverIds: string[] = 
       submitted_for_approval_by: user.id,
       submitted_for_approval_at: new Date().toISOString(),
       approval_requested_from: uniqueApproverIds,
+      finance_approval_requested_from: uniqueFinanceApproverIds,
       rejection_reason: null,
       updated_at: new Date().toISOString(),
     })
@@ -735,7 +758,7 @@ export async function submitPOForApproval(poId: string, approverIds: string[] = 
     entity_type: 'purchase_order',
     entity_id: poId,
     action: 'UPDATE',
-    changes: { after: { status: 'pending_approval', submitted_by: user.id, approval_requested_from: uniqueApproverIds } },
+    changes: { after: { status: 'pending_approval', submitted_by: user.id, approval_requested_from: uniqueApproverIds, finance_approval_requested_from: uniqueFinanceApproverIds } },
     performed_by: user.id,
   });
 

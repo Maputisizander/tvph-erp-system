@@ -29,6 +29,11 @@ const APPROVERS = [
   { id: 'admin-b', full_name: 'Bob Boss', email: 'bob@example.com' },
 ];
 
+const FINANCE_APPROVERS = [
+  { id: 'fin-a', full_name: 'Fran Finance', email: 'fran@example.com' },
+  { id: 'fin-b', full_name: 'Gary Gaap', email: 'gary@example.com' },
+];
+
 function openPicker() {
   fireEvent.click(screen.getByRole('button', { name: /submit for approval/i }));
 }
@@ -44,32 +49,42 @@ describe('PoIssueButton', () => {
 
   describe('No eligible approvers', () => {
     it('disables submission and explains why when nobody can approve', () => {
-      render(<PoIssueButton poId="po-123" eligibleApprovers={[]} />);
+      render(<PoIssueButton poId="po-123" eligibleApprovers={[]} eligibleFinanceApprovers={FINANCE_APPROVERS} />);
 
       const button = screen.getByRole('button', { name: /submit for approval/i });
       expect(button).toBeDisabled();
       expect(screen.getByText(/no eligible approver/i)).toBeInTheDocument();
     });
+
+    it('disables submission when no finance approver exists', () => {
+      render(<PoIssueButton poId="po-123" eligibleApprovers={APPROVERS} eligibleFinanceApprovers={[]} />);
+
+      const button = screen.getByRole('button', { name: /submit for approval/i });
+      expect(button).toBeDisabled();
+      expect(screen.getByText(/no eligible finance approver/i)).toBeInTheDocument();
+    });
   });
 
   describe('Picker flow', () => {
     it('renders an enabled trigger button initially', () => {
-      render(<PoIssueButton poId="po-123" eligibleApprovers={APPROVERS} />);
+      render(<PoIssueButton poId="po-123" eligibleApprovers={APPROVERS} eligibleFinanceApprovers={FINANCE_APPROVERS} />);
       const button = screen.getByRole('button', { name: /submit for approval/i });
       expect(button).toBeInTheDocument();
       expect(button).not.toBeDisabled();
     });
 
     it('opens the picker and lists eligible approvers', () => {
-      render(<PoIssueButton poId="po-123" eligibleApprovers={APPROVERS} />);
+      render(<PoIssueButton poId="po-123" eligibleApprovers={APPROVERS} eligibleFinanceApprovers={FINANCE_APPROVERS} />);
       openPicker();
 
       expect(screen.getByText('Alice Admin')).toBeInTheDocument();
       expect(screen.getByText('bob@example.com')).toBeInTheDocument();
+      expect(screen.getByText('Fran Finance')).toBeInTheDocument();
+      expect(screen.getByText('gary@example.com')).toBeInTheDocument();
     });
 
-    it('keeps the confirm button disabled until an approver is selected', () => {
-      render(<PoIssueButton poId="po-123" eligibleApprovers={APPROVERS} />);
+    it('keeps the confirm button disabled until an admin and finance approver are selected', () => {
+      render(<PoIssueButton poId="po-123" eligibleApprovers={APPROVERS} eligibleFinanceApprovers={FINANCE_APPROVERS} />);
       openPicker();
 
       // With nothing selected the trigger and the confirm share a name; the
@@ -79,29 +94,37 @@ describe('PoIssueButton', () => {
       expect(confirm).toBeDisabled();
 
       fireEvent.click(screen.getByText('Alice Admin'));
-      expect(
-        screen.getByRole('button', { name: /submit for approval \(1\)/i })
-      ).not.toBeDisabled();
+      expect(confirm).toBeDisabled();
+
+      fireEvent.click(screen.getByText('Fran Finance'));
+      expect(confirm).not.toBeDisabled();
     });
 
-    it('submits the selected approver ids', async () => {
-      render(<PoIssueButton poId="po-xyz" eligibleApprovers={APPROVERS} />);
+    it('submits the selected admin and finance approver ids', async () => {
+      render(<PoIssueButton poId="po-xyz" eligibleApprovers={APPROVERS} eligibleFinanceApprovers={FINANCE_APPROVERS} />);
       openPicker();
 
       fireEvent.click(screen.getByText('Alice Admin'));
       fireEvent.click(screen.getByText('Bob Boss'));
-      fireEvent.click(screen.getByRole('button', { name: /submit for approval \(2\)/i }));
+      fireEvent.click(screen.getByText('Fran Finance'));
+      fireEvent.click(screen.getByText('Gary Gaap'));
+      fireEvent.click(screen.getByRole('button', { name: /submit for approval \(2 admins · 2 finance\)/i }));
 
       await waitFor(() => {
-        expect(mockSubmitPOForApproval).toHaveBeenCalledWith('po-xyz', ['admin-a', 'admin-b']);
+        expect(mockSubmitPOForApproval).toHaveBeenCalledWith(
+          'po-xyz',
+          ['admin-a', 'admin-b'],
+          ['fin-a', 'fin-b'],
+        );
       });
     });
 
     it('refreshes the router on success', async () => {
-      render(<PoIssueButton poId="po-123" eligibleApprovers={APPROVERS} />);
+      render(<PoIssueButton poId="po-123" eligibleApprovers={APPROVERS} eligibleFinanceApprovers={FINANCE_APPROVERS} />);
       openPicker();
       fireEvent.click(screen.getByText('Alice Admin'));
-      fireEvent.click(screen.getByRole('button', { name: /submit for approval \(1\)/i }));
+      fireEvent.click(screen.getByText('Fran Finance'));
+      fireEvent.click(screen.getByRole('button', { name: /submit for approval \(1 admin · 1 finance\)/i }));
 
       await waitFor(() => {
         expect(mockRouter.refresh).toHaveBeenCalled();
@@ -114,10 +137,11 @@ describe('PoIssueButton', () => {
       const errorMsg = 'You cannot select yourself as an approver.';
       mockSubmitPOForApproval.mockResolvedValue({ error: errorMsg });
 
-      render(<PoIssueButton poId="po-123" eligibleApprovers={APPROVERS} />);
+      render(<PoIssueButton poId="po-123" eligibleApprovers={APPROVERS} eligibleFinanceApprovers={FINANCE_APPROVERS} />);
       openPicker();
       fireEvent.click(screen.getByText('Alice Admin'));
-      fireEvent.click(screen.getByRole('button', { name: /submit for approval \(1\)/i }));
+      fireEvent.click(screen.getByText('Fran Finance'));
+      fireEvent.click(screen.getByRole('button', { name: /submit for approval \(1 admin · 1 finance\)/i }));
 
       await waitFor(() => {
         expect(screen.getByText(errorMsg)).toBeInTheDocument();
