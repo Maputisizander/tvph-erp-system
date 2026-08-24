@@ -11,22 +11,10 @@ import { createPortalLink } from '@/lib/portal/links';
 import { sendPoPendingApprovalEmail } from '@/lib/email/po-pending-approval';
 import { sendPoPendingFinanceEmail } from '@/lib/email/po-pending-finance';
 import { sendPoSignedAcknowledgedEmail } from '@/lib/email/po-signed-acknowledged';
-import { docTypeLabel } from '@/lib/vendors/document-types';
+import { docTypeLabel, getMissingPaymentRequiredDocTypes, PAYMENT_REQUIRED_DOC_TYPES } from '@/lib/vendors/document-types';
 import { createHash } from 'crypto';
 import { parsePoSequenceNumber } from '@/lib/dashboard/po-sequence';
 import { extractLegacyPoFromPdf } from '@/lib/pdf/extractLegacyPoFromPdf';
-
-const PAYMENT_REQUIRED_DOC_TYPES = [
-  "signed_nda",
-  "statement_of_commitment",
-  "company_profile",
-  "products_services_list",
-  "vendor_information_summary",
-  "audited_financial_statements",
-  "sec_registration",
-  "safety_drug_policy",
-  "dole_174",
-];
 
 // ponytail: defer via next/server after() without breaking jest (which lacks Request)
 function defer(fn: () => Promise<void>) {
@@ -1785,14 +1773,7 @@ export async function createPaymentRequest(
     .in('doc_type', PAYMENT_REQUIRED_DOC_TYPES)
     .is('archived_at', null);
 
-  const satisfiedDocTypes = new Set(
-    (vendorDocs || [])
-      .filter((d) => d.status === 'submitted' || d.status === 'approved')
-      .map((d) => d.doc_type),
-  );
-  const missingRequiredDocs = PAYMENT_REQUIRED_DOC_TYPES.filter(
-    (t) => !satisfiedDocTypes.has(t),
-  );
+  const missingRequiredDocs = getMissingPaymentRequiredDocTypes(vendorDocs || []);
   if (missingRequiredDocs.length > 0) {
     return {
       error: `Blocked: required accreditation document${missingRequiredDocs.length > 1 ? 's' : ''} ${missingRequiredDocs
