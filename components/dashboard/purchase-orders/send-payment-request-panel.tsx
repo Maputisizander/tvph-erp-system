@@ -73,6 +73,7 @@ interface Props {
   vendorDocuments: VendorDoc[];
   approvedCerts: ApprovedCert[];
   userRole: string;
+  poSource?: string;
 }
 
 export function SendPaymentRequestPanel({
@@ -85,6 +86,7 @@ export function SendPaymentRequestPanel({
   vendorDocuments,
   approvedCerts,
   userRole,
+  poSource = "erp",
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -112,13 +114,16 @@ export function SendPaymentRequestPanel({
   ).length;
   const totalDocs = REQUIRED_COMPLIANCE_DOC_TYPES.length;
   const progressPercent = Math.round((submittedDocs / totalDocs) * 100);
-  const missingOrPending = REQUIRED_COMPLIANCE_DOC_TYPES.filter(
-    (t) =>
-      docStatusMap[t]?.status !== "submitted" &&
-      docStatusMap[t]?.status !== "approved",
-  );
+  const isLegacy = poSource === "legacy";
+  const missingOrPending = isLegacy
+    ? []
+    : REQUIRED_COMPLIANCE_DOC_TYPES.filter(
+        (t) =>
+          docStatusMap[t]?.status !== "submitted" &&
+          docStatusMap[t]?.status !== "approved",
+      );
   const missingLabels = missingOrPending.map((t) => docTypeLabel(t));
-  const hasComplianceGaps = missingOrPending.length > 0;
+  const hasComplianceGaps = !isLegacy && missingOrPending.length > 0;
 
   function handleSubmit() {
     setError(null);
@@ -165,7 +170,19 @@ export function SendPaymentRequestPanel({
         </div>
 
         {/* Compliance Banner */}
-        {hasComplianceGaps ? (
+        {isLegacy ? (
+          <div className="flex items-start gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800">
+            <ShieldCheck className="h-5 w-5 text-slate-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                Legacy PO — Compliance Waived
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                This PO predates accreditation. Payment requests are not blocked by documents.
+              </p>
+            </div>
+          </div>
+        ) : hasComplianceGaps ? (
           <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50">
             <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div>
@@ -320,7 +337,7 @@ export function SendPaymentRequestPanel({
               <button
                 onClick={handleSubmit}
                 disabled={isPending || !amount || hasComplianceGaps}
-                title={hasComplianceGaps ? "Submit missing required accreditation documents first" : undefined}
+                title={hasComplianceGaps ? "Submit missing required accreditation documents first" : !amount ? "Enter an amount to enable" : undefined}
                 className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-xl text-sm font-medium transition-all active:scale-95 disabled:opacity-60 shadow-sm"
               >
                 {isPending ? (
@@ -337,6 +354,9 @@ export function SendPaymentRequestPanel({
                 Cancel
               </Link>
             </div>
+            {!hasComplianceGaps && !amount && (
+              <p className="text-xs text-slate-500 dark:text-slate-400">Enter an amount above to enable the button.</p>
+            )}
           </div>
         </div>
       </div>

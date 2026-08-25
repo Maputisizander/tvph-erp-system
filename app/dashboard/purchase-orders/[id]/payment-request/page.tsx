@@ -84,6 +84,7 @@ async function SendPaymentRequestContent({
       vendorDocuments={vendorDocs || []}
       approvedCerts={approvedCerts}
       userRole={currentRole || ""}
+      poSource={(po as { source?: string }).source || "erp"}
     />
   );
 }
