@@ -31,7 +31,7 @@ function defer(fn: () => Promise<void>) {
 // ── Exec tier helpers ──────────────────────────────────────────────────────
 // T1 <=500_000 : 0 exec, T2 500_001..1_000_000 : 1 exec (CTO OR CEO), T3 >=1_000_001 : 2 exec (CTO AND CEO distinct)
 // Live purchase_orders.amount is the source of truth at each stage (per #110 clarification).
-export function getExecRequiredCount(amount: number | null | undefined): number {
+function getExecRequiredCount(amount: number | null | undefined): number {
   const n = Number(amount ?? 0);
   if (n <= 500_000) return 0;
   if (n <= 1_000_000) return 1;
