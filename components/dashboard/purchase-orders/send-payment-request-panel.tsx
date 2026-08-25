@@ -48,6 +48,7 @@ interface Props {
   approvedCerts: ApprovedCert[];
   userRole: string;
   poSource?: string;
+  poRemaining?: number;
 }
 
 export function SendPaymentRequestPanel({
@@ -61,11 +62,14 @@ export function SendPaymentRequestPanel({
   approvedCerts,
   userRole,
   poSource = "erp",
+  poRemaining,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(() =>
+    poRemaining !== undefined && poRemaining > 0 ? String(poRemaining) : ""
+  );
   const [dueInDays, setDueInDays] = useState("30");
   const [notes, setNotes] = useState("");
   const [selectedCertId, setSelectedCertId] = useState(
@@ -243,6 +247,12 @@ export function SendPaymentRequestPanel({
               </div>
             </div>
 
+            {poRemaining !== undefined && (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Remaining to pay: <span className="font-semibold text-slate-700 dark:text-slate-300">₱{poRemaining.toLocaleString()}</span>
+                {poRemaining === 0 && " — fully paid"}
+              </p>
+            )}
             <div className="flex items-center gap-3">
               <input
                 type="checkbox"
@@ -255,6 +265,8 @@ export function SendPaymentRequestPanel({
                     if (poDpAmount > 0) {
                       setAmount(String(poDpAmount));
                     }
+                  } else if (poRemaining !== undefined && poRemaining > 0) {
+                    setAmount(String(poRemaining));
                   }
                 }}
                 className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
