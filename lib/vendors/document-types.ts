@@ -25,3 +25,28 @@ export function docTypeLabel(docType: string, customLabel?: string | null): stri
     docType.replace(/_/g, " ")
   );
 }
+
+export const OPTIONAL_DOCUMENT_TYPES = [
+  "general_information_sheet",
+  "secretary_certificate",
+  "iso_certification",
+  "pcab_license",
+  "other_licenses",
+] as const;
+
+const OPTIONAL_DOC_TYPE_SET = new Set<string>(OPTIONAL_DOCUMENT_TYPES);
+
+export const PAYMENT_REQUIRED_DOC_TYPES: string[] = DOCUMENT_TYPES.map(
+  (t) => t.id,
+).filter((id) => !OPTIONAL_DOC_TYPE_SET.has(id));
+
+export function getMissingPaymentRequiredDocTypes(
+  documents: Array<{ doc_type: string; status: string }>,
+): string[] {
+  const satisfied = new Set(
+    documents
+      .filter((d) => d.status === "submitted" || d.status === "approved")
+      .map((d) => d.doc_type),
+  );
+  return PAYMENT_REQUIRED_DOC_TYPES.filter((t) => !satisfied.has(t));
+}

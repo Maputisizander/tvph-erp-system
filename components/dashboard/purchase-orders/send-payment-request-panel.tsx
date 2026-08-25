@@ -8,44 +8,18 @@ import {
   Send,
   Loader2,
   FileText,
-  CheckCircle2,
   AlertCircle,
-  Clock,
   ShieldCheck,
   AlertTriangle,
 } from "lucide-react";
 import { createPaymentRequest } from "@/app/dashboard/purchase-orders/actions";
-import { docTypeLabel } from "@/lib/vendors/document-types";
+import {
+  docTypeLabel,
+  getMissingPaymentRequiredDocTypes,
+  OPTIONAL_DOCUMENT_TYPES,
+  PAYMENT_REQUIRED_DOC_TYPES,
+} from "@/lib/vendors/document-types";
 import { DocumentList } from "@/components/dashboard/vendors/document-list";
-
-const COMPLIANCE_DOC_TYPES = [
-  "signed_nda",
-  "statement_of_commitment",
-  "company_profile",
-  "products_services_list",
-  "vendor_information_summary",
-  "general_information_sheet",
-  "audited_financial_statements",
-  "sec_registration",
-  "secretary_certificate",
-  "safety_drug_policy",
-  "iso_certification",
-  "pcab_license",
-  "dole_174",
-  "other_licenses",
-];
-
-const OPTIONAL_COMPLIANCE_DOC_TYPES = [
-  "general_information_sheet",
-  "secretary_certificate",
-  "iso_certification",
-  "pcab_license",
-  "other_licenses",
-];
-
-const REQUIRED_COMPLIANCE_DOC_TYPES = COMPLIANCE_DOC_TYPES.filter(
-  (t) => !OPTIONAL_COMPLIANCE_DOC_TYPES.includes(t),
-);
 
 interface VendorDoc {
   id: string;
@@ -99,29 +73,26 @@ export function SendPaymentRequestPanel({
   );
   const [isDownpayment, setIsDownpayment] = useState(false);
 
-  const docStatusMap: Record<string, VendorDoc> = {};
-  for (const doc of vendorDocuments) {
-    docStatusMap[doc.doc_type] = doc;
-  }
-
-  const approvedDocs = REQUIRED_COMPLIANCE_DOC_TYPES.filter(
-    (t) => docStatusMap[t]?.status === "approved",
-  ).length;
-  const submittedDocs = REQUIRED_COMPLIANCE_DOC_TYPES.filter(
-    (t) =>
-      docStatusMap[t]?.status === "submitted" ||
-      docStatusMap[t]?.status === "approved",
-  ).length;
-  const totalDocs = REQUIRED_COMPLIANCE_DOC_TYPES.length;
-  const progressPercent = Math.round((submittedDocs / totalDocs) * 100);
   const isLegacy = poSource === "legacy";
-  const missingOrPending = isLegacy
-    ? []
-    : REQUIRED_COMPLIANCE_DOC_TYPES.filter(
-        (t) =>
-          docStatusMap[t]?.status !== "submitted" &&
-          docStatusMap[t]?.status !== "approved",
-      );
+  const totalDocs = PAYMENT_REQUIRED_DOC_TYPES.length;
+  const approvedTypes = new Set(
+    vendorDocuments
+      .filter((d) => d.status === "approved")
+      .map((d) => d.doc_type),
+  );
+  const satisfiedTypes = new Set(
+    vendorDocuments
+      .filter((d) => d.status === "submitted" || d.status === "approved")
+      .map((d) => d.doc_type),
+  );
+  const approvedDocs = PAYMENT_REQUIRED_DOC_TYPES.filter((t) =>
+    approvedTypes.has(t),
+  ).length;
+  const submittedDocs = PAYMENT_REQUIRED_DOC_TYPES.filter((t) =>
+    satisfiedTypes.has(t),
+  ).length;
+  const progressPercent = Math.round((submittedDocs / totalDocs) * 100);
+  const missingOrPending = isLegacy ? [] : getMissingPaymentRequiredDocTypes(vendorDocuments);
   const missingLabels = missingOrPending.map((t) => docTypeLabel(t));
   const hasComplianceGaps = !isLegacy && missingOrPending.length > 0;
 
@@ -225,7 +196,7 @@ export function SendPaymentRequestPanel({
               vendorId={vendorId}
               documents={vendorDocuments}
               userRole={userRole}
-              optionalDocTypes={OPTIONAL_COMPLIANCE_DOC_TYPES}
+              optionalDocTypes={[...OPTIONAL_DOCUMENT_TYPES]}
             />
           </div>
         </div>
