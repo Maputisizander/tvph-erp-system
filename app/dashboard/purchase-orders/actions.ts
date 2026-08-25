@@ -1760,26 +1760,29 @@ export async function createPaymentRequest(
 
   // ponytail: po + active-request check in parallel (was 2 sequential round-trips)
   const [{ data: po }, { data: activePR }] = await Promise.all([
-    supabase.from('purchase_orders').select('id, po_number, amount, project_id, vendor_id, vendors(name)').eq('id', poId).single(),
+    supabase.from('purchase_orders').select('id, po_number, amount, project_id, vendor_id, source, vendors(name)').eq('id', poId).single(),
     supabase.from('payment_requests').select('id').eq('po_id', poId).in('status', ['pending', 'approved']).limit(1).maybeSingle(),
   ]);
   if (!po) return { error: 'PO not found' };
   if (activePR) return { error: 'An active Payment Request already exists for this PO.' };
 
-  const { data: vendorDocs } = await supabase
-    .from('vendor_documents')
-    .select('doc_type, status')
-    .eq('vendor_id', po.vendor_id)
-    .in('doc_type', PAYMENT_REQUIRED_DOC_TYPES)
-    .is('archived_at', null);
+  // Legacy POs predate accreditation — guarantee they can request payment regardless of doc gaps. ERP stays strict.
+  if ((po as { source?: string }).source !== 'legacy') {
+    const { data: vendorDocs } = await supabase
+      .from('vendor_documents')
+      .select('doc_type, status')
+      .eq('vendor_id', po.vendor_id)
+      .in('doc_type', PAYMENT_REQUIRED_DOC_TYPES)
+      .is('archived_at', null);
 
-  const missingRequiredDocs = getMissingPaymentRequiredDocTypes(vendorDocs || []);
-  if (missingRequiredDocs.length > 0) {
-    return {
-      error: `Blocked: required accreditation document${missingRequiredDocs.length > 1 ? 's' : ''} ${missingRequiredDocs
-        .map((t) => docTypeLabel(t))
-        .join(', ')} ${missingRequiredDocs.length > 1 ? 'are' : 'is'} missing or not submitted. Complete vendor accreditation before sending a payment request.`,
-    };
+    const missingRequiredDocs = getMissingPaymentRequiredDocTypes(vendorDocs || []);
+    if (missingRequiredDocs.length > 0) {
+      return {
+        error: `Blocked: required accreditation document${missingRequiredDocs.length > 1 ? 's' : ''} ${missingRequiredDocs
+          .map((t) => docTypeLabel(t))
+          .join(', ')} ${missingRequiredDocs.length > 1 ? 'are' : 'is'} missing or not submitted. Complete vendor accreditation before sending a payment request.`,
+      };
+    }
   }
 
   let percentComplete: number | null = null;
