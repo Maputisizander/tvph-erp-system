@@ -191,8 +191,8 @@ export function NewClientInvoiceForm({ initialAccountId }: { initialAccountId?: 
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/10">
                   <th className={`${thClass} w-12`}>S/N</th>
-                  <th className={thClass}>Region</th>
-                  <th className={thClass}>Area / City</th>
+                  <th className={`${thClass} min-w-[168px]`}>Region</th>
+                  <th className={`${thClass} min-w-[168px]`}>Area / City</th>
                   <th className={`${thClass} w-28`}>Node ID</th>
                   <th className={`${thClass} w-20`}>Phase</th>
                   <th className={`${thClass} w-24`}>Nodes</th>

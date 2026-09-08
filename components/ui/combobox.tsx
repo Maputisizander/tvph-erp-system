@@ -129,6 +129,7 @@ export function Combobox({ options, value, onChange, placeholder, className = ""
         onFocus={openDropdown}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
+        title={input || value}
         className="w-full px-3 py-2 bg-white dark:bg-[#0a0a0a] border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
         autoComplete="off"
       />
