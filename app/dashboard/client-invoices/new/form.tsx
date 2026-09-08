@@ -127,7 +127,7 @@ export function NewClientInvoiceForm({ initialAccountId }: { initialAccountId?: 
   };
 
   return (
-    <div className="p-6 lg:p-8 max-w-3xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center gap-3">
         <Link href="/dashboard/client-invoices" className="p-2 -ml-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"><ArrowLeft className="h-5 w-5" /></Link>
         <div>
@@ -194,9 +194,9 @@ export function NewClientInvoiceForm({ initialAccountId }: { initialAccountId?: 
                   <th className={`${thClass} min-w-[168px]`}>Region</th>
                   <th className={`${thClass} min-w-[168px]`}>Area / City</th>
                   <th className={`${thClass} min-w-[140px]`}>Node ID</th>
-                  <th className={`${thClass} w-20`}>Phase</th>
-                  <th className={`${thClass} w-24`}>Nodes</th>
-                  <th className={`${thClass} w-28`}>Cable (KM)</th>
+                  <th className={`${thClass} min-w-[80px]`}>Phase</th>
+                  <th className={`${thClass} min-w-[100px]`}>Nodes</th>
+                  <th className={`${thClass} min-w-[120px]`}>Cable (KM)</th>
                   <th className={`${thClass} w-16 text-center`}>MRS</th>
                   <th className={`${thClass} w-10`}></th>
                 </tr>

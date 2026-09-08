@@ -122,7 +122,7 @@ export function BillingNodesEditor({ billingId, initialNodes }: { billingId: str
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead><tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/10">
-            <th className={`${th} w-10`}>S/N</th><th className={`${th} min-w-[168px]`}>Region</th><th className={`${th} min-w-[168px]`}>Area / City</th><th className={`${th} min-w-[140px]`}>Node ID</th><th className={`${th} w-20`}>Phase</th><th className={`${th} w-20`}>Nodes</th><th className={`${th} w-28`}>Cable (KM)</th><th className={`${th} w-14 text-center`}>MRS</th><th className={`${th} w-10`}></th>
+            <th className={`${th} w-10`}>S/N</th><th className={`${th} min-w-[168px]`}>Region</th><th className={`${th} min-w-[168px]`}>Area / City</th><th className={`${th} min-w-[140px]`}>Node ID</th><th className={`${th} min-w-[80px]`}>Phase</th><th className={`${th} min-w-[100px]`}>Nodes</th><th className={`${th} min-w-[120px]`}>Cable (KM)</th><th className={`${th} w-14 text-center`}>MRS</th><th className={`${th} w-10`}></th>
           </tr></thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
             {nodes.map((n, idx) => (
