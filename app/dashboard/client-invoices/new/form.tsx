@@ -193,7 +193,7 @@ export function NewClientInvoiceForm({ initialAccountId }: { initialAccountId?: 
                   <th className={`${thClass} w-12`}>S/N</th>
                   <th className={`${thClass} min-w-[168px]`}>Region</th>
                   <th className={`${thClass} min-w-[168px]`}>Area / City</th>
-                  <th className={`${thClass} w-28`}>Node ID</th>
+                  <th className={`${thClass} min-w-[140px]`}>Node ID</th>
                   <th className={`${thClass} w-20`}>Phase</th>
                   <th className={`${thClass} w-24`}>Nodes</th>
                   <th className={`${thClass} w-28`}>Cable (KM)</th>
@@ -207,7 +207,7 @@ export function NewClientInvoiceForm({ initialAccountId }: { initialAccountId?: 
                     <td className={`${tdClass} text-center text-slate-400 font-mono text-xs`}>{idx + 1}</td>
                     <td className={tdClass}><Combobox options={REGION_NAMES} value={n.region} onChange={v => { updateNode(idx, "region", v); const a = areaByRegion[v] || []; if (!a.includes(n.area_city)) updateNode(idx, "area_city", ""); }} placeholder="Region" /></td>
                     <td className={tdClass}><Combobox options={areaByRegion[n.region] || []} value={n.area_city} onChange={v => updateNode(idx, "area_city", v)} placeholder="Area / City" /></td>
-                    <td className={tdClass}><input type="text" value={n.node_id} onChange={e => updateNode(idx, "node_id", e.target.value)} onPaste={handleNodeIdPaste} className={inputClass} placeholder="e.g. MN113" /></td>
+                    <td className={tdClass}><input type="text" value={n.node_id} title={n.node_id} onChange={e => updateNode(idx, "node_id", e.target.value)} onPaste={handleNodeIdPaste} className={inputClass} placeholder="e.g. MN113" /></td>
                     <td className={tdClass}><input type="text" value={n.phase} onChange={e => updateNode(idx, "phase", e.target.value)} className={inputClass} placeholder="Phase" /></td>
                     <td className={tdClass}><input type="number" min="0" value={n.no_of_nodes || ""} onChange={e => updateNode(idx, "no_of_nodes", parseInt(e.target.value) || 0)} className={`${inputClass} text-right`} placeholder="0" /></td>
                     <td className={tdClass}><input type="number" min="0" step="any" value={n.cable_length_km || ""} onChange={e => updateNode(idx, "cable_length_km", parseFloat(e.target.value) || 0)} className={`${inputClass} text-right`} placeholder="0.00" /></td>

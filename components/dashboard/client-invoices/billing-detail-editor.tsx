@@ -220,7 +220,7 @@ export function BillingDetailEditor({ billingId, row, initialNodes, projects }: 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/10">
-              <th className={`${th} w-10`}>S/N</th><th className={`${th} min-w-[168px]`}>Region</th><th className={`${th} min-w-[168px]`}>Area / City</th><th className={`${th} w-28`}>Node ID</th><th className={`${th} w-20`}>Phase</th><th className={`${th} w-20`}>Nodes</th><th className={`${th} w-28`}>Cable (KM)</th><th className={`${th} w-14 text-center`}>MRS</th><th className={`${th} w-10`}></th>
+              <th className={`${th} w-10`}>S/N</th><th className={`${th} min-w-[168px]`}>Region</th><th className={`${th} min-w-[168px]`}>Area / City</th><th className={`${th} min-w-[140px]`}>Node ID</th><th className={`${th} w-20`}>Phase</th><th className={`${th} w-20`}>Nodes</th><th className={`${th} w-28`}>Cable (KM)</th><th className={`${th} w-14 text-center`}>MRS</th><th className={`${th} w-10`}></th>
             </tr></thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
               {nodes.map((n, idx) => (
@@ -228,7 +228,7 @@ export function BillingDetailEditor({ billingId, row, initialNodes, projects }: 
                   <td className={`${td} text-center text-slate-400 font-mono text-xs`}>{idx + 1}</td>
                   <td className={td}><Combobox options={REGION_NAMES} value={n.region} onChange={v => { updateNode(idx, "region", v); const a = areaByRegion[v] || []; if (!a.includes(n.area_city)) updateNode(idx, "area_city", ""); }} placeholder="Region" /></td>
                   <td className={td}><Combobox options={areaByRegion[n.region] || []} value={n.area_city} onChange={v => updateNode(idx, "area_city", v)} placeholder="Area / City" /></td>
-                  <td className={td}><input type="text" value={n.node_id} onChange={e => updateNode(idx, "node_id", e.target.value)} onPaste={handlePaste} className={inpDark} placeholder="MN113" /></td>
+                  <td className={td}><input type="text" value={n.node_id} title={n.node_id} onChange={e => updateNode(idx, "node_id", e.target.value)} onPaste={handlePaste} className={inpDark} placeholder="MN113" /></td>
                   <td className={td}><input type="text" value={n.phase} onChange={e => updateNode(idx, "phase", e.target.value)} className={inpDark} /></td>
                   <td className={td}><input type="number" min="0" value={n.no_of_nodes || ""} onChange={e => updateNode(idx, "no_of_nodes", parseInt(e.target.value) || 0)} className={`${inpDark} text-right`} /></td>
                   <td className={td}><input type="number" min="0" step="any" value={n.cable_length_km || ""} onChange={e => updateNode(idx, "cable_length_km", parseFloat(e.target.value) || 0)} className={`${inpDark} text-right`} /></td>
