@@ -191,6 +191,7 @@ export async function createClientBilling(formData: FormData) {
   } catch {}
 
   revalidatePath("/dashboard/client-invoices");
+  revalidatePath("/dashboard");
   return { success: true, id: row.id };
 }
 
@@ -233,11 +234,13 @@ export async function transitionBillingStatus(
     if ((r1 as any).error) return r1;
     revalidatePath("/dashboard/client-invoices");
     revalidatePath(`/dashboard/client-invoices/${billingId}`);
+    revalidatePath("/dashboard");
     // auto second hop
     const r2 = await writeTransition(billingId, "for_payment", "pending_payment", user.id, supabase);
     if ((r2 as any).error) return r2;
     revalidatePath("/dashboard/client-invoices");
     revalidatePath(`/dashboard/client-invoices/${billingId}`);
+    revalidatePath("/dashboard");
     return { success: true };
   }
   if (!canTransition(from, toStatus)) {
@@ -258,6 +261,7 @@ export async function transitionBillingStatus(
 
   revalidatePath("/dashboard/client-invoices");
   revalidatePath(`/dashboard/client-invoices/${billingId}`);
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -331,6 +335,7 @@ export async function updateClientBilling(billingId: string, formData: FormData)
   await recordAuditLog({ entity_type: "client_billing", entity_id: billingId, action: "UPDATE", changes: { after: patch }, performed_by: user.id });
   revalidatePath("/dashboard/client-invoices");
   revalidatePath(`/dashboard/client-invoices/${billingId}`);
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -364,6 +369,7 @@ export async function updateClientBillingNodes(billingId: string, formData: Form
   await supabase.from("client_billing").update(patch).eq("id", billingId);
   revalidatePath("/dashboard/client-invoices");
   revalidatePath(`/dashboard/client-invoices/${billingId}`);
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -374,6 +380,7 @@ export async function deleteClientBilling(billingId: string) {
   const { error } = await supabase.from("client_billing").update({ deleted_at: new Date().toISOString() }).eq("id", billingId);
   if (error) return { error: error.message };
   revalidatePath("/dashboard/client-invoices");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -539,5 +546,6 @@ export async function importClientBilling(formData: FormData) {
     performed_by: user.id,
   });
   revalidatePath("/dashboard/client-invoices");
+  revalidatePath("/dashboard");
   return { created, updated, errors, totalRows: rows.length };
 }

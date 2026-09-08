@@ -384,7 +384,7 @@ export async function DashboardContent() {
                 Accounts Receivable — Client Collections
               </h3>
               <div className="grid grid-cols-3 gap-3">
-                <StatChip label="Collected" value={arCollectedThisMonth} color="emerald" />
+                <StatChip label="Collected this month" value={arCollectedThisMonth} color="emerald" />
                 <StatChip label="Outstanding" value={arOutstanding} color="amber" />
                 <StatChip label="Overdue" value={arOverdue} color="red" />
               </div>
