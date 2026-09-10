@@ -13,16 +13,22 @@ const NEXT: Record<string, { label: string; to: string; variant: string }[]> = {
   pending_payment: [{ label: "Mark Collected", to: "collected", variant: "bg-emerald-600 hover:bg-emerald-700" }],
 };
 
+function phToday(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+}
+
 export function TransitionPanel({ billingId, status, invoiceNumber, invoiceBatch }: { billingId: string; status: string; invoiceNumber?: string | null; invoiceBatch?: string | null }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ to: string; label: string } | null>(null);
   const [invNum, setInvNum] = useState("");
   const [invBatch, setInvBatch] = useState("");
+  const [collectedDate, setCollectedDate] = useState("");
 
   const actions = NEXT[status] || [];
 
   const needsInvoice = confirm?.to === "for_payment" && status === "pending_sky_technical";
+  const needsCollectedDate = confirm?.to === "collected" && status === "pending_payment";
 
   const doTransition = () => {
     if (!confirm) return;
@@ -30,9 +36,21 @@ export function TransitionPanel({ billingId, status, invoiceNumber, invoiceBatch
       setError("Invoice number is required to approve.");
       return;
     }
+    if (needsCollectedDate) {
+      if (!collectedDate) {
+        setError("Collected date is required.");
+        return;
+      }
+      if (collectedDate > phToday()) {
+        setError("Collected date cannot be in the future.");
+        return;
+      }
+    }
     setError(null);
     const to = confirm.to;
-    const opts = needsInvoice ? { invoice_number: invNum.trim() || undefined, invoice_batch: invBatch.trim() || undefined } : undefined;
+    let opts: any = undefined;
+    if (needsInvoice) opts = { invoice_number: invNum.trim() || undefined, invoice_batch: invBatch.trim() || undefined };
+    else if (needsCollectedDate) opts = { collected_date: collectedDate };
     startTransition(async () => {
       const res = await transitionBillingStatus(billingId, to, undefined, opts as any);
       if ((res as any)?.error) setError((res as any).error);
@@ -63,6 +81,7 @@ export function TransitionPanel({ billingId, status, invoiceNumber, invoiceBatch
                 setError(null);
                 setInvNum(invoiceNumber || "");
                 setInvBatch(invoiceBatch || "");
+                setCollectedDate(phToday());
                 setConfirm({ to: a.to, label: a.label });
               }}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50 ${a.variant}`}
@@ -95,6 +114,16 @@ export function TransitionPanel({ billingId, status, invoiceNumber, invoiceBatch
                   <div>
                     <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Invoice Batch</label>
                     <input value={invBatch} onChange={e => setInvBatch(e.target.value)} placeholder="e.g. QC 22" className="w-full rounded-xl px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0a0a0a] text-slate-900 dark:text-white" />
+                  </div>
+                </div>
+              )}
+              {needsCollectedDate && (
+                <div className="space-y-3 p-4 rounded-xl bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-200/50 dark:border-emerald-800/30">
+                  <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Collection date (PH time):</p>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Collected Date <span className="text-rose-500">*</span></label>
+                    <input type="date" value={collectedDate} max={phToday()} onChange={e => setCollectedDate(e.target.value)} className="w-full rounded-xl px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0a0a0a] text-slate-900 dark:text-white" />
+                    <p className="text-[11px] text-slate-400 mt-1">Defaults to today. You can backdate to any past date.</p>
                   </div>
                 </div>
               )}

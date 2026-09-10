@@ -44,7 +44,7 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
 
   let query = supabase
     .from('client_billing')
-    .select('id, invoice_number, invoice_batch, region, num_nodes, date_issued, date_endorsed, due_date, est_payment_date, amount_vat_ex, amount_vat_inc, status, project_name_free, crm_accounts(company_name), projects(name)', { count: 'exact' })
+    .select('id, invoice_number, invoice_batch, region, num_nodes, date_issued, date_endorsed, due_date, est_payment_date, collected_at, amount_vat_ex, amount_vat_inc, status, project_name_free, crm_accounts(company_name), projects(name)', { count: 'exact' })
     .is('deleted_at', null)
     .order('date_issued', { ascending: false });
 
@@ -151,7 +151,7 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
                     <tr key={r.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
                       <td className="px-6 py-4">
                         <div className="font-bold text-slate-900 dark:text-white">{r.invoice_number || '—'}</div>
-                        <div className="text-xs text-slate-400 flex items-center gap-1"><Clock className="h-3 w-3" /> {r.date_issued ? new Date(r.date_issued).toLocaleDateString() : '—'}</div>
+                        <div className="text-xs text-slate-400 flex items-center gap-1"><Clock className="h-3 w-3" /> {r.date_issued ? new Date(r.date_issued).toLocaleDateString("en-US", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" }) : '—'}</div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="font-medium text-slate-900 dark:text-white">{r.crm_accounts?.company_name || '—'}</div>
@@ -165,12 +165,14 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
                       </td>
                       <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">₱ {Number(r.amount_vat_inc || 0).toLocaleString()}</td>
                       <td className="px-6 py-4">
-                        <div className="text-xs text-slate-600 dark:text-slate-400">{r.due_date ? new Date(r.due_date).toLocaleDateString() : '—'}</div>
-                        {ag.band && (
+                        <div className="text-xs text-slate-600 dark:text-slate-400">{r.due_date ? new Date(r.due_date).toLocaleDateString("en-US", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" }) : '—'}</div>
+                        {r.status === "collected" && r.collected_at ? (
+                          <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400">{new Date(r.collected_at).toLocaleDateString("en-US", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" })}</span>
+                        ) : ag.band ? (
                           <span className={`mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap ${agingBadgeClasses(ag.band)}`}>{agingLabel(ag.band, ag.daysDelayed)}</span>
-                        )}
+                        ) : null}
                       </td>
-                      <td className="px-6 py-4"><span title={r.status === "pending_sky_technical" ? "Submitted to Sky Technical" : undefined} className={`inline-flex items-center rounded-full font-bold border whitespace-nowrap ${r.status === "pending_sky_technical" ? "text-[9px] px-2 py-0.5" : "text-[10px] px-2.5 py-1"} ${billingStatusBadgeClasses(r.status)}`}>{billingStatusShortLabel(r.status).toUpperCase()}</span></td>
+                      <td className="px-6 py-4"><span title={r.status === "pending_sky_technical" ? "Submitted to Sky Technical" : undefined} className={`inline-flex items-center rounded-full font-bold border whitespace-nowrap ${r.status === "pending_sky_technical" ? "text-[9px] px-2 py-0.5" : "text-[10px] px-2.5 py-1"} ${billingStatusBadgeClasses(r.status)}`}>{billingStatusShortLabel(r.status).toUpperCase()}</span>{r.status === "collected" && r.collected_at ? <div className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">{new Date(r.collected_at).toLocaleDateString("en-US", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" })}</div> : null}</td>
                       <td className="px-6 py-4 text-right">
                         <Link href={`/dashboard/client-invoices/${r.id}`} className="inline-flex items-center justify-center h-8 w-8 rounded-lg text-slate-400 group-hover:text-primary group-hover:bg-primary/10 transition-colors"><ChevronRight className="h-5 w-5" /></Link>
                       </td>

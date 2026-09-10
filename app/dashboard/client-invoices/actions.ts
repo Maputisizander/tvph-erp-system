@@ -20,6 +20,14 @@ function todayISO(): string {
   return new Date().toISOString().split("T")[0]!;
 }
 
+function phTodayISO(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+}
+
+function phDateToTimestamptz(dateStr: string): string {
+  return new Date(`${dateStr}T12:00:00+08:00`).toISOString();
+}
+
 function addDaysISO(dateStr: string, days: number): string {
   return new Date(new Date(dateStr).getTime() + days * 86400000).toISOString().split("T")[0]!;
 }
@@ -53,6 +61,7 @@ async function writeTransition(
   userId: string,
   supabase: any,
   note?: string | null,
+  collectedDate?: string | null,
 ) {
   const now = new Date().toISOString();
   const patch: Record<string, any> = { status: to, updated_at: now };
@@ -61,7 +70,15 @@ async function writeTransition(
     const { data: cur } = await supabase.from("client_billing").select("date_endorsed").eq("id", billingId).single();
     if (!cur?.date_endorsed) patch.date_endorsed = todayISO();
   }
-  if (to === "collected") patch.collected_at = now;
+  if (to === "collected") {
+    if (collectedDate) {
+      const todayPH = phTodayISO();
+      if (collectedDate > todayPH) return { error: "Collected date cannot be in the future." };
+      patch.collected_at = phDateToTimestamptz(collectedDate);
+    } else {
+      patch.collected_at = now;
+    }
+  }
   const { error } = await supabase.from("client_billing").update(patch).eq("id", billingId);
   if (error) return { error: error.message };
   await supabase.from("client_billing_timeline").insert({
@@ -199,7 +216,7 @@ export async function transitionBillingStatus(
   billingId: string,
   toStatus: string,
   note?: string,
-  opts?: { invoice_number?: string | null; invoice_batch?: string | null },
+  opts?: { invoice_number?: string | null; invoice_batch?: string | null; collected_date?: string | null },
 ) {
   const supabase = await createClient();
   // Collected is finance-gated; everything else is plain write
@@ -250,8 +267,8 @@ export async function transitionBillingStatus(
     }
   }
 
-  // Normal single hop
-  const res = await writeTransition(billingId, from, toStatus, user.id, supabase, note);
+  // Normal single hop — pass collected_date when marking collected
+  const res = await writeTransition(billingId, from, toStatus, user.id, supabase, note, opts?.collected_date ?? null);
   if ((res as any).error) return res;
 
   // Auto: For Payment -> Pending Payment (so endorsed rows immediately enter aging)

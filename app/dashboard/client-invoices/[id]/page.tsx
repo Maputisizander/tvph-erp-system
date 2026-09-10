@@ -31,6 +31,7 @@ async function Content({ paramsPromise }: { paramsPromise: Promise<{ id: string 
 
   if (error || !row) notFound();
   const ag = agingBand(row);
+  const fmtPH = (v: string | null | undefined) => v ? new Date(v).toLocaleDateString("en-US", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" }) : "—";
 
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -122,11 +123,12 @@ async function Content({ paramsPromise }: { paramsPromise: Promise<{ id: string 
                 <Timeline items={items} showTimestamps timestampPosition="top" />
               )}
             </div>
-            <div className="px-6 py-4 bg-slate-50/50 dark:bg-white/[0.02] border-t border-slate-100 dark:border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div><span className="text-slate-400">Issued</span><p className="font-medium text-slate-700 dark:text-slate-300">{row.date_issued ? new Date(row.date_issued).toLocaleDateString() : '—'}</p></div>
-              <div><span className="text-slate-400">Endorsed</span><p className="font-medium text-slate-700 dark:text-slate-300">{row.date_endorsed ? new Date(row.date_endorsed).toLocaleDateString() : '—'}</p></div>
-              <div><span className="text-slate-400">Due</span><p className="font-medium text-slate-700 dark:text-slate-300">{row.due_date ? new Date(row.due_date).toLocaleDateString() : '—'}</p></div>
-              <div><span className="text-slate-400">Est Pay</span><p className="font-medium text-slate-700 dark:text-slate-300">{row.est_payment_date ? new Date(row.est_payment_date).toLocaleDateString() : '—'}</p></div>
+            <div className="px-6 py-4 bg-slate-50/50 dark:bg-white/[0.02] border-t border-slate-100 dark:border-white/10 grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+              <div><span className="text-slate-400">Issued</span><p className="font-medium text-slate-700 dark:text-slate-300">{fmtPH(row.date_issued)}</p></div>
+              <div><span className="text-slate-400">Endorsed</span><p className="font-medium text-slate-700 dark:text-slate-300">{fmtPH(row.date_endorsed)}</p></div>
+              <div><span className="text-slate-400">Due</span><p className="font-medium text-slate-700 dark:text-slate-300">{fmtPH(row.due_date)}</p></div>
+              <div><span className="text-slate-400">Est Pay</span><p className="font-medium text-slate-700 dark:text-slate-300">{fmtPH(row.est_payment_date)}</p></div>
+              <div><span className="text-slate-400">Collected</span><p className="font-medium text-emerald-700 dark:text-emerald-400">{row.collected_at ? fmtPH(row.collected_at) : '—'}</p></div>
             </div>
           </div>
         );
