@@ -82,19 +82,25 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
 
   query = applyFilters(query);
 
-  const { data: rows, error, count } = await query.range(from, to);
-
-  // filter options (for MoreFilters dropdowns)
-  const [{ data: accountOpts }, { data: projectOpts }, { data: batchRows }, { data: regionRows }] = await Promise.all([
+  // kick off independent queries in parallel to cut 5-6s sequential time down to ~1 roundtrip
+  const rowsPromise = query.range(from, to);
+  const filterOptsPromise = Promise.all([
     supabase.from('crm_accounts').select('id, company_name').is('deleted_at', null).order('company_name').limit(100),
     supabase.from('projects').select('id, name').is('deleted_at', null).order('name').limit(100),
     supabase.from('client_billing').select('invoice_batch').is('deleted_at', null).not('invoice_batch', 'is', null).limit(200),
     supabase.from('client_billing').select('region').is('deleted_at', null).not('region', 'is', null).limit(200),
   ]);
+  let summaryQuery = supabase.from('client_billing').select('amount_vat_inc, status, due_date').is('deleted_at', null);
+  summaryQuery = applyFilters(summaryQuery);
+  const summaryPromise = summaryQuery.limit(2000);
+
+  const [{ data: rows, error, count }, filterOpts, summaryRes] = await Promise.all([rowsPromise, filterOptsPromise, summaryPromise]);
+  const [{ data: accountOpts }, { data: projectOpts }, { data: batchRows }, { data: regionRows }] = filterOpts as any;
   const batches = Array.from(new Set((batchRows as any[] || []).map(r=>r.invoice_batch).filter(Boolean))).sort();
   const regions = Array.from(new Set((regionRows as any[] || []).map(r=>r.region).filter(Boolean))).sort();
+  const summaryRows = (summaryRes as any).data as any[] | null;
 
-  // MRS summary per billing on this page
+  // MRS summary per billing on this page (depends on rows, so after)
   const mrsMap = new Map<string, { total: number; withMrs: number }>();
   if (rows?.length) {
     const ids = rows.map((r: any) => r.id);
@@ -106,11 +112,6 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
       mrsMap.set(n.billing_id, cur);
     }
   }
-
-  // summary for the *filtered* set (not just current page) — ponytail: one extra query, JS sum
-  let summaryQuery = supabase.from('client_billing').select('amount_vat_inc, status, due_date').is('deleted_at', null);
-  summaryQuery = applyFilters(summaryQuery);
-  const { data: summaryRows } = await summaryQuery.limit(2000);
   const filteredCount = summaryRows?.length ?? count ?? 0;
   const filteredSum = (summaryRows ?? []).reduce((a: number, r: any) => a + Number(r.amount_vat_inc || 0), 0);
   const overdueSum = (summaryRows ?? []).filter((r: any) => r.due_date && ['for_payment', 'pending_payment'].includes(r.status) && r.due_date < todayStr).reduce((a: number, r: any) => a + Number(r.amount_vat_inc || 0), 0);
