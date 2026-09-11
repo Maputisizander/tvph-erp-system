@@ -1,8 +1,78 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo, useRef, useEffect } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { SlidersHorizontal, X } from "lucide-react";
+import { SlidersHorizontal, X, Search } from "lucide-react";
+
+function SearchableSelect({
+  value,
+  options,
+  placeholder,
+  onChange,
+}: {
+  value: string;
+  options: { value: string; label: string }[];
+  placeholder: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const selectedLabel = options.find((o) => o.value === value)?.label ?? "";
+  // when value changes externally, sync q if not typing
+  useEffect(() => {
+    if (!open) setQ(selectedLabel);
+  }, [selectedLabel, open]);
+  useEffect(() => {
+    if (open) setQ(selectedLabel);
+  }, [open]); // eslint-disable-line
+  const filtered = useMemo(() => {
+    if (!q) return options;
+    const needle = q.toLowerCase();
+    return options.filter((o) => o.label.toLowerCase().includes(needle));
+  }, [options, q]);
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+        <input
+          value={open ? q : selectedLabel}
+          placeholder={placeholder}
+          onFocus={() => { setOpen(true); setQ(selectedLabel); }}
+          onChange={(e) => { setQ(e.target.value); setOpen(true); if (e.target.value === "") onChange(""); }}
+          className="w-full pl-8 pr-3 py-2 bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+        />
+      </div>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full bg-white dark:bg-[#0a0a0a] border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+          <button
+            onClick={() => { onChange(""); setQ(""); setOpen(false); }}
+            className={`w-full text-left px-3 py-2 text-sm ${!value ? "bg-primary/10 text-primary font-medium" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}
+          >
+            {placeholder}
+          </button>
+          {filtered.map((o) => (
+            <button
+              key={o.value}
+              onClick={() => { onChange(o.value); setQ(o.label); setOpen(false); }}
+              className={`w-full text-left px-3 py-2 text-sm ${value === o.value ? "bg-primary/10 text-primary font-medium" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}
+            >
+              {o.label}
+            </button>
+          ))}
+          {filtered.length === 0 && <p className="px-3 py-2 text-xs text-slate-400">No match</p>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function MoreFilters({
   accounts,
@@ -43,7 +113,6 @@ export function MoreFilters({
     });
   };
 
-  const sel = "w-full px-3 py-2 bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary";
   const inp = "w-full px-3 py-2 bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary";
 
   return (
@@ -68,31 +137,39 @@ export function MoreFilters({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Client</label>
-              <select value={searchParams.get("client") || "all"} onChange={e=>update("client", e.target.value==="all"?"":e.target.value)} className={sel}>
-                <option value="all">All Clients</option>
-                {accounts.map(a=> <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
+              <SearchableSelect
+                value={searchParams.get("client") || ""}
+                placeholder="All Clients"
+                options={accounts.map(a=>({ value: a.id, label: a.name }))}
+                onChange={v=>update("client", v)}
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Project</label>
-              <select value={searchParams.get("project") || "all"} onChange={e=>update("project", e.target.value==="all"?"":e.target.value)} className={sel}>
-                <option value="all">All Projects</option>
-                {projects.map(p=> <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              <SearchableSelect
+                value={searchParams.get("project") || ""}
+                placeholder="All Projects"
+                options={projects.map(p=>({ value: p.id, label: p.name }))}
+                onChange={v=>update("project", v)}
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Region</label>
-              <select value={searchParams.get("region") || "all"} onChange={e=>update("region", e.target.value==="all"?"":e.target.value)} className={sel}>
-                <option value="all">All Regions</option>
-                {regions.map(r=> <option key={r} value={r}>{r}</option>)}
-              </select>
+              <SearchableSelect
+                value={searchParams.get("region") || ""}
+                placeholder="All Regions"
+                options={regions.map(r=>({ value: r, label: r }))}
+                onChange={v=>update("region", v)}
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Batch</label>
-              <select value={searchParams.get("batch") || "all"} onChange={e=>update("batch", e.target.value==="all"?"":e.target.value)} className={sel}>
-                <option value="all">All Batches</option>
-                {batches.map(b=> <option key={b} value={b}>{b}</option>)}
-              </select>
+              <SearchableSelect
+                value={searchParams.get("batch") || ""}
+                placeholder="All Batches"
+                options={batches.map(b=>({ value: b, label: b }))}
+                onChange={v=>update("batch", v)}
+              />
             </div>
           </div>
 
