@@ -17,7 +17,7 @@ function phToday(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 }
 
-export function TransitionPanel({ billingId, status, invoiceNumber, invoiceBatch }: { billingId: string; status: string; invoiceNumber?: string | null; invoiceBatch?: string | null }) {
+export function TransitionPanel({ billingId, status, invoiceNumber, invoiceBatch, estPaymentDate }: { billingId: string; status: string; invoiceNumber?: string | null; invoiceBatch?: string | null; estPaymentDate?: string | null }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ to: string; label: string } | null>(null);
@@ -81,7 +81,9 @@ export function TransitionPanel({ billingId, status, invoiceNumber, invoiceBatch
                 setError(null);
                 setInvNum(invoiceNumber || "");
                 setInvBatch(invoiceBatch || "");
-                setCollectedDate(phToday());
+                // ponytail: default to Estimated Payment Date when present (matches CSV backfill), else today PH
+                const def = estPaymentDate && estPaymentDate <= phToday() ? estPaymentDate : phToday();
+                setCollectedDate(def);
                 setConfirm({ to: a.to, label: a.label });
               }}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50 ${a.variant}`}
@@ -123,7 +125,7 @@ export function TransitionPanel({ billingId, status, invoiceNumber, invoiceBatch
                   <div>
                     <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Collected Date <span className="text-rose-500">*</span></label>
                     <input type="date" value={collectedDate} max={phToday()} onChange={e => setCollectedDate(e.target.value)} className="w-full rounded-xl px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0a0a0a] text-slate-900 dark:text-white" />
-                    <p className="text-[11px] text-slate-400 mt-1">Defaults to today. You can backdate to any past date.</p>
+                    <p className="text-[11px] text-slate-400 mt-1">Defaults to Estimated Payment Date when set, else today. You can backdate to any past date.</p>
                   </div>
                 </div>
               )}

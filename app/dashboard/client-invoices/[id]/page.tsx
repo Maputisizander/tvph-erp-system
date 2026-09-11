@@ -71,7 +71,7 @@ async function Content({ paramsPromise }: { paramsPromise: Promise<{ id: string 
         </div>
       </div>
 
-      <TransitionPanel billingId={row.id} status={row.status} invoiceNumber={row.invoice_number} invoiceBatch={row.invoice_batch} />
+      <TransitionPanel billingId={row.id} status={row.status} invoiceNumber={row.invoice_number} invoiceBatch={row.invoice_batch} estPaymentDate={row.est_payment_date} />
 
       <BillingDetailEditor
         billingId={row.id}
