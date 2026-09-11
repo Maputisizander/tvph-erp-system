@@ -7,6 +7,7 @@ import { StatusSelect } from '@/components/ui/status-select';
 import { Pagination } from '@/components/ui/pagination';
 import { LIST_PAGE_SIZE, parsePage, pageRange } from '@/components/ui/pagination-utils';
 import { billingStatusBadgeClasses, billingStatusShortLabel, agingBand, agingBadgeClasses, agingLabel } from '@/lib/billing/status';
+import { MoreFilters } from '@/components/dashboard/client-invoices/more-filters';
 
 export default function ClientInvoicesPage(props: {
   searchParams?: Promise<{ q?: string; status?: string; aging?: string; page?: string }>;
@@ -24,6 +25,22 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
   const q = searchParams?.q || '';
   const statusFilter = searchParams?.status || 'all';
   const agingFilter = searchParams?.aging || 'all';
+  const clientFilter = searchParams?.client || '';
+  const projectFilter = searchParams?.project || '';
+  const regionFilter = searchParams?.region || '';
+  const batchFilter = searchParams?.batch || '';
+  const amountMin = searchParams?.amountMin ? Number(searchParams.amountMin) : null;
+  const amountMax = searchParams?.amountMax ? Number(searchParams.amountMax) : null;
+  const issuedFrom = searchParams?.issuedFrom || '';
+  const issuedTo = searchParams?.issuedTo || '';
+  const dueFrom = searchParams?.dueFrom || '';
+  const dueTo = searchParams?.dueTo || '';
+  const estFrom = searchParams?.estFrom || '';
+  const estTo = searchParams?.estTo || '';
+  const collectedFrom = searchParams?.collectedFrom || '';
+  const collectedTo = searchParams?.collectedTo || '';
+  const endorsedFrom = searchParams?.endorsedFrom || '';
+  const endorsedTo = searchParams?.endorsedTo || '';
   const page = parsePage(searchParams?.page);
   const [from, to] = pageRange(page, LIST_PAGE_SIZE);
   const todayStr = new Date().toISOString().split("T")[0]!;
@@ -34,11 +51,26 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
     if (q) q_ = q_.or(`invoice_number.ilike.%${q}%,invoice_batch.ilike.%${q}%`);
     if (statusFilter !== 'all') q_ = q_.eq('status', statusFilter);
     if (agingFilter !== 'all') {
-      // aging only meaningful for payment phases; other statuses yield empty
       if (agingFilter === 'overdue') q_ = q_.in('status', ['for_payment', 'pending_payment']).lt('due_date', todayStr);
       else if (agingFilter === 'close_due') q_ = q_.in('status', ['for_payment', 'pending_payment']).gte('due_date', todayStr).lte('due_date', plusDays(todayStr, 7));
       else if (agingFilter === 'healthy') q_ = q_.in('status', ['for_payment', 'pending_payment']).gt('due_date', plusDays(todayStr, 7));
     }
+    if (clientFilter) q_ = q_.eq('account_id', clientFilter);
+    if (projectFilter) q_ = q_.eq('project_id', projectFilter);
+    if (regionFilter) q_ = q_.eq('region', regionFilter);
+    if (batchFilter) q_ = q_.eq('invoice_batch', batchFilter);
+    if (amountMin != null && !isNaN(amountMin)) q_ = q_.gte('amount_vat_inc', amountMin);
+    if (amountMax != null && !isNaN(amountMax)) q_ = q_.lte('amount_vat_inc', amountMax);
+    if (issuedFrom) q_ = q_.gte('date_issued', issuedFrom);
+    if (issuedTo) q_ = q_.lte('date_issued', issuedTo);
+    if (dueFrom) q_ = q_.gte('due_date', dueFrom);
+    if (dueTo) q_ = q_.lte('due_date', dueTo);
+    if (estFrom) q_ = q_.gte('est_payment_date', estFrom);
+    if (estTo) q_ = q_.lte('est_payment_date', estTo);
+    if (endorsedFrom) q_ = q_.gte('date_endorsed', endorsedFrom);
+    if (endorsedTo) q_ = q_.lte('date_endorsed', endorsedTo);
+    if (collectedFrom) q_ = q_.gte('collected_at', `${collectedFrom}T00:00:00+08:00`);
+    if (collectedTo) q_ = q_.lt('collected_at', `${plusDays(collectedTo, 1)}T00:00:00+08:00`);
     return q_ as T;
   }
 
@@ -51,6 +83,16 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
   query = applyFilters(query);
 
   const { data: rows, error, count } = await query.range(from, to);
+
+  // filter options (for MoreFilters dropdowns)
+  const [{ data: accountOpts }, { data: projectOpts }, { data: batchRows }, { data: regionRows }] = await Promise.all([
+    supabase.from('crm_accounts').select('id, company_name').is('deleted_at', null).order('company_name').limit(100),
+    supabase.from('projects').select('id, name').is('deleted_at', null).order('name').limit(100),
+    supabase.from('client_billing').select('invoice_batch').is('deleted_at', null).not('invoice_batch', 'is', null).limit(200),
+    supabase.from('client_billing').select('region').is('deleted_at', null).not('region', 'is', null).limit(200),
+  ]);
+  const batches = Array.from(new Set((batchRows as any[] || []).map(r=>r.invoice_batch).filter(Boolean))).sort();
+  const regions = Array.from(new Set((regionRows as any[] || []).map(r=>r.region).filter(Boolean))).sort();
 
   // MRS summary per billing on this page
   const mrsMap = new Map<string, { total: number; withMrs: number }>();
@@ -92,27 +134,35 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
       </div>
 
       <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row gap-4 bg-slate-50/50 dark:bg-[#0a0a0a]/50">
-          <SearchInput placeholder="Search invoice no. or batch..." paramName="q" />
-          <StatusSelect
-            paramName="status"
-            options={[
-              { value: 'all', label: 'All Statuses' },
-              { value: 'for_billing', label: 'For Billing' },
-              { value: 'pending_sky_technical', label: 'Submitted to Sky Technical' },
-              { value: 'for_payment', label: 'For Payment' },
-              { value: 'pending_payment', label: 'Pending Payment' },
-              { value: 'collected', label: 'Collected' },
-            ]}
-          />
-          <StatusSelect
-            paramName="aging"
-            options={[
-              { value: 'all', label: 'All Aging' },
-              { value: 'overdue', label: 'Overdue' },
-              { value: 'close_due', label: 'Close Due (≤7d)' },
-              { value: 'healthy', label: 'Healthy (>7d)' },
-            ]}
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col gap-4 bg-slate-50/50 dark:bg-[#0a0a0a]/50">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <SearchInput placeholder="Search invoice no. or batch..." paramName="q" />
+            <StatusSelect
+              paramName="status"
+              options={[
+                { value: 'all', label: 'All Statuses' },
+                { value: 'for_billing', label: 'For Billing' },
+                { value: 'pending_sky_technical', label: 'Submitted to Sky Technical' },
+                { value: 'for_payment', label: 'For Payment' },
+                { value: 'pending_payment', label: 'Pending Payment' },
+                { value: 'collected', label: 'Collected' },
+              ]}
+            />
+            <StatusSelect
+              paramName="aging"
+              options={[
+                { value: 'all', label: 'All Aging' },
+                { value: 'overdue', label: 'Overdue' },
+                { value: 'close_due', label: 'Close Due (≤7d)' },
+                { value: 'healthy', label: 'Healthy (>7d)' },
+              ]}
+            />
+          </div>
+          <MoreFilters
+            accounts={(accountOpts as any[] || []).map(a=>({ id: a.id, name: a.company_name }))}
+            projects={(projectOpts as any[] || []).map(p=>({ id: p.id, name: p.name }))}
+            regions={regions}
+            batches={batches}
           />
         </div>
 
