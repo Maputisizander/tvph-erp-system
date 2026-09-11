@@ -135,7 +135,7 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
 
       <div className="bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col gap-4 bg-slate-50/50 dark:bg-[#0a0a0a]/50">
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
             <SearchInput placeholder="Search invoice no. or batch..." paramName="q" />
             <StatusSelect
               paramName="status"
@@ -157,13 +157,13 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
                 { value: 'healthy', label: 'Healthy (>7d)' },
               ]}
             />
+            <MoreFilters
+              accounts={(accountOpts as any[] || []).map(a=>({ id: a.id, name: a.company_name }))}
+              projects={(projectOpts as any[] || []).map(p=>({ id: p.id, name: p.name }))}
+              regions={regions}
+              batches={batches}
+            />
           </div>
-          <MoreFilters
-            accounts={(accountOpts as any[] || []).map(a=>({ id: a.id, name: a.company_name }))}
-            projects={(projectOpts as any[] || []).map(p=>({ id: p.id, name: p.name }))}
-            regions={regions}
-            batches={batches}
-          />
         </div>
 
         <div className="overflow-x-auto">

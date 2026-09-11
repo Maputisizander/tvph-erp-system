@@ -47,22 +47,24 @@ export function MoreFilters({
   const inp = "w-full px-3 py-2 bg-white dark:bg-[#071F15] border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary";
 
   return (
-    <div>
-      <button
-        onClick={() => setOpen(!open)}
-        className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${hasActive ? "bg-primary text-white border-primary" : "bg-white dark:bg-[#071F15] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50"}`}
-      >
-        <SlidersHorizontal className="h-4 w-4" /> Filters {activeCount > 0 && <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs font-bold ${hasActive ? "bg-white text-primary" : "bg-primary text-white"}`}>{activeCount}</span>}
-      </button>
-
-      {hasActive && (
-        <button onClick={clearAll} className="ml-2 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700">
-          <X className="h-3 w-3" /> Clear
+    <>
+      <div className="inline-flex items-center gap-2 shrink-0">
+        <button
+          onClick={() => setOpen(!open)}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${hasActive ? "bg-primary text-white border-primary" : "bg-white dark:bg-[#071F15] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50"}`}
+        >
+          <SlidersHorizontal className="h-4 w-4" /> Filters {activeCount > 0 && <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs font-bold ${hasActive ? "bg-white text-primary" : "bg-primary text-white"}`}>{activeCount}</span>}
         </button>
-      )}
+
+        {hasActive && (
+          <button onClick={clearAll} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700">
+            <X className="h-3 w-3" /> Clear
+          </button>
+        )}
+      </div>
 
       {open && (
-        <div className="mt-3 p-4 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-slate-800 rounded-2xl space-y-4 animate-in fade-in">
+        <div className="basis-full w-full mt-3 p-4 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-slate-800 rounded-2xl space-y-4 animate-in fade-in">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Client</label>
@@ -147,6 +149,6 @@ export function MoreFilters({
           {isPending && <p className="text-xs text-slate-400">Applying…</p>}
         </div>
       )}
-    </div>
+    </>
   );
 }
