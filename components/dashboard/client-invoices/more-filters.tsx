@@ -21,7 +21,7 @@ function SearchableSelect({
   const ref = useRef<HTMLDivElement>(null);
   const selectedLabel = options.find((o) => o.value === value)?.label ?? "";
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(q), 2000);
+    const t = setTimeout(() => setDebouncedQ(q), 500);
     return () => clearTimeout(t);
   }, [q]);
   useEffect(() => {

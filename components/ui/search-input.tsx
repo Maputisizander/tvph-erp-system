@@ -23,7 +23,7 @@ export function SearchInput({
   const [text, setText] = useState(searchParams.get(paramName) || "");
   const [debouncedValue, setDebouncedValue] = useState(text);
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedValue(text), 2000);
+    const t = setTimeout(() => setDebouncedValue(text), 500);
     return () => clearTimeout(t);
   }, [text]);
 

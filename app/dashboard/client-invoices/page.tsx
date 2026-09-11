@@ -8,6 +8,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { LIST_PAGE_SIZE, parsePage, pageRange } from '@/components/ui/pagination-utils';
 import { billingStatusBadgeClasses, billingStatusShortLabel, agingBand, agingBadgeClasses, agingLabel } from '@/lib/billing/status';
 import { MoreFilters } from '@/components/dashboard/client-invoices/more-filters';
+import { TableTransition } from '@/components/dashboard/client-invoices/table-transition';
 
 export default function ClientInvoicesPage(props: {
   searchParams?: Promise<{ q?: string; status?: string; aging?: string; page?: string }>;
@@ -167,6 +168,7 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
           </div>
         </div>
 
+        <TableTransition>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800/20 border-b border-slate-200 dark:border-slate-800">
@@ -200,7 +202,7 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
                   const ag = agingBand(r);
                   const mrs = mrsMap.get(r.id);
                   return (
-                    <tr key={r.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
+                    <tr key={r.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors animate-in fade-in duration-200">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-bold text-slate-900 dark:text-white">{r.invoice_number || '—'}</div>
                         <div className="text-xs text-slate-400 flex items-center gap-1 whitespace-nowrap"><Clock className="h-3 w-3" /> {r.date_issued ? new Date(r.date_issued).toLocaleDateString("en-US", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" }) : '—'}</div>
@@ -261,6 +263,7 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
           </span>
         </div>
         <Pagination page={page} totalCount={count ?? 0} pageSize={LIST_PAGE_SIZE} />
+        </TableTransition>
       </div>
     </div>
   );
