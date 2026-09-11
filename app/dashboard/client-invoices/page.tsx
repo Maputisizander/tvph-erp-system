@@ -150,9 +150,9 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
                   const mrs = mrsMap.get(r.id);
                   return (
                     <tr key={r.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-bold text-slate-900 dark:text-white">{r.invoice_number || '—'}</div>
-                        <div className="text-xs text-slate-400 flex items-center gap-1"><Clock className="h-3 w-3" /> {r.date_issued ? new Date(r.date_issued).toLocaleDateString("en-US", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" }) : '—'}</div>
+                        <div className="text-xs text-slate-400 flex items-center gap-1 whitespace-nowrap"><Clock className="h-3 w-3" /> {r.date_issued ? new Date(r.date_issued).toLocaleDateString("en-US", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" }) : '—'}</div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="font-medium text-slate-900 dark:text-white">{r.crm_accounts?.company_name || '—'}</div>
