@@ -17,9 +17,13 @@ function SearchableSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   const selectedLabel = options.find((o) => o.value === value)?.label ?? "";
-  // when value changes externally, sync q if not typing
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q), 200);
+    return () => clearTimeout(t);
+  }, [q]);
   useEffect(() => {
     if (!open) setQ(selectedLabel);
   }, [selectedLabel, open]);
@@ -27,10 +31,10 @@ function SearchableSelect({
     if (open) setQ(selectedLabel);
   }, [open]); // eslint-disable-line
   const filtered = useMemo(() => {
-    if (!q) return options;
-    const needle = q.toLowerCase();
+    if (!debouncedQ) return options;
+    const needle = debouncedQ.toLowerCase();
     return options.filter((o) => o.label.toLowerCase().includes(needle));
-  }, [options, q]);
+  }, [options, debouncedQ]);
   useEffect(() => {
     const h = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
