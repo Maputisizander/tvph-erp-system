@@ -440,43 +440,8 @@ export async function approvePR(prId: string) {
   const now = new Date().toISOString();
   const newApprovedBy = [...already, user.id];
   const newApprovedAt = [...alreadyAt, now];
-  // AND: N-of-N when >1, else single approval suffices
-  const required = requested.length > 1 ? requested.length : 1;
-  const isComplete = requested.length > 1 ? requested.every((id) => newApprovedBy.includes(id)) : newApprovedBy.length >= 1;
 
-  if (!isComplete) {
-    const { error, count } = await supabase
-      .from('purchase_requests')
-      .update({ admin_approved_by: newApprovedBy, admin_approved_at: newApprovedAt, updated_at: now } as any, { count: 'exact' })
-      .eq('id', prId)
-      .eq('status', 'pending_approval');
-    if (error) return { error: error.message };
-    if (count === 0) return { error: 'This PR is not pending the admin approval.' };
-
-    await recordAuditLog({
-      entity_type: 'purchase_request',
-      entity_id: prId,
-      action: 'UPDATE',
-      changes: { after: { admin_approved_by: newApprovedBy, partial: true } },
-      performed_by: user.id,
-    });
-
-    const remaining = requested.filter((id) => !newApprovedBy.includes(id));
-    if (remaining.length > 0) {
-      await createNotification({
-        type: 'pr',
-        title: '⏳ PR Partial Approval',
-        message: `A purchase request received approval (${newApprovedBy.length}/${required}). Awaiting ${remaining.length} more admin approval(s).`,
-        link: `/dashboard/purchase-requests/${prId}`,
-        created_by: user.id,
-        recipientIds: remaining,
-      });
-    }
-
-    revalidatePath(`/dashboard/purchase-requests/${prId}`);
-    revalidatePath('/dashboard/purchase-requests');
-    return { success: true, partial: true } as any;
-  }
+  // OR: any single valid admin approval completes the stage (1-of-N).
 
   const { error, count } = await supabase
     .from('purchase_requests')

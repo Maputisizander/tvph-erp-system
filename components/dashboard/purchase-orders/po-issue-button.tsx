@@ -125,10 +125,10 @@ export function PoIssueButton({
               </button>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-              Choose the admin(s) who will approve this PO.
+              Choose the admin(s) who will approve this PO — any one can approve (1-of-N, OR).
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-              Selected admins will be emailed that this PO is pending their approval.
+              Selected admins will be emailed; only one approval is needed to move the PO forward. Finance stage also needs just one finance approval.
             </p>
             <div className="max-h-48 overflow-y-auto space-y-1 -mx-1 px-1">
               {eligibleApprovers.map((a) => {

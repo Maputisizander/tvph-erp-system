@@ -599,24 +599,14 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
             <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-                Awaiting Admin Approval {requestedAdminIds.length > 1 ? `(${adminApprovedIds.length}/${requestedAdminIds.length})` : ""}
+                Awaiting Admin Approval
               </p>
               <p className="text-xs text-amber-600/80 dark:text-amber-400/60 mt-1">
-                This PO has been submitted for approval and <span className="font-semibold">cannot be sent to the vendor</span> until {requestedAdminIds.length > 1 ? `all ${requestedAdminIds.length} admins approve` : "an admin approves"} it.
+                This PO has been submitted for approval and <span className="font-semibold">cannot be sent to the vendor</span> until {requestedAdminIds.length > 1 ? `any one of the ${requestedAdminIds.length} admins approves` : "an admin approves"} it (1-of-N). Then {Number((po as any).amount) > 500_000 ? "executive and " : ""}finance will review.
               </p>
               {adminApproversLabel && (
                 <p className="text-xs text-amber-600/80 dark:text-amber-400/60 mt-1">
-                  Requested approvers: <span className="font-semibold">{adminApproversLabel}</span>.
-                </p>
-              )}
-              {adminApprovedLabel && (
-                <p className="text-xs text-amber-600/80 dark:text-amber-400/60 mt-1">
-                  Approved by: <span className="font-semibold">{adminApprovedLabel}</span> ({adminApprovedIds.length}/{requestedAdminIds.length || 1}).
-                </p>
-              )}
-              {adminRemainingLabel && adminApprovedIds.length < requestedAdminIds.length && (
-                <p className="text-xs text-amber-600/80 dark:text-amber-400/60 mt-1">
-                  Awaiting: <span className="font-semibold">{adminRemainingLabel}</span>.
+                  Requested approvers: <span className="font-semibold">{adminApproversLabel}</span> — any one can approve.
                 </p>
               )}
             </div>
@@ -625,7 +615,7 @@ async function PODetailContent({ paramsPromise, searchParamsPromise }: { paramsP
             (() => {
               const already = currentUser ? adminApprovedIds.includes(currentUser.id) : false;
               const isRequested = currentUser ? (requestedAdminIds.length <= 1 || requestedAdminIds.includes(currentUser.id)) : false;
-              if (already) return <p className="text-xs text-amber-600/80 dark:text-amber-400/60">You already approved. Awaiting remaining approval(s).</p>;
+              if (already) return <p className="text-xs text-amber-600/80 dark:text-amber-400/60">You already approved. Awaiting another approver to complete the 1-of-N check or system refresh.</p>;
               if (!isRequested) return <p className="text-xs text-amber-600/80 dark:text-amber-400/60">You are not one of the requested approvers.</p>;
               return <PoApprovalActions poId={po.id} />;
             })()

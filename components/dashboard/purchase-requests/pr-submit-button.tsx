@@ -126,10 +126,10 @@ export function PrSubmitButton({
             </div>
 
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-              Choose the admin(s) who will approve this PR.
+              Choose the admin(s) who will approve this PR — any one can approve (1-of-N, OR).
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-              Selected admins will be emailed that this PR is pending their approval.
+              Selected admins will be emailed; only one approval is needed to move the PR to finance.
             </p>
             <div className="max-h-48 overflow-y-auto space-y-1 -mx-1 px-1">
               {eligibleApprovers.map((a) => {

@@ -860,40 +860,9 @@ export async function approvePO(poId: string) {
   const now = new Date().toISOString();
   const newApprovedBy = [...already, user.id];
   const newApprovedAt = [...alreadyAt, now];
-  const required = requested.length > 1 ? requested.length : 1;
-  const isAdminComplete = requested.length > 1 ? requested.every((id) => newApprovedBy.includes(id)) : newApprovedBy.length >= 1;
 
-  if (!isAdminComplete) {
-    const { error, count } = await supabase
-      .from('purchase_orders')
-      .update({ admin_approved_by: newApprovedBy, admin_approved_at: newApprovedAt, updated_at: now } as any, { count: 'exact' })
-      .eq('id', poId)
-      .eq('status', 'pending_approval');
-    if (error) return { error: error.message };
-    if (count === 0) return { error: 'This PO is not pending the admin approval.' };
-    await recordAuditLog({
-      entity_type: 'purchase_order',
-      entity_id: poId,
-      action: 'UPDATE',
-      changes: { after: { admin_approved_by: newApprovedBy, partial: true } },
-      performed_by: user.id,
-    });
-    const remaining = requested.filter((id) => !newApprovedBy.includes(id));
-    if (remaining.length > 0) {
-      await createNotification({
-        type: 'po',
-        title: '⏳ PO Partial Approval',
-        message: `A purchase order received approval (${newApprovedBy.length}/${required}). Awaiting ${remaining.length} more admin approval(s).`,
-        link: `/dashboard/purchase-orders/${poId}`,
-        created_by: user.id,
-        recipientIds: remaining,
-      });
-    }
-    revalidatePath(`/dashboard/purchase-orders/${poId}`);
-    revalidatePath('/dashboard/purchase-orders');
-    return { success: true, partial: true } as any;
-  }
-
+  // OR: any single valid admin approval completes the stage (1-of-N). The pool
+  // check above already ensures the approver is in the requested set when >1.
   // Admin stage complete — proceed to exec or finance
   const liveExecRequired = getExecRequiredCount((po as any).amount);
   const nextExecRequired = liveExecRequired;
