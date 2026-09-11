@@ -165,8 +165,8 @@ async function Content({ searchParams: searchParamsPromise }: { searchParams?: P
                         {mrs ? `${mrs.withMrs}/${mrs.total} MRS` : "—"}
                       </td>
                       <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">₱ {Number(r.amount_vat_inc || 0).toLocaleString()}</td>
-                      <td className="px-6 py-4">
-                        <div className="text-xs text-slate-600 dark:text-slate-400">{r.due_date ? new Date(r.due_date).toLocaleDateString("en-US", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" }) : '—'}</div>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">{r.due_date ? new Date(r.due_date).toLocaleDateString("en-US", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" }) : '—'}</div>
                         {ag.band && (
                           <span className={`mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap ${agingBadgeClasses(ag.band)}`}>{agingLabel(ag.band, ag.daysDelayed)}</span>
                         )}
